@@ -140,15 +140,22 @@ export const DEFAULT_TRANBOX_SETTING = {
 };
 
 // --- 字幕默认样式属性 ---
-const SUBTITLE_WINDOW_STYLE = `padding: 0.5em 1em;
-background-color: rgba(0, 0, 0, 0.5);
+const SUBTITLE_WINDOW_STYLE = `padding: 12px 20px;
+background: rgba(10, 12, 16, 0.62);
+backdrop-filter: blur(6px);
+border-radius: 16px;
 color: white;
-line-height: 1.3;
-text-shadow: 1px 1px 2px black;
-display: inline-block`; // 字幕外层窗口的 CSS 默认样式
+line-height: 1.45;
+display: inline-block`;
 
-const SUBTITLE_ORIGIN_STYLE = `font-size: clamp(1rem, 2cqw, 3rem);`; // 字幕原文的默认 CSS 样式
-const SUBTITLE_TRANSLATION_STYLE = `font-size: clamp(1rem, 2cqw, 3rem);`; // 字幕译文的默认 CSS 样式
+const SUBTITLE_ORIGIN_STYLE = `font-size: clamp(16px, 2cqw, 20px);
+font-weight: 550;
+color: #FFFFFF;
+text-shadow: 0 1px 3px rgba(0,0,0,.7);`;
+const SUBTITLE_TRANSLATION_STYLE = `font-size: clamp(15px, 1.9cqw, 19px);
+font-weight: 500;
+color: #C6DAFF;
+text-shadow: 0 1px 3px rgba(0,0,0,.7);`;
 
 export const OPT_ENHANCE_ON = "on";
 export const OPT_ENHANCE_OFF = "off";
@@ -263,7 +270,7 @@ export const DEFAULT_SETTING = {
   preInit: true, // 是否在 DOMContentLoaded 之前预先加载核心拦截脚本以加快翻译响应
   transAllnow: false, // 兜底机制：无匹配规则下是否强行全页面立即翻译
   subtitleSetting: DEFAULT_SUBTITLE_SETTING, // 字幕翻译模块的具体参数设置
-  logLevel: LogLevel.INFO.value, // 扩展运行时的全局调试日志级别
+  logLevel: LogLevel?.INFO?.value ?? 1, // 扩展运行时的全局调试日志级别
   rootMargin: 500, // 滚动翻译机制触发时，段落距离屏幕视口边界的触发高度 (px)
   customStyles: DEFAULT_CUSTOM_STYLES, // 用于个性化译文表现的自定义 CSS 样式规则列表
 };

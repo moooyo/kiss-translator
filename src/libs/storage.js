@@ -36,11 +36,17 @@ import { getGmMethod } from "./gm";
  * @returns {{setValue: Function, getValue: Function, deleteValue: Function}} 封装好的存储方法集合
  */
 function getGmStorage() {
-  return {
-    setValue: getGmMethod("setValue", "GM_setValue", [window.KISS_GM]),
-    getValue: getGmMethod("getValue", "GM_getValue", [window.KISS_GM]),
-    deleteValue: getGmMethod("deleteValue", "GM_deleteValue", [window.KISS_GM]),
-  };
+  try {
+    return {
+      setValue: getGmMethod("setValue", "GM_setValue", [window.KISS_GM]),
+      getValue: getGmMethod("getValue", "GM_getValue", [window.KISS_GM]),
+      deleteValue: getGmMethod("deleteValue", "GM_deleteValue", [
+        window.KISS_GM,
+      ]),
+    };
+  } catch (error) {
+    throw new Error(`GM storage API is not available: ${error.message}`);
+  }
 }
 
 /**

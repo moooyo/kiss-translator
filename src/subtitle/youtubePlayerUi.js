@@ -14,6 +14,21 @@ export const YT_CAPTION_SELECTOR = "#ytp-caption-window-container";
 export const YT_AD_SELECTOR = ".video-ads";
 export const YT_SUBTITLE_BUTTON_SELECTOR = "button.ytp-subtitles-button";
 
+function renderToggleButton(button, selected = false) {
+  const label = document.createElement("span");
+  label.textContent = APP_NAME;
+  label.style.cssText =
+    "font:650 12px/1 system-ui,sans-serif;white-space:nowrap;";
+  const icon = createLogoSVG({ isSelected: selected });
+  icon.style.width = "20px";
+  icon.style.height = "20px";
+  button.replaceChildren(icon, label);
+  button.style.background = selected
+    ? "rgba(211,227,253,.95)"
+    : "rgba(255,255,255,.16)";
+  button.style.color = selected ? "#041E49" : "#FFFFFF";
+}
+
 /**
  * 异步等待目标 DOM 元素挂载并执行回调。
  *
@@ -105,8 +120,19 @@ export class YouTubePlayerUi {
     const toggleButton = document.createElement("button");
     toggleButton.className = "ytp-button kiss-subtitle-button";
     toggleButton.title = APP_NAME;
-
-    toggleButton.appendChild(createLogoSVG());
+    Object.assign(toggleButton.style, {
+      width: "auto",
+      height: "36px",
+      display: "inline-flex",
+      alignItems: "center",
+      gap: "7px",
+      margin: "6px 5px",
+      padding: "0 13px",
+      borderRadius: "999px",
+      backdropFilter: "blur(8px)",
+      transition: "background .3s, transform .2s",
+    });
+    renderToggleButton(toggleButton);
     kissControls.appendChild(toggleButton);
 
     // 使用 DomManager 挂载 React 菜单，避免直接把菜单结构散落到 provider 编排层。
@@ -121,14 +147,12 @@ export class YouTubePlayerUi {
     toggleButton.onclick = () => {
       if (!this.#isMenuShow) {
         this.#isMenuShow = true;
-        this.#toggleButton?.replaceChildren(
-          createLogoSVG({ isSelected: true })
-        );
+        if (this.#toggleButton) renderToggleButton(this.#toggleButton, true);
         this.#menuManager.show();
         this.updateMenuProps();
       } else {
         this.#isMenuShow = false;
-        this.#toggleButton?.replaceChildren(createLogoSVG());
+        if (this.#toggleButton) renderToggleButton(this.#toggleButton);
         this.#menuManager.hide();
       }
     };
@@ -183,24 +207,25 @@ export class YouTubePlayerUi {
     notificationEl.className = "kiss-notification";
     Object.assign(notificationEl.style, {
       position: "absolute",
-      top: "16px",
+      bottom: "24px",
       left: "50%",
       transform: "translateX(-50%)",
-      background: "rgba(0, 0, 0, 0.5)",
-      color: "#fff",
-      padding: "8px 12px",
-      borderRadius: "8px",
+      background: "#2F3033",
+      color: "#F1F1F1",
+      padding: "12px 20px",
+      borderRadius: "14px",
       zIndex: "2147483647",
       opacity: "0",
       transition: "opacity 0.3s ease-in-out",
       pointerEvents: "none",
-      fontSize: "16px",
+      fontSize: "13px",
+      fontWeight: "500",
       lineHeight: "1.4",
       width: "auto",
       maxWidth: "min(360px, calc(100% - 32px))",
       textAlign: "left",
       boxSizing: "border-box",
-      boxShadow: "0 2px 8px rgba(0,0,0,0.25)",
+      boxShadow: "0 4px 8px 3px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.18)",
     });
 
     const videoEl = this.#getVideoEl();

@@ -1,79 +1,137 @@
-import Fab from "@mui/material/Fab";
-import TranslateIcon from "@mui/icons-material/Translate";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
+import GTranslateRoundedIcon from "@mui/icons-material/GTranslateRounded";
+import PaletteRoundedIcon from "@mui/icons-material/PaletteRounded";
+import SelectAllRoundedIcon from "@mui/icons-material/SelectAllRounded";
+import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
+import { useCallback, useMemo, useState } from "react";
 import ThemeProvider from "../../hooks/Theme";
-import Draggable from "./Draggable";
-import { useState, useMemo, useCallback } from "react";
 import { SettingProvider } from "../../hooks/Setting";
-import { MSG_TRANS_TOGGLE, MSG_POPUP_TOGGLE } from "../../config";
+import { useI18n } from "../../hooks/I18n";
+import {
+  MSG_OPEN_OPTIONS,
+  MSG_OPEN_TRANBOX,
+  MSG_TRANS_TOGGLE,
+  MSG_TRANS_TOGGLE_STYLE,
+} from "../../config";
+import { isExt } from "../../libs/client";
+import { sendBgMsg } from "../../libs/msg";
 import useWindowSize from "../../hooks/WindowSize";
+import Draggable from "./Draggable";
+import { ACTION_STYLES } from "./styles";
 
-/**
- * 内容页悬浮翻译球 (Floating Action Button) 组件
- * 支持拖拽、贴边吸附隐藏以及点击事件
- */
-export default function ContentFab({
+function ContentFabContent({
   fabConfig: { x: fabX, y: fabY, fabClickAction = 0 } = {},
   processActions,
 }) {
-  const fabWidth = 40; // 悬浮球的固定宽度 40px
+  const i18n = useI18n();
+  const fabSize = 58;
   const windowSize = useWindowSize();
-  const [moved, setMoved] = useState(false); // 标记是否发生了拖动
+  const [moved, setMoved] = useState(false);
+  const [open, setOpen] = useState(false);
 
-  // 拖拽开始时的回调
-  const handleStart = useCallback(() => {
-    setMoved(false);
+  const runAction = useCallback(
+    (action) => {
+      processActions({ action });
+      setOpen(false);
+    },
+    [processActions]
+  );
+
+  const openSettings = useCallback(() => {
+    if (isExt) sendBgMsg(MSG_OPEN_OPTIONS);
+    else window.open(process.env.REACT_APP_OPTIONSPAGE, "_blank");
+    setOpen(false);
   }, []);
 
-  // 拖拽移动中的回调
-  const handleMove = useCallback(() => {
-    setMoved(true);
-  }, []);
-
-  // 处理点击事件。如果拖拽移动过，则忽略该次点击，防止误触
-  const handleClick = useCallback(() => {
-    if (!moved) {
-      if (fabClickAction === 1) {
-        // 直接触发全文翻译切换
-        processActions({ action: MSG_TRANS_TOGGLE });
-      } else {
-        // 弹出悬浮 Popup 控制面板
-        processActions({ action: MSG_POPUP_TOGGLE });
-      }
+  const handleMainClick = useCallback(() => {
+    if (moved) return;
+    if (fabClickAction === 1 && !open) {
+      runAction(MSG_TRANS_TOGGLE);
+      return;
     }
-  }, [moved, fabClickAction, processActions]);
+    setOpen((current) => !current);
+  }, [fabClickAction, moved, open, runAction]);
 
-  // 计算悬浮球的位置参数，如果是初次加载则放置在视口垂直居中、贴在边缘的位置
   const fabProps = useMemo(
     () => ({
       windowSize,
-      width: fabWidth,
-      height: fabWidth,
-      left: fabX ?? -fabWidth,
-      top: fabY ?? windowSize.h / 2,
+      width: fabSize,
+      height: fabSize,
+      left: fabX ?? Math.max(12, windowSize.w - fabSize - 26),
+      top: fabY ?? Math.max(12, windowSize.h - fabSize - 26),
     }),
-    [windowSize, fabWidth, fabX, fabY]
+    [fabX, fabY, windowSize]
   );
 
+  const items = [
+    {
+      label: i18n("popup_translate_page"),
+      icon: TranslateRoundedIcon,
+      action: () => runAction(MSG_TRANS_TOGGLE),
+    },
+    {
+      label: i18n("text_style_alt"),
+      icon: PaletteRoundedIcon,
+      action: () => runAction(MSG_TRANS_TOGGLE_STYLE),
+    },
+    {
+      label: i18n("selection_translate"),
+      icon: SelectAllRoundedIcon,
+      action: () => runAction(MSG_OPEN_TRANBOX),
+    },
+    {
+      label: i18n("open_setting"),
+      icon: SettingsRoundedIcon,
+      action: openSettings,
+    },
+  ];
+
+  return (
+    <Draggable
+      key="fab"
+      {...fabProps}
+      persistPosition
+      onStart={() => setMoved(false)}
+      onMove={() => setMoved(true)}
+      handler={
+        <button
+          type="button"
+          className="kt-content-fab"
+          aria-expanded={open}
+          aria-label={i18n("translate")}
+          onClick={handleMainClick}
+        >
+          {open ? <CloseRoundedIcon /> : <GTranslateRoundedIcon />}
+        </button>
+      }
+    >
+      {open && (
+        <div className="kt-content-fab-menu">
+          {items.map(({ label, icon: Icon, action }, index) => (
+            <button
+              type="button"
+              className="kt-content-fab-menu__item"
+              style={{ animationDelay: `${index * 0.045}s` }}
+              onClick={action}
+              key={label}
+            >
+              <Icon />
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+    </Draggable>
+  );
+}
+
+export default function ContentFab(props) {
   return (
     <SettingProvider context="fab">
       <ThemeProvider>
-        <Draggable
-          key="fab"
-          snapEdge // 启用贴边吸附隐藏效果
-          {...fabProps}
-          onStart={handleStart}
-          onMove={handleMove}
-          handler={
-            <Fab size="small" color="primary" onClick={handleClick}>
-              <TranslateIcon
-                sx={{
-                  width: 24,
-                  height: 24,
-                }}
-              />
-            </Fab>
-          }
-        />
+        <style>{ACTION_STYLES}</style>
+        <ContentFabContent {...props} />
       </ThemeProvider>
     </SettingProvider>
   );

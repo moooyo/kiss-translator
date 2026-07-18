@@ -1,31 +1,35 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import Box from "@mui/material/Box";
-import Stack from "@mui/material/Stack";
-import Button from "@mui/material/Button";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import { sendBgMsg, sendTabMsg } from "../../libs/msg";
 import { browser } from "../../libs/browser";
 import { useI18n } from "../../hooks/I18n";
-import Divider from "@mui/material/Divider";
 import Header from "./Header";
 import {
   MSG_OPEN_SEPARATE_WINDOW,
   MSG_TRANS_GETRULE,
+  DEFAULT_SETTING,
+  GLOBLA_RULE,
   resolveApiPromptList,
 } from "../../config";
 import { kissLog } from "../../libs/log";
 import PopupCont from "./PopupCont";
 import TranForm from "../Selection/TranForm";
 import { useSetting } from "../../hooks/Setting";
+import { M3Button, M3Segmented } from "../../components/M3";
+import { POPUP_STYLES } from "./styles";
 
-/**
- * 文本翻译面板组件 (用于直接在 Popup 中输入文本进行翻译)
- */
-function Trantab() {
+function TranslationTab() {
   const [text, setText] = useState("");
-  // 获取全局设置
   const { setting } = useSetting();
 
-  // REVIEW: 如果在异步加载未完成或出现异常时 setting 仍为 null / undefined，此处直接解构 setting 将导致 TypeError 崩溃。建议对 setting 进行判空保护，例如：const { tranboxSetting = {}, transApis = [], langDetector = {} } = setting || {};
+  if (!setting?.tranboxSetting) {
+    return (
+      <div className="kt-popup-loading" role="status">
+        <AutorenewRoundedIcon />
+      </div>
+    );
+  }
+
   const {
     tranboxSetting: {
       enDict,
@@ -37,19 +41,19 @@ function Trantab() {
       aiDictApiSlug,
       aiDictPromptSlug,
     },
-    transApis,
-    langDetector,
-    prompts,
+    transApis = [],
+    langDetector = {},
+    prompts = [],
     subtitleSetting,
   } = setting;
-  const resolvedTransApis = useMemo(
-    () => resolveApiPromptList(transApis, prompts, subtitleSetting),
-    [prompts, subtitleSetting, transApis]
+  const resolvedTransApis = resolveApiPromptList(
+    transApis,
+    prompts,
+    subtitleSetting
   );
 
   return (
-    <Box sx={{ p: 2 }}>
-      {/* 渲染主动文本输入翻译表单组件 */}
+    <div className="kt-popup-text-panel">
       <TranForm
         text={text}
         setText={setText}
@@ -66,81 +70,112 @@ function Trantab() {
         aiDictPromptSlug={aiDictPromptSlug}
         prompts={prompts}
       />
-    </Box>
+    </div>
   );
 }
 
-/**
- * Popup 浮窗页面主入口组件
- */
 export default function Popup() {
   const i18n = useI18n();
-  // 当前网页的翻译规则设置
   const [rule, setRule] = useState(null);
-  // 全局通用设置
   const [setting, setSetting] = useState(null);
-  // 是否展示文本翻译输入框面板 (为 true 时显示文本翻译，为 false 时显示网页设置)
-  const [showTrantab, setShowTrantab] = useState(false);
-  // 是否以独立翻译窗口的模式运行 (通过 URL Hash #tranbox 识别)
+  const [activeTab, setActiveTab] = useState("page");
   const [isSeparate, setIsSeparate] = useState(false);
 
-  // 跳转到浏览器插件的设置选项页面
   const handleOpenSetting = useCallback(() => {
     browser?.runtime.openOptionsPage();
   }, []);
 
-  // 页面挂载时：获取当前网页的规则和全局配置，并检测是否是独立窗口
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
-        const cleanHash = window.location.hash.slice(1);
-        if (cleanHash === "tranbox") {
-          setIsSeparate(true);
+        const previewMode =
+          process.env.NODE_ENV === "development" &&
+          new URLSearchParams(window.location.search).has("preview");
+        if (previewMode) {
+          setRule({
+            ...GLOBLA_RULE,
+            transOpen: "true",
+            textStyle: "dash_line",
+          });
+          setSetting({
+            ...DEFAULT_SETTING,
+            uiLang: "zh",
+            darkMode: "light",
+            tranboxSetting: {
+              ...DEFAULT_SETTING.tranboxSetting,
+              transOpen: true,
+            },
+            mouseHoverSetting: {
+              ...DEFAULT_SETTING.mouseHoverSetting,
+              useMouseHover: true,
+            },
+          });
           return;
         }
-
-        // 向当前活动的标签页请求该网址的翻译规则及全局配置信息
-        const res = await sendTabMsg(MSG_TRANS_GETRULE);
-        if (res && !res.error) {
-          setRule(res.rule);
-          setSetting(res.setting);
+        const cleanHash = window.location.hash.slice(1);
+        if (cleanHash === "tranbox") {
+          if (active) setIsSeparate(true);
+          return;
         }
-      } catch (err) {
-        kissLog("query rule", err);
+        const response = await sendTabMsg(MSG_TRANS_GETRULE);
+        if (active && response && !response.error) {
+          setRule(response.rule);
+          setSetting(response.setting);
+        }
+      } catch (error) {
+        kissLog("query rule", error);
       }
     })();
+    return () => {
+      active = false;
+    };
   }, []);
 
-  // 切换“网页翻译配置”与“输入翻译面板”两个标签页
-  const toggleTab = useCallback(() => {
-    setShowTrantab((pre) => !pre);
-  }, []);
-
-  // 请求后台 Background 在独立的无边框小窗口中打开当前翻译页面，并关闭当前 Popup
   const openSeparateWindow = useCallback(() => {
     sendBgMsg(MSG_OPEN_SEPARATE_WINDOW);
     window.close();
   }, []);
 
-  // 独立窗口模式下只显示文本翻译输入框组件
+  const tabs = useMemo(
+    () => [
+      { value: "page", label: i18n("popup_page_translation") },
+      { value: "text", label: i18n("popup_text_translation") },
+    ],
+    [i18n]
+  );
+
   if (isSeparate) {
     return (
-      <Box>
-        <Trantab />
-      </Box>
+      <main className="kt-popup-shell kt-popup-shell--window">
+        <style>{POPUP_STYLES}</style>
+        <TranslationTab />
+      </main>
     );
   }
 
   return (
-    <Box width={360}>
-      {/* 头部组件 */}
-      <Header toggleTab={toggleTab} openSeparateWindow={openSeparateWindow} />
-      <Divider />
-      {/* 内容区域 (可垂直滚动) */}
-      <Box sx={{ overflowY: "auto", maxHeight: 500 }}>
-        {showTrantab ? (
-          <Trantab />
-        ) : rule ? (
+    <main className="kt-popup-shell">
+      <style>{POPUP_STYLES}</style>
+      <Header
+        openSeparateWindow={openSeparateWindow}
+        openSettings={handleOpenSetting}
+      />
+      <M3Segmented
+        className="kt-popup-tabs"
+        items={tabs}
+        value={activeTab}
+        onChange={setActiveTab}
+        ariaLabel={i18n("translate")}
+      />
+      <div
+        className={`kt-popup-scroll ${
+          activeTab === "text" ? "kt-popup-scroll--text" : ""
+        }`}
+      >
+        {activeTab === "text" ? (
+          <TranslationTab />
+        ) : rule && setting ? (
           <PopupCont
             rule={rule}
             setting={setting}
@@ -149,41 +184,27 @@ export default function Popup() {
             handleOpenSetting={handleOpenSetting}
           />
         ) : (
-          /* 如果当前网页规则未成功获取 (例如在扩展禁用的标签页上)，显示备用的支持页脚 */
-          <Stack
-            sx={{ p: 2 }}
-            direction="row"
-            justifyContent="space-between"
-            alignItems="center"
-          >
-            <Button
-              variant="text"
-              onClick={() => {
-                window.open(
-                  "https://chromewebstore.google.com/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof/reviews",
-                  "_blank"
-                );
-              }}
-            >
-              {i18n("comment_support")}
-            </Button>
-            <Button
-              variant="text"
-              onClick={() => {
-                window.open(
-                  "https://github.com/fishjar/kiss-translator#%E8%B5%9E%E8%B5%8F",
-                  "_blank"
-                );
-              }}
-            >
-              {i18n("appreciate_support")}
-            </Button>
-            <Button variant="text" onClick={handleOpenSetting}>
-              {i18n("setting")}
-            </Button>
-          </Stack>
+          <div className="kt-popup-empty">
+            <span>{i18n("load_setting_err")}</span>
+            <div className="kt-popup-empty__actions">
+              <M3Button
+                variant="text"
+                onClick={() =>
+                  window.open(
+                    "https://chromewebstore.google.com/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof/reviews",
+                    "_blank"
+                  )
+                }
+              >
+                {i18n("comment_support")}
+              </M3Button>
+              <M3Button variant="text" onClick={handleOpenSetting}>
+                {i18n("setting")}
+              </M3Button>
+            </div>
+          </div>
         )}
-      </Box>
-    </Box>
+      </div>
+    </main>
   );
 }

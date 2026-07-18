@@ -163,6 +163,7 @@ function ApiProviderIcon({ apiType, disabled = false, sx = {} }) {
 
   return (
     <Box
+      className="kt-api-provider-icon"
       sx={{
         display: "inline-flex",
         alignItems: "center",
@@ -1323,6 +1324,7 @@ function ApiListItem({
   onDragOver,
   onDrop,
   onDragEnd,
+  onToggle,
 }) {
   const handleContentClick = (event) => {
     if (bulkMode) {
@@ -1404,16 +1406,45 @@ function ApiListItem({
           </Box>
         </Tooltip>
         <ApiProviderIcon apiType={api.apiType} disabled={api.isDisabled} />
-        <Typography
+        <Box
           sx={{
             minWidth: 0,
             flex: 1,
             opacity: api.isDisabled ? 0.5 : 1,
-            overflowWrap: "anywhere",
           }}
         >
-          {api.apiName || api.apiType}
-        </Typography>
+          <Typography
+            sx={{
+              fontSize: 14,
+              fontWeight: 650,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {api.apiName || api.apiType}
+          </Typography>
+          <Typography
+            color="text.secondary"
+            sx={{
+              mt: 0.25,
+              fontSize: 11,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {api.model || api.apiType}
+          </Typography>
+        </Box>
+        {!bulkMode && (
+          <Switch
+            checked={!api.isDisabled}
+            onClick={(event) => event.stopPropagation()}
+            onChange={onToggle}
+            inputProps={{ "aria-label": api.apiName || api.apiType }}
+          />
+        )}
       </ListItemButton>
     </ListItem>
   );
@@ -1757,75 +1788,41 @@ export default function Apis() {
           </Menu>
         </Box>
 
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: { xs: "column", md: "row" },
-            border: 1,
-            borderColor: "divider",
-            borderRadius: 1,
-            overflow: "hidden",
-            height: { md: "calc(100vh - 250px)" },
-          }}
-        >
-          <Box
-            sx={(theme) => ({
-              width: { xs: "100%", md: 280 },
-              flex: { xs: "0 0 auto", md: "0 0 280px" },
-              height: { md: "100%" },
-              overflowY: "auto",
-              borderRight: {
-                xs: 0,
-                md: `1px solid ${theme.palette.divider}`,
-              },
-              borderBottom: {
-                xs: `1px solid ${theme.palette.divider}`,
-                md: 0,
-              },
-            })}
-          >
-            <List disablePadding>
-              {apiItems.map(({ api }) => (
-                <ApiListItem
-                  key={api.apiSlug}
-                  api={api}
-                  selected={api.apiSlug === selectedApiSlug}
-                  bulkMode={bulkMode}
-                  checked={checkedApiSlugSet.has(api.apiSlug)}
-                  dragging={api.apiSlug === draggingApiSlug}
-                  dragOver={api.apiSlug === dragOverApiSlug}
-                  onSelect={() => setSelectedApiSlug(api.apiSlug)}
-                  onCheck={handleCheckApi}
-                  onDragStart={(event) => handleDragStart(event, api.apiSlug)}
-                  onDragOver={(event) => handleDragOver(event, api.apiSlug)}
-                  onDrop={(event) => handleDrop(event, api.apiSlug)}
-                  onDragEnd={handleDragEnd}
-                />
-              ))}
-            </List>
-          </Box>
-          <Box
-            ref={detailPanelRef}
-            sx={{
-              flex: 1,
-              minWidth: 0,
-              p: 2,
-              boxSizing: "border-box",
-              height: { md: "100%" },
-              overflowY: { md: "auto" },
-              scrollbarGutter: { md: "stable" },
-              overscrollBehavior: "contain",
-            }}
-          >
-            {selectedApiItem && (
+        <Box>
+          <List disablePadding className="kt-api-grid">
+            {apiItems.map(({ api }) => (
+              <ApiListItem
+                key={api.apiSlug}
+                api={api}
+                selected={api.apiSlug === selectedApiSlug}
+                bulkMode={bulkMode}
+                checked={checkedApiSlugSet.has(api.apiSlug)}
+                dragging={api.apiSlug === draggingApiSlug}
+                dragOver={api.apiSlug === dragOverApiSlug}
+                onSelect={() => setSelectedApiSlug(api.apiSlug)}
+                onCheck={handleCheckApi}
+                onDragStart={(event) => handleDragStart(event, api.apiSlug)}
+                onDragOver={(event) => handleDragOver(event, api.apiSlug)}
+                onDrop={(event) => handleDrop(event, api.apiSlug)}
+                onDragEnd={handleDragEnd}
+                onToggle={() => {
+                  if (api.isDisabled) enableApis([api.apiSlug]);
+                  else disableApis([api.apiSlug]);
+                  setDetailKey((key) => key + 1);
+                }}
+              />
+            ))}
+          </List>
+          {selectedApiItem && (
+            <Box className="kt-api-detail" ref={detailPanelRef}>
               <ApiFields
                 key={detailKey}
                 apiSlug={selectedApiItem.api.apiSlug}
                 deleteApi={deleteApi}
                 copyApi={copyApi}
               />
-            )}
-          </Box>
+            </Box>
+          )}
         </Box>
       </Stack>
     </Box>

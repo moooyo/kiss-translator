@@ -1,21 +1,17 @@
 import { SettingProvider } from "../../hooks/Setting";
 import ThemeProvider from "../../hooks/Theme";
 import DraggableResizable from "./DraggableResizable";
-import Stack from "@mui/material/Stack";
 import Box from "@mui/material/Box";
-import IconButton from "@mui/material/IconButton";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import PushPinIcon from "@mui/icons-material/PushPin";
 import PushPinOutlinedIcon from "@mui/icons-material/PushPinOutlined";
-import LockIcon from "@mui/icons-material/Lock";
-import LockOpenIcon from "@mui/icons-material/LockOpen";
 import CloseIcon from "@mui/icons-material/Close";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
-import Typography from "@mui/material/Typography";
+import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import { useI18n } from "../../hooks/I18n";
 import { useCallback, useState } from "react";
 import TranForm from "./TranForm.js";
@@ -23,9 +19,10 @@ import { MSG_OPEN_SEPARATE_WINDOW } from "../../config/msg.js";
 import { sendBgMsg } from "../../libs/msg.js";
 import { isExt } from "../../libs/client.js";
 import { useTheme, alpha } from "@mui/material/styles";
-import Logo from "../../components/Logo";
 import { isValidWord } from "../../libs/utils";
 import { useDarkMode } from "../../hooks/ColorMode";
+import { M3IconButton } from "../../components/M3";
+import { SELECTION_STYLES } from "./styles";
 
 /**
  * 划词翻译框的顶部导航栏组件
@@ -48,11 +45,8 @@ function TranBoxHeader({
   followSelection,
   setFollowSelection,
 }) {
-  const theme = useTheme();
   const i18n = useI18n();
   const { darkMode, toggleDarkMode } = useDarkMode();
-
-  const iconColor = theme.palette.text.secondary;
 
   // 请求在独立的无边框小窗口中打开翻译框
   const openSeparateWindow = useCallback(() => {
@@ -60,284 +54,63 @@ function TranBoxHeader({
     // REVIEW: 在独立小窗口中打开翻译后，并未同时调用 setShowBox(false) 来隐藏当前页面上的划词翻译框，这可能导致页面上残留已打开的翻译框，体验上可进一步优化。
   }, []);
 
-  // 鼠标移出按钮后，自动取消焦点
-  const blurOnLeave = (e) => e.currentTarget.blur();
-
-  // 顶部操作图标按钮的基础通用样式配置
-  const baseBtnStyle = {
-    borderRadius: "6px",
-    padding: "5px",
-    minWidth: "30px",
-    minHeight: "30px",
-    transition: "all 0.2s ease",
-    backgroundColor: "transparent",
-    "& svg": {
-      color: iconColor,
-    },
-  };
-
   return (
-    <Box
+    <div
+      className="kt-tranbox-header"
       onMouseUp={(e) => e.stopPropagation()}
       onTouchEnd={(e) => e.stopPropagation()}
-      sx={{
-        backgroundColor: theme.palette.background.default,
-        padding: "4px 8px 4px 12px",
-        height: "36px",
-        display: "flex",
-        alignItems: "center",
-        minHeight: "auto",
-      }}
     >
-      <Stack
-        direction="row"
-        justifyContent="space-between"
-        alignItems="center"
-        spacing={1}
-        sx={{
-          width: "100%",
-          height: "100%",
-          minWidth: 0,
-        }}
-      >
-        {/* 左侧：Logo 图标与版本号显示 */}
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={1}
-          sx={{ minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}
-        >
-          <Box
-            sx={{
-              width: 18,
-              height: 18,
-              flexShrink: 0,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              borderRadius: "4px",
-              backgroundColor: theme.palette.background.paper,
-              border: `1px solid ${theme.palette.divider}`,
-              transition: "all 0.2s ease",
-              "&:hover": {
-                boxShadow: theme.shadows[2],
-                transform: "translateY(-1px)",
-                backgroundColor: theme.palette.action.hover,
-              },
-            }}
+      <span className="kt-tranbox-header__drag" aria-hidden="true">
+        <DragIndicatorRoundedIcon />
+      </span>
+      <span className="kt-tranbox-header__title">{i18n("app_name")}</span>
+      <span className="kt-tranbox-header__actions">
+        {isExt && (
+          <M3IconButton
+            title={i18n("open_separate_window")}
+            onClick={openSeparateWindow}
           >
-            <Logo size={16} />
-          </Box>
-
-          <Typography
-            variant="caption"
-            sx={{
-              minWidth: 0,
-              fontWeight: 500,
-              fontSize: "12px",
-              color: theme.palette.text.secondary,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {`${process.env.REACT_APP_NAME} v${process.env.REACT_APP_VERSION}`}
-          </Typography>
-        </Stack>
-
-        {/* 右侧：功能控制按钮组 */}
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={0.5}
-          sx={{ flexShrink: 0 }}
+            <OpenInNewIcon />
+          </M3IconButton>
+        )}
+        <M3IconButton
+          title={i18n("btn_tip_simple_style")}
+          aria-pressed={simpleStyle}
+          onClick={() => setSimpleStyle((previous) => !previous)}
         >
-          {/* 独立窗口打开 */}
-          {isExt && (
-            <IconButton
-              size="small"
-              title={i18n("open_separate_window")}
-              onClick={openSeparateWindow}
-              onMouseLeave={blurOnLeave}
-              sx={{
-                ...baseBtnStyle,
-                "&:hover": {
-                  backgroundColor: theme.palette.primary.light + "20",
-                  transform: "scale(1.05)",
-                  boxShadow: theme.shadows[2],
-                  "& svg": { color: theme.palette.primary.main },
-                },
-                "&:active": {
-                  transform: "scale(0.95)",
-                  backgroundColor: theme.palette.primary.light + "40",
-                },
-              }}
-            >
-              <OpenInNewIcon sx={{ width: 16, height: 16 }} />
-            </IconButton>
+          {simpleStyle ? <UnfoldMoreIcon /> : <UnfoldLessIcon />}
+        </M3IconButton>
+        <M3IconButton
+          title={i18n("btn_tip_click_away")}
+          aria-pressed={hideClickAway}
+          onClick={() => setHideClickAway((previous) => !previous)}
+        >
+          {hideClickAway ? <PushPinIcon /> : <PushPinOutlinedIcon />}
+        </M3IconButton>
+        <M3IconButton
+          title={i18n("btn_tip_follow_selection")}
+          aria-pressed={!followSelection}
+          onClick={() => setFollowSelection((previous) => !previous)}
+        >
+          {followSelection ? <PushPinOutlinedIcon /> : <PushPinIcon />}
+        </M3IconButton>
+        <M3IconButton
+          title={i18n("btn_tip_dark_mode")}
+          onClick={toggleDarkMode}
+        >
+          {darkMode === "dark" ? (
+            <DarkModeIcon />
+          ) : darkMode === "auto" ? (
+            <BrightnessAutoIcon />
+          ) : (
+            <LightModeIcon />
           )}
-
-          {/* 锁定划词框 (点击外部不消失) */}
-          <IconButton
-            size="small"
-            title={i18n("btn_tip_click_away")}
-            onMouseLeave={blurOnLeave}
-            onClick={() => setHideClickAway((pre) => !pre)}
-            sx={{
-              ...baseBtnStyle,
-              "&:hover": {
-                backgroundColor: theme.palette.success.light + "20",
-                transform: "scale(1.05)",
-                boxShadow: theme.shadows[2],
-                "& svg": { color: theme.palette.success.main },
-              },
-              "&:active": {
-                transform: "scale(0.95)",
-                backgroundColor: theme.palette.success.light + "40",
-              },
-            }}
-          >
-            {hideClickAway ? (
-              <LockOpenIcon
-                sx={{
-                  width: 16,
-                  height: 16,
-                  color: theme.palette.success.main,
-                }}
-              />
-            ) : (
-              <LockIcon sx={{ width: 16, height: 16 }} />
-            )}
-          </IconButton>
-
-          {/* 固定位置/跟随划词选区位置切换 */}
-          <IconButton
-            size="small"
-            title={i18n("btn_tip_follow_selection")}
-            onMouseLeave={blurOnLeave}
-            onClick={() => setFollowSelection((pre) => !pre)}
-            sx={{
-              ...baseBtnStyle,
-              "&:hover": {
-                backgroundColor: theme.palette.warning.light + "20",
-                transform: "scale(1.05)",
-                boxShadow: theme.shadows[2],
-                "& svg": { color: theme.palette.warning.main },
-              },
-              "&:active": {
-                transform: "scale(0.95)",
-                backgroundColor: theme.palette.warning.light + "40",
-              },
-            }}
-          >
-            {followSelection ? (
-              <PushPinOutlinedIcon
-                sx={{
-                  width: 16,
-                  height: 16,
-                  color: theme.palette.warning.main,
-                }}
-              />
-            ) : (
-              <PushPinIcon sx={{ width: 16, height: 16 }} />
-            )}
-          </IconButton>
-
-          {/* 极简折叠样式切换 */}
-          <IconButton
-            size="small"
-            title={i18n("btn_tip_simple_style")}
-            onMouseLeave={blurOnLeave}
-            onClick={() => setSimpleStyle((pre) => !pre)}
-            sx={{
-              ...baseBtnStyle,
-              "&:hover": {
-                backgroundColor: theme.palette.info.light + "20",
-                transform: "scale(1.05)",
-                boxShadow: theme.shadows[2],
-                "& svg": { color: theme.palette.info.main },
-              },
-              "&:active": {
-                transform: "scale(0.95)",
-                backgroundColor: theme.palette.info.light + "40",
-              },
-            }}
-          >
-            {simpleStyle ? (
-              <UnfoldMoreIcon
-                sx={{ width: 16, height: 16, color: theme.palette.info.main }}
-              />
-            ) : (
-              <UnfoldLessIcon sx={{ width: 16, height: 16 }} />
-            )}
-          </IconButton>
-
-          {/* 深色/浅色/自动主题模式切换 */}
-          <IconButton
-            size="small"
-            title={i18n("btn_tip_dark_mode")}
-            onMouseLeave={blurOnLeave}
-            onClick={toggleDarkMode}
-            sx={{
-              ...baseBtnStyle,
-              "&:hover": {
-                backgroundColor: theme.palette.warning.light + "20",
-                transform: "scale(1.05)",
-                boxShadow: theme.shadows[2],
-                "& svg": { color: theme.palette.warning.main },
-              },
-              "&:active": {
-                transform: "scale(0.95)",
-                backgroundColor: theme.palette.warning.light + "40",
-              },
-            }}
-          >
-            {darkMode === "dark" ? (
-              <DarkModeIcon
-                sx={{
-                  width: 16,
-                  height: 16,
-                  color: theme.palette.warning.main,
-                }}
-              />
-            ) : darkMode === "auto" ? (
-              <BrightnessAutoIcon
-                sx={{
-                  width: 16,
-                  height: 16,
-                  color: theme.palette.info.main,
-                }}
-              />
-            ) : (
-              <LightModeIcon sx={{ width: 16, height: 16 }} />
-            )}
-          </IconButton>
-
-          {/* 关闭翻译框 */}
-          <IconButton
-            size="small"
-            title={i18n("close")}
-            onMouseLeave={blurOnLeave}
-            onClick={() => setShowBox(false)}
-            sx={{
-              ...baseBtnStyle,
-              "&:hover": {
-                backgroundColor: theme.palette.error.light + "20",
-                transform: "scale(1.05)",
-                boxShadow: theme.shadows[2],
-                "& svg": { color: theme.palette.error.main },
-              },
-              "&:active": {
-                transform: "scale(0.95)",
-                backgroundColor: theme.palette.error.light + "40",
-              },
-            }}
-          >
-            <CloseIcon sx={{ width: 16, height: 16 }} />
-          </IconButton>
-        </Stack>
-      </Stack>
-    </Box>
+        </M3IconButton>
+        <M3IconButton title={i18n("close")} onClick={() => setShowBox(false)}>
+          <CloseIcon />
+        </M3IconButton>
+      </span>
+    </div>
   );
 }
 
@@ -372,6 +145,7 @@ function TranBoxContent({
 
   return (
     <Box
+      className="kt-tranbox-content"
       sx={{
         p: simpleStyle ? 1 : 2,
         backgroundColor: theme.palette.background.paper,
@@ -449,6 +223,7 @@ export default function TranBox(props) {
     <SettingProvider context="tranbox">
       {/* 提供独立翻译框专属的自定义样式 CSS 作用的主题 */}
       <ThemeProvider styles={props.extStyles}>
+        <style>{SELECTION_STYLES}</style>
         {props.showBox && (
           // 渲染可拖动可缩放的外壳
           <DraggableResizable

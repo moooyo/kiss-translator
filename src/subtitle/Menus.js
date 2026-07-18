@@ -1,246 +1,150 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo } from "react";
 import { API_SPE_TYPES } from "../config";
 
-/**
- * Label 组件 - 单行文本溢出省略包装标签
- *
- * @param {object} props
- * @param {React.ReactNode} props.children - 标签子节点文本内容
- */
-function Label({ children }) {
-  return (
-    <div
-      style={{
-        overflow: "hidden",
-        textOverflow: "ellipsis",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {children}
-    </div>
-  );
+const MENU_STYLES = String.raw`
+.kt-subtitle-panel {
+  --kt-pri: #0b57d0;
+  --kt-onpri: #ffffff;
+  --kt-pric: #d3e3fd;
+  --kt-onpric: #041e49;
+  --kt-secc: #c2e7ff;
+  --kt-onsecc: #001d35;
+  --kt-sf0: #ffffff;
+  --kt-sf1: #f3f6fb;
+  --kt-sf2: #f0f4f9;
+  --kt-sf3: #e9eef6;
+  --kt-on: #1f1f1f;
+  --kt-onv: #444746;
+  --kt-line: #747775;
+  --kt-linev: #c9cdd3;
+  --kt-spring: cubic-bezier(.3, 1.4, .4, 1);
+  width: min(322px, calc(100vw - 24px));
+  position: absolute;
+  right: 0;
+  bottom: 78px;
+  z-index: 2147483647;
+  overflow: visible;
+  padding: 18px;
+  border: 1px solid var(--kt-linev);
+  border-radius: 24px;
+  background: var(--kt-sf0);
+  box-shadow: 0 4px 8px 3px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.18);
+  color: var(--kt-on);
+  font-family: "Google Sans Flex", "Noto Sans SC", system-ui, sans-serif;
+  line-height: 1.4;
+  animation: kt-subtitle-up .4s var(--kt-spring);
+  display: flex;
+  flex-direction: column;
 }
-
-/**
- * MenuItem 组件 - 菜单单项卡片包装器
- * 支持鼠标悬浮 (hover) 时的背景色渐变高亮与不透明度过渡过渡效果
- *
- * @param {object} props
- * @param {React.ReactNode} props.children - 子元素内容
- * @param {Function} props.onClick - 点击事件回调
- * @param {boolean} [props.disabled=false] - 是否禁用点击
- */
-function MenuItem({ children, onClick, disabled = false }) {
-  const [hover, setHover] = useState(false);
-
-  return (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        alignItems: "center",
-        padding: "0px 8px",
-        opacity: hover ? 1 : 0.8,
-        background: `rgba(255, 255, 255, ${hover ? 0.1 : 0})`,
-        cursor: disabled ? "default" : "pointer",
-        transition: "background 0.2s, opacity 0.2s",
-        borderRadius: 5,
-      }}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      onClick={onClick}
-    >
-      {children}
-    </div>
-  );
+.kt-subtitle-panel * { box-sizing: border-box; }
+.kt-subtitle-panel__header { display: flex; align-items: center; gap: 10px; order: -1; margin-bottom: 8px; font-size: 15px; font-weight: 700; }
+.kt-subtitle-panel__header-icon { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 10px; background: var(--kt-pric); color: var(--kt-onpric); font-size: 15px; }
+.kt-subtitle-row { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--kt-linev); }
+.kt-subtitle-row__copy { min-width: 0; }
+.kt-subtitle-row__label { overflow: hidden; font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.kt-subtitle-row__hint { margin-top: 2px; color: var(--kt-onv); font-size: 10.5px; }
+.kt-subtitle-switch { width: 52px; height: 32px; flex: none; position: relative; padding: 0; border: 2px solid var(--kt-line); border-radius: 999px; background: var(--kt-sf3); cursor: pointer; transition: background .35s var(--kt-spring), border-color .35s var(--kt-spring); }
+.kt-subtitle-switch::after { content: ""; width: 16px; height: 16px; position: absolute; top: 6px; left: 6px; border-radius: 50%; background: var(--kt-line); transition: all .35s var(--kt-spring); }
+.kt-subtitle-switch[aria-checked="true"] { border-color: var(--kt-pri); background: var(--kt-pri); }
+.kt-subtitle-switch[aria-checked="true"]::after { width: 24px; height: 24px; top: 2px; left: 22px; background: var(--kt-onpri); }
+.kt-subtitle-select { max-width: 142px; min-height: 38px; padding: 0 30px 0 12px; border: 0; border-radius: 999px; outline: 0; background: var(--kt-sf2); color: var(--kt-on); font: inherit; font-size: 11.5px; font-weight: 650; }
+.kt-subtitle-segmented { display: flex; gap: 3px; margin: 8px 0 5px; padding: 3px; border-radius: 999px; background: var(--kt-sf2); }
+.kt-subtitle-segmented button { min-height: 34px; flex: 1; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--kt-onv); cursor: pointer; font: inherit; font-size: 11px; }
+.kt-subtitle-segmented button[aria-pressed="true"] { background: var(--kt-secc); color: var(--kt-onsecc); font-weight: 700; }
+.kt-subtitle-section-label { margin-top: 12px; font-size: 11.5px; font-weight: 700; }
+.kt-subtitle-progress { height: 4px; margin-top: 14px; overflow: hidden; border-radius: 999px; background: var(--kt-sf2); }
+.kt-subtitle-progress span { height: 100%; display: block; border-radius: inherit; background: var(--kt-pri); transition: width .3s; }
+.kt-subtitle-download { width: 100%; min-height: 42px; margin-top: 12px; border: 0; border-radius: 999px; background: var(--kt-pric); color: var(--kt-onpric); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.kt-subtitle-download:disabled { cursor: default; opacity: .45; }
+@media (prefers-color-scheme: dark) {
+  .kt-subtitle-panel {
+    --kt-pri: #a8c7fa;
+    --kt-onpri: #062e6f;
+    --kt-pric: #0842a0;
+    --kt-onpric: #d3e3fd;
+    --kt-secc: #004a77;
+    --kt-onsecc: #c2e7ff;
+    --kt-sf0: #1e1f20;
+    --kt-sf1: #232426;
+    --kt-sf2: #282a2c;
+    --kt-sf3: #2d2f31;
+    --kt-on: #e3e3e3;
+    --kt-onv: #c4c7c5;
+    --kt-line: #8e918f;
+    --kt-linev: #3f4245;
+    box-shadow: 0 4px 10px 3px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.5);
+  }
 }
+@keyframes kt-subtitle-up { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
+`;
 
-/**
- * Switch 组件 - 开关 (Toggle Switch) 菜单组件
- *
- * @param {object} props
- * @param {string} props.label - 开关文本标题
- * @param {string} props.name - 配置表单中的字段 Key 名
- * @param {boolean} props.value - 当前开关状态值 (true 为开启，false 为关闭)
- * @param {Function} props.onChange - 开关改变时的回调通知
- * @param {boolean} props.disabled - 是否禁用该开关
- */
-function Switch({ label, name, value, onChange, disabled }) {
-  // REVIEW: 这里的 handleClick 依赖了 value。当每次开关被点击切换时，value 会随之改变，
-  // 导致该 useCallback 重新生成并返回新的函数引用，使得 useCallback 并没有起到缓存函数引用的效果。
+function Switch({ label, hint, name, value, onChange, disabled = false }) {
   const handleClick = useCallback(() => {
-    if (disabled) return;
-
-    // 点击时状态取反派发
-    onChange({ name, value: !value });
-  }, [disabled, onChange, name, value]);
+    if (!disabled) onChange({ name, value: !value });
+  }, [disabled, name, onChange, value]);
 
   return (
-    <MenuItem onClick={handleClick} disabled={disabled}>
-      <Label>{label}</Label>
-      {/* 开关轨道 (Track) */}
-      <div
-        style={{
-          width: 40,
-          height: 24,
-          borderRadius: 12,
-          background: value ? "rgba(32,156,238,.8)" : "rgba(255,255,255,.3)",
-          position: "relative",
-        }}
-      >
-        {/* 开关滑块 (Thumb) */}
-        <div
-          style={{
-            width: 20,
-            height: 20,
-            borderRadius: 10,
-            position: "absolute",
-            left: 2,
-            top: 2,
-            background: "rgba(255,255,255,.9)",
-            transform: `translateX(${value ? 16 : 0}px)`,
-          }}
-        ></div>
+    <div className="kt-subtitle-row" onClick={handleClick}>
+      <div className="kt-subtitle-row__copy">
+        <div className="kt-subtitle-row__label">{label}</div>
+        {hint && <div className="kt-subtitle-row__hint">{hint}</div>}
       </div>
-    </MenuItem>
-  );
-}
-
-/**
- * Select 组件 - 下拉选择菜单组件 (Select Component)
- *
- * @param {object} props
- * @param {string} props.label - 下拉标题文本
- * @param {string} props.name - 表单字段 Key 名
- * @param {*} props.value - 当前选中的值
- * @param {Array<object>} props.options - 下拉选项数组，每一项为 { value, label }
- * @param {Function} props.onChange - 选项改变时的回调
- * @param {boolean} props.disabled - 是否禁用下拉框
- */
-function Select({ label, name, value, options, onChange, disabled }) {
-  const [isOpen, setIsOpen] = useState(false); // 控制下拉菜单面板的展开/收起状态
-
-  // 查找当前被选中的选项，若没匹配到则回退至第一个可选项以做安全兜底
-  const selectedOption = useMemo(
-    () => options.find((opt) => opt.value === value) || options[0],
-    [options, value]
-  );
-
-  // 切换下拉菜单展开收起
-  const handleToggle = useCallback(() => {
-    if (disabled) return;
-    setIsOpen((prev) => !prev);
-  }, [disabled]);
-
-  // 选中下拉具体选项时，派发 onChange 事件，随后关闭下拉选择面板
-  const handleSelect = useCallback(
-    (optionValue) => {
-      onChange({ name, value: optionValue });
-      setIsOpen(false);
-    },
-    [onChange, name]
-  );
-
-  return (
-    <div style={{ position: "relative" }}>
-      <MenuItem onClick={handleToggle} disabled={disabled}>
-        <Label>{label}</Label>
-        <div
-          style={{
-            fontSize: 12,
-            opacity: 0.8,
-            maxWidth: 130,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {selectedOption?.label || ""}
-        </div>
-      </MenuItem>
-      {/* 下拉浮出面板 */}
-      {isOpen && (
-        <div
-          style={{
-            position: "absolute",
-            right: 0,
-            top: "100%",
-            background: "rgba(0,0,0,.8)",
-            borderRadius: 5,
-            minWidth: 250,
-            maxHeight: 200,
-            overflow: "auto",
-            zIndex: 1000,
-            marginTop: 4,
-          }}
-        >
-          {options.map((option) => (
-            <div
-              key={option.value}
-              onClick={() => handleSelect(option.value)}
-              style={{
-                padding: "8px 12px",
-                cursor: "pointer",
-                background:
-                  option.value === value
-                    ? "rgba(32,156,238,.3)"
-                    : "transparent",
-                opacity: option.value === value ? 1 : 0.8,
-                transition: "all 0.2s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,.1)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background =
-                  option.value === value
-                    ? "rgba(32,156,238,.3)"
-                    : "transparent";
-              }}
-            >
-              {option.label}
-            </div>
-          ))}
-        </div>
-      )}
+      <button
+        type="button"
+        className="kt-subtitle-switch"
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
+        disabled={disabled}
+        onClick={(event) => {
+          event.stopPropagation();
+          handleClick();
+        }}
+      />
     </div>
   );
 }
 
-/**
- * Button 组件 - 简单按钮菜单项组件
- *
- * @param {object} props
- * @param {string} props.label - 按钮上的文本内容
- * @param {Function} props.onClick - 点击按钮的回调事件
- * @param {boolean} props.disabled - 是否禁用按钮
- */
-function Button({ label, onClick, disabled }) {
-  const handleClick = useCallback(() => {
-    if (disabled) return;
-
-    onClick();
-  }, [disabled, onClick]);
-
+function Select({ label, name, value, options, onChange, disabled = false }) {
   return (
-    <MenuItem onClick={handleClick} disabled={disabled}>
-      <Label>{label}</Label>
-    </MenuItem>
+    <label className="kt-subtitle-row">
+      <span className="kt-subtitle-row__label">{label}</span>
+      <select
+        className="kt-subtitle-select"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange({ name, value: event.target.value })}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
-/**
- * Menus 组件 - 视频字幕设置快捷快捷菜单浮动面板组件
- * 用于在视频网页播放器上层叠展示，控制 AI 智能分句、AI 上下文增强、双语显示等配置项
- *
- * @param {object} props
- * @param {Function} props.i18n - 国际化翻译转换函数
- * @param {object} props.formData - 表单绑定配置数据对象
- * @param {number} [props.progressed=0] - 字幕处理/下载进度百分比数值 (0 - 100)
- * @param {Function} props.updateSetting - 更新全局/字幕配置项的回调函数
- * @param {Function} props.downloadSubtitle - 点击触发下载双语字幕的回调函数
- * @param {Array<object>} props.transApis - 系统当前配置的翻译 API 列表
- */
+function Segmented({ label, value, items, onChange }) {
+  return (
+    <div>
+      <div className="kt-subtitle-section-label">{label}</div>
+      <div className="kt-subtitle-segmented">
+        {items.map((item) => (
+          <button
+            type="button"
+            aria-pressed={value === item.value}
+            onClick={() => onChange(item.value)}
+            key={item.value}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function Menus({
   i18n,
   formData,
@@ -249,126 +153,151 @@ export function Menus({
   downloadSubtitle,
   transApis,
 }) {
-  // 当快捷菜单的任何子选项发生更改时，统一向上层派发更新事件
   const handleChange = useCallback(
-    ({ name, value }) => {
-      updateSetting({ name, value });
-    },
+    ({ name, value }) => updateSetting({ name, value }),
     [updateSetting]
   );
 
-  // 过滤并计算出当前所有未禁用的翻译 API 列表，用于 UI 下拉列表展示
   const enabledApis = useMemo(
     () => (transApis || []).filter((api) => !api.isDisabled),
     [transApis]
   );
-
-  // 进一步过滤出其中属于 AI 大语言模型翻译类型的 API
   const aiEnabledApis = useMemo(
     () => enabledApis.filter((api) => API_SPE_TYPES.ai.has(api.apiType)),
     [enabledApis]
   );
+  const segOptions = useMemo(
+    () => [
+      { value: "-", label: i18n("disable") },
+      ...aiEnabledApis.map((api) => ({
+        value: api.apiSlug,
+        label: api.apiName,
+      })),
+    ],
+    [aiEnabledApis, i18n]
+  );
+  const serviceOptions = useMemo(
+    () =>
+      enabledApis.map((api) => ({
+        value: api.apiSlug,
+        label: api.apiName,
+      })),
+    [enabledApis]
+  );
 
-  // 构造 AI 智能断句服务下拉列表选项 (若没有启用的 AI 接口，则下拉项仅有禁用)
-  const segOptions = useMemo(() => {
-    const options = [{ value: "-", label: i18n("disable") || "禁用" }];
-    aiEnabledApis.forEach((api) => {
-      options.push({ value: api.apiSlug, label: api.apiName });
-    });
-    return options;
-  }, [aiEnabledApis, i18n]);
-
-  // 构造 AI 视频上下文增强服务下拉列表选项 (若没有启用的 AI 接口，则下拉项仅有禁用)
-  const aiContextOptions = useMemo(() => {
-    const options = [{ value: "-", label: i18n("disable") || "禁用" }];
-    aiEnabledApis.forEach((api) => {
-      options.push({ value: api.apiSlug, label: api.apiName });
-    });
-    return options;
-  }, [aiEnabledApis, i18n]);
-
-  // 根据当前字幕处理/翻译进度值，动态计算快捷菜单底部的下载按钮状态文案
-  const status = useMemo(() => {
-    if (progressed === 0) return i18n("waiting_subtitles");
-    if (progressed === 100) return i18n("download_subtitles");
-    return i18n("processing_subtitles");
-  }, [progressed, i18n]);
-
-  // 从表单配置对象中解构出字幕交互相关的控制值
   const {
-    segSlug, // 选中的智能断句大模型 apiSlug
-    skipAd, // 是否开启自动跳过广告
-    isBilingual, // 是否采用双语对照视图显示
-    blurTranslation, // 是否启用模糊隐藏译文，悬浮时显示的背词模式
-    autoTranslate, // 当前视频是否开启字幕翻译
-    aiContextSlug, // 选中的上下文增强服务 apiSlug
+    segSlug = "-",
+    skipAd = false,
+    isBilingual = true,
+    blurTranslation = false,
+    autoTranslate = true,
+    displayOrder = "original-first",
+    apiSlug = serviceOptions[0]?.value || "",
+    windowStyle = "",
   } = formData;
+  const backgroundMode = windowStyle.includes("linear-gradient")
+    ? "gradient"
+    : windowStyle === ""
+      ? "none"
+      : "translucent";
+  const status =
+    progressed === 0
+      ? i18n("waiting_subtitles")
+      : progressed === 100
+        ? i18n("download_subtitles")
+        : i18n("processing_subtitles");
+
+  const backgroundStyles = {
+    translucent:
+      "background:rgba(10,12,16,.62);backdrop-filter:blur(6px);border-radius:16px;padding:12px 20px;",
+    gradient:
+      "background:linear-gradient(180deg,rgba(10,12,16,.08),rgba(10,12,16,.78));border-radius:16px;padding:12px 20px;",
+    none: "",
+  };
 
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: 0,
-        bottom: 100,
-        background: "rgba(0,0,0,.6)",
-        width: 250,
-        lineHeight: "40px",
-        fontSize: 16,
-        padding: 8,
-        borderRadius: 5,
-      }}
-    >
-      {/* 当前视频的翻译开关 */}
+    <div className="kt-subtitle-panel">
       <Switch
-        onChange={handleChange}
         name="autoTranslate"
         value={autoTranslate}
         label={i18n("enable_subtitle_translate")}
-      />
-      {/* 智能断句下拉项：若可用 AI 大模型数量为 0 时禁用下拉 */}
-      <Select
         onChange={handleChange}
-        name="segSlug"
-        value={segSlug || "-"}
-        options={segOptions}
-        label={i18n("ai_segmentation")}
-        disabled={segOptions.length <= 1}
       />
-      {/* 视频上下文增强下拉项：通过 AI 预分析视频内容，帮助更准确地进行专业词汇翻译 */}
-      <Select
-        onChange={handleChange}
-        name="aiContextSlug"
-        value={aiContextSlug || "-"}
-        options={aiContextOptions}
-        label={i18n("ai_enhanced_context")}
-        disabled={aiContextOptions.length <= 1}
-      />
-      {/* 双语对照显示开关 */}
+      <div className="kt-subtitle-panel__header">
+        <span className="kt-subtitle-panel__header-icon">CC</span>
+        <span>{i18n("subtitle_translate")}</span>
+      </div>
       <Switch
-        onChange={handleChange}
         name="isBilingual"
         value={isBilingual}
-        label={i18n("is_bilingual_view")}
-      />
-      {/* 译文模糊背词开关 */}
-      <Switch
+        label={i18n("bilingual_subtitles")}
         onChange={handleChange}
+      />
+      <Segmented
+        label={i18n("subtitle_display_order")}
+        value={displayOrder}
+        onChange={(value) => handleChange({ name: "displayOrder", value })}
+        items={[
+          { value: "original-first", label: i18n("original_first") },
+          { value: "translation-first", label: i18n("translation_first") },
+        ]}
+      />
+      <Switch
         name="blurTranslation"
         value={blurTranslation}
         label={i18n("is_blur_translation")}
-      />
-      {/* 广告跳过开关 */}
-      <Switch
         onChange={handleChange}
+      />
+      <Select
+        name="segSlug"
+        value={segSlug}
+        options={segOptions}
+        label={i18n("ai_segmentation")}
+        disabled={segOptions.length <= 1}
+        onChange={handleChange}
+      />
+      <Segmented
+        label={i18n("subtitle_background")}
+        value={backgroundMode}
+        onChange={(value) =>
+          handleChange({ name: "windowStyle", value: backgroundStyles[value] })
+        }
+        items={[
+          {
+            value: "translucent",
+            label: i18n("subtitle_background_translucent"),
+          },
+          { value: "gradient", label: i18n("subtitle_background_gradient") },
+          { value: "none", label: i18n("subtitle_background_none") },
+        ]}
+      />
+      {serviceOptions.length > 0 && (
+        <Select
+          name="apiSlug"
+          value={apiSlug}
+          options={serviceOptions}
+          label={i18n("translate_service")}
+          onChange={handleChange}
+        />
+      )}
+      <Switch
         name="skipAd"
         value={skipAd}
         label={i18n("is_skip_ad")}
+        onChange={handleChange}
       />
-      {/* 字幕下载动作按钮：按需 AI 断句下允许下载当前已处理的字幕 */}
-      <Button
-        label={`${status} [${progressed}%] `}
+      <div className="kt-subtitle-progress" aria-hidden="true">
+        <span style={{ width: `${progressed}%` }} />
+      </div>
+      <button
+        type="button"
+        className="kt-subtitle-download"
+        disabled={progressed < 100}
         onClick={downloadSubtitle}
-      />
+      >
+        {status} · {progressed}%
+      </button>
+      <style>{MENU_STYLES}</style>
     </div>
   );
 }

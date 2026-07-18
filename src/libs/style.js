@@ -13,7 +13,6 @@ import {
   OPT_STYLE_BLINK,
   OPT_STYLE_GLOW,
   OPT_STYLE_COLORFUL,
-  DEFAULT_COLOR,
   OPT_STYLE_MARKER,
   OPT_STYLE_GRADIENT_MARKER,
   OPT_STYLE_DASHBOX_BOLD,
@@ -51,7 +50,7 @@ const glow = keyframes`
   }
 `;
 
-const genLineStyle = (style, color, thickness = 1) => `
+const genLineStyle = (style, color, thickness = 2) => `
   text-decoration-line: underline;
   text-decoration-style: ${style};
   text-decoration-color: ${color};
@@ -60,18 +59,12 @@ const genLineStyle = (style, color, thickness = 1) => `
   -webkit-text-decoration-line: underline;
   -webkit-text-decoration-style: ${style};
   -webkit-text-decoration-color: ${color};
-  -webkit-text-decoration-thickness: 1px;
+  -webkit-text-decoration-thickness: ${thickness}px;
   -webkit-text-underline-offset: 0.3em;
 
-  opacity: 0.8;
-  -webkit-opacity: 0.8;
-  &:hover {
-    opacity: 1;
-    -webkit-opacity: 1;
-  }
 `;
 
-const genBuiltinStyles = (color = DEFAULT_COLOR) => ({
+const genBuiltinStyles = (color = "#7CACF8") => ({
   // 无样式
   [OPT_STYLE_NONE]: ``,
   // 下划线
@@ -102,7 +95,7 @@ const genBuiltinStyles = (color = DEFAULT_COLOR) => ({
   `,
   // 马克笔
   [OPT_STYLE_MARKER]: `
-    background: linear-gradient(to top, ${color} 50%, transparent 50%);
+    background: linear-gradient(transparent 55%, rgba(255,214,90,.55) 55%);
   `,
   // 渐变马克笔
   [OPT_STYLE_GRADIENT_MARKER]: `
@@ -124,12 +117,9 @@ const genBuiltinStyles = (color = DEFAULT_COLOR) => ({
   `,
   // 引用
   [OPT_STYLE_BLOCKQUOTE]: `
-    opacity: 0.8;
-    -webkit-opacity: 0.8;
-    display: block;
-    padding: 0.25em 0.5em;
-    border-left: 0.25em solid ${color};
-    background: rgb(32, 156, 238, 0.2);
+    opacity: 0.72;
+    -webkit-opacity: 0.72;
+    font-style: italic;
     &:hover {
       opacity: 1;
       -webkit-opacity: 1;
@@ -196,7 +186,18 @@ export const genTextClass = (customStyles = []) => {
   });
 
   const textClass = {};
-  let textStyles = "";
+  let textStyles = `
+    @keyframes kt-translation-up {
+      from { opacity: 0; transform: translateY(14px) scale(.97); }
+      to { opacity: 1; transform: none; }
+    }
+    .kiss-translator-inner {
+      animation: kt-translation-up .5s cubic-bezier(.3,1.4,.4,1) both;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .kiss-translator-inner { animation: none; }
+    }
+  `;
   Object.entries(styles).forEach(([k, v]) => {
     textClass[k] = css`
       ${v}

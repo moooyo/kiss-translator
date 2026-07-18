@@ -5,7 +5,6 @@ import { useI18n } from "../../hooks/I18n";
 import { useSync } from "../../hooks/Sync";
 import Alert from "@mui/material/Alert";
 import Link from "@mui/material/Link";
-import MenuItem from "@mui/material/MenuItem";
 import LoadingButton from "@mui/lab/LoadingButton";
 import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
@@ -34,6 +33,9 @@ import SyncIcon from "@mui/icons-material/Sync";
 import ContentCopyIcon from "@mui/icons-material/ContentCopy";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
 import EditIcon from "@mui/icons-material/Edit";
+import CloudSyncRoundedIcon from "@mui/icons-material/CloudSyncRounded";
+import FolderSharedRoundedIcon from "@mui/icons-material/FolderSharedRounded";
+import CodeRoundedIcon from "@mui/icons-material/CodeRounded";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
@@ -255,28 +257,45 @@ export default function SyncSetting() {
           <Alert severity="warning">{i18n("sync_warn_gist")}</Alert>
         )}
 
-        {/* 同步通道类型 (Cloudflare Worker 或 WebDAV) */}
-        <TextField
-          select
-          size="small"
-          name="syncType"
-          value={syncType}
-          label={i18n("data_sync_type")}
-          onChange={handleChange}
-          helperText={
-            isGistSync && (
-              <Link href={URL_GITHUB_GIST_TOKEN} target="_blank">
-                {i18n("gist_sync_tip")}
-              </Link>
-            )
-          }
-        >
-          {OPT_SYNCTYPE_ALL.map((item) => (
-            <MenuItem key={item} value={item}>
-              {item}
-            </MenuItem>
-          ))}
-        </TextField>
+        <div className="kt-sync-methods">
+          {OPT_SYNCTYPE_ALL.map((item) => {
+            const Icon =
+              item === "WebDAV"
+                ? FolderSharedRoundedIcon
+                : item.toLowerCase().includes("gist")
+                  ? CodeRoundedIcon
+                  : CloudSyncRoundedIcon;
+            return (
+              <button
+                type="button"
+                className="kt-sync-method"
+                aria-pressed={syncType === item}
+                key={item}
+                onClick={() =>
+                  handleChange({
+                    preventDefault: () => {},
+                    target: { name: "syncType", value: item },
+                  })
+                }
+              >
+                <Icon />
+                <span className="kt-sync-method__name">{item}</span>
+                <span className="kt-sync-method__description">
+                  {item === "WebDAV"
+                    ? "Nextcloud · Nutstore"
+                    : item.toLowerCase().includes("gist")
+                      ? "Private GitHub Gist"
+                      : "Cloudflare Worker"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {isGistSync && (
+          <Link href={URL_GITHUB_GIST_TOKEN} target="_blank">
+            {i18n("gist_sync_tip")}
+          </Link>
+        )}
 
         {/* 同步接口 URL 终端地址 */}
         {!isGistSync && (

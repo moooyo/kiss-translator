@@ -238,16 +238,9 @@ export default function DraggableResizable({
     return () => observer.disconnect();
   }, [autoHeight, getMaxPositionY, setPosition, size.h]);
 
-  // 深色模式下，为悬浮翻译小窗口提供精美的外发光日食效果阴影
   const glowShadow = isDark
-    ? `
-        0 0 0 1px rgba(255,255,255,0.18),
-        0 0 10px 2px rgba(255,255,255,0.18),
-        0 8px 32px rgba(0,0,0,0.35)
-      `
-    : ` 
-        0 4px 18px rgba(0, 0, 0, 0.15)
-      `;
+    ? "0 4px 10px 3px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.5)"
+    : "0 4px 8px 3px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.18)";
 
   const opts = {
     size,
@@ -273,7 +266,7 @@ export default function DraggableResizable({
         gridTemplateColumns: `${lineWidth * 2}px ${size.w}px ${lineWidth * 2}px`,
         gridTemplateRows: `${lineWidth * 2}px auto ${lineWidth * 2}px`,
         zIndex: 2147483647,
-        borderRadius: "12px",
+        borderRadius: "22px",
         overflow: "hidden",
       }}
       {...props}
@@ -322,7 +315,7 @@ export default function DraggableResizable({
           width: size.w,
           maxWidth: size.w,
           minWidth: 0,
-          borderRadius: 4,
+          borderRadius: "22px",
           overflow: "hidden",
           backgroundColor: theme.palette.background.paper,
           boxShadow: glowShadow,

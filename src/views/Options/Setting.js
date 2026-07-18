@@ -39,6 +39,7 @@ import { kissLog, LogLevel } from "../../libs/log";
 import UploadButton from "./UploadButton";
 import DownloadButton from "./DownloadButton";
 import ValidationInput from "../../hooks/ValidationInput";
+import OverviewHero from "./OverviewHero";
 
 /**
  * 包装单个快捷键录入表单项组件
@@ -190,11 +191,15 @@ export default function Settings() {
     skipLangs = [],
   } = setting;
   // 解构 FAB 悬浮球的显隐状态及点击后的默认交互行为
-  const { isHide = false, fabClickAction = 0, hideExceptionList = "" } =
-    fab || {};
+  const {
+    isHide = false,
+    fabClickAction = 0,
+    hideExceptionList = "",
+  } = fab || {};
 
   return (
     <Box>
+      <OverviewHero />
       <Stack spacing={3}>
         {/* 数据导入导出控制条 */}
         <Stack

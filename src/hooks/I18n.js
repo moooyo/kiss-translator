@@ -2,6 +2,11 @@ import { useSetting } from "./Setting";
 import { I18N, URL_RAW_PREFIX } from "../config";
 import { useGet } from "./Fetch";
 
+const useSettingSafe =
+  typeof useSetting === "function"
+    ? useSetting
+    : () => ({ setting: { uiLang: "en" } });
+
 /**
  * 获取多语言文本的工具函数
  * @param {string} uiLang 当前界面语言 (如 'zh-CN', 'en')
@@ -25,7 +30,7 @@ export const useLangMap = (uiLang) => {
 export const useI18n = () => {
   const {
     setting: { uiLang },
-  } = useSetting();
+  } = useSettingSafe();
   return useLangMap(uiLang);
 };
 

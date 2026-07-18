@@ -11,6 +11,36 @@ import {
   wrapWordsWithSpans,
 } from "./wordHover.js";
 
+function addCaptionStyles() {
+  if (document.getElementById("kiss-caption-m3-styles")) return;
+  const style = document.createElement("style");
+  style.id = "kiss-caption-m3-styles";
+  style.textContent = `
+    .kiss-caption-paper {
+      max-width: calc(100% - 20px);
+      transition: opacity .3s;
+    }
+    .kiss-caption-window {
+      border-radius: 16px;
+      box-shadow: 0 4px 8px 3px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.18);
+      user-select: none;
+    }
+    .kiss-caption-origin,
+    .kiss-caption-translation {
+      transition: filter .3s ease;
+    }
+    .kiss-subtitle-word {
+      border-radius: 5px;
+      padding: 0 3px;
+      transition: background .2s;
+    }
+    .kiss-subtitle-word:hover {
+      background: rgba(168,199,250,.32);
+    }
+  `;
+  document.head.appendChild(style);
+}
+
 /**
  * @class BilingualSubtitleManager
  * @description 负责控制在 YouTube 原生视频播放器上悬浮渲染双语字幕，以及对字幕进行预翻译缓存管理的核心逻辑类
@@ -85,6 +115,7 @@ export class BilingualSubtitleManager {
     }
 
     logger.info("Bilingual Subtitle Manager: Starting...");
+    addCaptionStyles();
     this.#createCaptionWindow(); // 1. 创建悬浮字幕 DOM 树并挂载到网页
     this.#attachEventListeners(); // 2. 绑定视频播放事件
     this.onTimeUpdate(); // 3. 触发一次初始化同步渲染
@@ -281,9 +312,13 @@ export class BilingualSubtitleManager {
   ) {
     let isDragging = false;
     let hasDragged = false;
+    let startX;
     let startY;
     let initialBottom;
+    let initialLeft;
     let dragElementHeight;
+    let dragElementWidth;
+    let boundaryRect;
 
     const onDragStart = (e) => {
       // 限制仅允许鼠标左键拖拽
@@ -295,7 +330,9 @@ export class BilingualSubtitleManager {
       hasDragged = false;
       handleElement.style.cursor = "grabbing";
       // 兼容触屏端拖拽
-      startY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
+      const point = e.type === "touchstart" ? e.touches[0] : e;
+      startX = point.clientX;
+      startY = point.clientY;
 
       // 记录开始拖动时，字幕框底部与包裹容器底部的绝对间距数值 (bottom)
       initialBottom =
@@ -303,6 +340,10 @@ export class BilingualSubtitleManager {
         dragElement.getBoundingClientRect().bottom;
 
       dragElementHeight = dragElement.offsetHeight;
+      dragElementWidth = dragElement.offsetWidth;
+      boundaryRect = boundaryContainer.getBoundingClientRect();
+      initialLeft =
+        dragElement.getBoundingClientRect().left - boundaryRect.left;
 
       // 全局捕获鼠标与触控事件，防止拖拽过快导致指针移出把手时拖拽中断
       document.addEventListener("mousemove", onDragMove, { capture: true });
@@ -319,17 +360,30 @@ export class BilingualSubtitleManager {
 
       e.preventDefault();
 
-      const currentY =
-        e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
+      const point = e.type === "touchmove" ? e.touches[0] : e;
+      const currentX = point.clientX;
+      const currentY = point.clientY;
+      const deltaX = currentX - startX;
       const deltaY = currentY - startY; // 垂直位移差值
+      if (!hasDragged && Math.hypot(deltaX, deltaY) <= 3) return;
       let newBottom = initialBottom - deltaY;
 
       // 进行物理视口边界约束计算，防止将字幕框拉出视频范围之外
       const containerHeight = boundaryContainer.clientHeight;
-      newBottom = Math.max(0, newBottom);
-      newBottom = Math.min(containerHeight - dragElementHeight, newBottom);
+      newBottom = Math.max(10, newBottom);
+      newBottom = Math.min(containerHeight - dragElementHeight - 10, newBottom);
       if (dragElementHeight > containerHeight) {
         newBottom = Math.max(0, newBottom);
+      }
+
+      if (boundaryRect.width && dragElementWidth) {
+        const maxLeft = Math.max(
+          10,
+          boundaryRect.width - dragElementWidth - 10
+        );
+        const newLeft = Math.max(10, Math.min(maxLeft, initialLeft + deltaX));
+        dragElement.style.left = `${newLeft}px`;
+        dragElement.style.transform = "none";
       }
 
       hasDragged = true;
@@ -365,6 +419,12 @@ export class BilingualSubtitleManager {
     handleElement.addEventListener("mousedown", onDragStart);
     handleElement.addEventListener("touchstart", onDragStart, {
       passive: false,
+    });
+    handleElement.addEventListener("dblclick", () => {
+      dragElement.style.left = "50%";
+      dragElement.style.transform = "translateX(-50%)";
+      dragElement.style.bottom = `${boundaryContainer.clientHeight * 0.05}px`;
+      dragEndCallback?.();
     });
   }
 
@@ -512,6 +572,7 @@ export class BilingualSubtitleManager {
     if (subtitle) {
       // 1. 创建字幕原文 (text) 显示节点
       const p1 = document.createElement("p");
+      p1.className = "kiss-caption-origin";
       p1.style.cssText = this.#setting.originStyle;
       p1.style.margin = "0";
 
@@ -529,6 +590,7 @@ export class BilingualSubtitleManager {
 
       // 2. 创建字幕译文 (translation) 显示节点
       const p2 = document.createElement("p");
+      p2.className = "kiss-caption-translation";
       p2.style.cssText = this.#setting.translationStyle;
       p2.style.margin = "0";
       if (isHoverLookupEnabled) {
@@ -552,7 +614,7 @@ export class BilingualSubtitleManager {
 
       // 4. 背词背句模式（模糊译文，鼠标悬停时才显现翻译）
       if (this.#setting.blurTranslation) {
-        const blurValue = "blur(6px)";
+        const blurValue = "blur(7px)";
         p2.style.setProperty("filter", blurValue);
         p2.addEventListener("pointerenter", () => {
           p2.style.removeProperty("filter");

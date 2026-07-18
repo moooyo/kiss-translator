@@ -15,26 +15,25 @@ export const addWordHoverStyles = () => {
     /* 鼠标 hover 的单词样式：呈现下划线，指示可点击查词 */
     .kiss-word-hover {
       cursor: pointer;
-      text-decoration: underline;
-      text-decoration-color: #4fc3f7;
-      text-decoration-thickness: 2px;
+      border-radius: 5px;
+      background: rgba(168, 199, 250, .32);
+      text-decoration: none;
     }
 
     /* 查词气泡弹窗主体样式 */
     .kiss-word-tooltip {
       position: fixed;
-      background: rgba(0, 0, 0, 0.9);
-      color: white;
-      border-radius: 6px;
-      padding: 12px;
-      font-size: 14px;
+      background: #FFFFFF;
+      color: #1F1F1F;
+      border-radius: 16px;
+      padding: 12px 14px;
+      font-size: 13px;
       z-index: 2147483647;
-      max-width: 300px;
+      max-width: 240px;
       word-wrap: break-word;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(4px);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      font-family: Arial, sans-serif;
+      box-shadow: 0 4px 8px 3px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.18);
+      border: 1px solid #C9CDD3;
+      font-family: "Google Sans Flex", "Noto Sans SC", system-ui, sans-serif;
     }
 
     /* 气泡弹窗头部（包含单词名和关闭按钮） */
@@ -45,14 +44,14 @@ export const addWordHoverStyles = () => {
       margin-bottom: 8px;
       font-weight: bold;
       font-size: 16px;
-      color: #4fc3f7;
+      color: #1F1F1F;
     }
 
     /* 关闭气泡弹窗的 X 按钮 */
     .kiss-word-tooltip-close {
       background: none;
       border: none;
-      color: #aaa;
+      color: #444746;
       cursor: pointer;
       font-size: 18px;
       padding: 0;
@@ -65,14 +64,14 @@ export const addWordHoverStyles = () => {
     }
 
     .kiss-word-tooltip-close:hover {
-      color: white;
-      background: rgba(255, 255, 255, 0.1);
+      color: #1F1F1F;
+      background: #F0F4F9;
       border-radius: 50%;
     }
 
     /* 释义加载中状态文案 */
     .kiss-word-loading {
-      color: #bbb;
+      color: #444746;
       font-style: italic;
     }
 
@@ -83,13 +82,17 @@ export const addWordHoverStyles = () => {
 
     /* 词性前缀标记（如 n. / v. 等） */
     .kiss-word-pos {
-      color: #4fc3f7;
-      font-weight: bold;
+      display: inline-block;
+      padding: 2px 6px;
+      border-radius: 999px;
+      background: #C4EED0;
+      color: #072711;
+      font-weight: 700;
     }
 
     /* 音标字符样式 */
     .kiss-word-phonetic {
-      color: #bbb;
+      color: #444746;
       font-style: italic;
       margin-right: 10px;
     }
@@ -98,7 +101,7 @@ export const addWordHoverStyles = () => {
     .kiss-word-example {
       margin-top: 10px;
       padding-top: 8px;
-      border-top: 1px solid #444;
+      border-top: 1px solid #C9CDD3;
     }
 
     .kiss-word-example-title {
@@ -113,8 +116,25 @@ export const addWordHoverStyles = () => {
 
     /* 例句中文翻译 */
     .kiss-word-example-translation {
-      color: #bbb;
+      color: #444746;
       font-style: italic;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .kiss-word-tooltip {
+        background: #1E1F20;
+        color: #E3E3E3;
+        border-color: #3F4245;
+        box-shadow: 0 4px 10px 3px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.5);
+      }
+      .kiss-word-tooltip-header { color: #E3E3E3; }
+      .kiss-word-tooltip-close,
+      .kiss-word-loading,
+      .kiss-word-phonetic,
+      .kiss-word-example-translation { color: #C4C7C5; }
+      .kiss-word-tooltip-close:hover { color: #E3E3E3; background: #282A2C; }
+      .kiss-word-pos { background: #0F5223; color: #C4EED0; }
+      .kiss-word-example { border-color: #3F4245; }
     }
   `;
   document.head.appendChild(style);
@@ -223,8 +243,8 @@ export class WordTooltipController {
     const videoContainer = this.getVideoContainer?.();
     if (videoContainer) {
       const containerRect = videoContainer.getBoundingClientRect();
-      const tooltipWidth = 300;
-      const tooltipHeight = 400;
+      const tooltipWidth = 240;
+      const tooltipHeight = 320;
 
       const left = containerRect.right - tooltipWidth - 45;
       const top = containerRect.top + 20;

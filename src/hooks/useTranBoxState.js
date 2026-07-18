@@ -57,8 +57,8 @@ export default function useTranBoxState(tranboxSetting) {
   const maxBoxWidth = getMaxTranBoxContentWidth();
   const defaultBoxWidth =
     isMobile || initSimpleStyle
-      ? 400
-      : limitNumber(window.innerWidth, 400, 800);
+      ? 380
+      : limitNumber(window.innerWidth * 0.38, 380, 560);
   const boxWidth = Math.min(defaultBoxWidth, maxBoxWidth);
   // 计算初始理想高度。若为极简/移动端则采用 200，否则在 200 ~ 600 之间取当前窗口高度的合适范围。
   const maxBoxHeight = getMaxTranBoxContentHeight();

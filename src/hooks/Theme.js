@@ -3,65 +3,227 @@ import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { CssBaseline, GlobalStyles } from "@mui/material";
 import { useDarkMode } from "./ColorMode";
 import { THEME_DARK, THEME_LIGHT } from "../config";
+import { M3_COLORS, M3_FONT_FAMILY, M3_GLOBAL_CSS } from "../styles/m3";
 
-/**
- * MUI 主题包装器 React 组件
- * 用于监听系统及用户配置的暗黑模式，并全局提供 Material-UI 主题上下文和基础全局样式
- * @param {object} props { children, options, styles }
- */
 export default function Theme({ children, options = {}, styles = {} }) {
-  // 获取当前用户设置的深色模式：'light', 'dark' 或是 'auto'
   const { darkMode } = useDarkMode();
-  // 保存系统级别的暗黑模式状态，默认为浅色 (light)
   const [systemMode, setSystemMode] = useState(THEME_LIGHT);
 
-  // 监听浏览器系统级的 prefers-color-scheme 暗黑/浅色模式变化，并自动同步状态
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") {
-      return;
-    }
+    if (typeof window.matchMedia !== "function") return undefined;
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
     const handleChange = () => {
       setSystemMode(mediaQuery.matches ? THEME_DARK : THEME_LIGHT);
     };
-    handleChange(); // 设置初始系统色彩模式
+    handleChange();
     mediaQuery.addEventListener("change", handleChange);
     return () => mediaQuery.removeEventListener("change", handleChange);
   }, []);
 
-  // 根据用户全局 darkMode 设定和当前的系统色彩模式，动态计算出最终的 MUI 主题配置
+  const previewMode =
+    process.env.NODE_ENV === "development"
+      ? new URLSearchParams(window.location.search).get("theme")
+      : null;
+  const resolvedMode =
+    previewMode === THEME_DARK
+      ? THEME_DARK
+      : previewMode === THEME_LIGHT
+        ? THEME_LIGHT
+        : darkMode === THEME_DARK ||
+            (darkMode === "auto" && systemMode === THEME_DARK)
+          ? THEME_DARK
+          : THEME_LIGHT;
+
   const theme = useMemo(() => {
+    const color = M3_COLORS[resolvedMode];
     let htmlFontSize = 16;
     try {
-      // 动态获取当前网页根元素的 font-size（应对用户在浏览器里调大了默认字号的场景，使 rem 布局更自然对齐）
-      const s = window.getComputedStyle(document.documentElement).fontSize;
-      htmlFontSize = parseInt(s.replace("px", ""));
-    } catch (err) {
-      // 容错：若解析失败则回退默认的 16px
+      htmlFontSize = Number.parseInt(
+        window.getComputedStyle(document.documentElement).fontSize,
+        10
+      );
+    } catch (_error) {
+      htmlFontSize = 16;
     }
-
-    // 判断当前最终是否应该呈现暗黑模式
-    const isDarkMode =
-      darkMode === "dark" || (darkMode === "auto" && systemMode === THEME_DARK);
 
     return createTheme({
       palette: {
-        mode: isDarkMode ? THEME_DARK : THEME_LIGHT,
+        mode: resolvedMode,
+        primary: { main: color.primary, contrastText: color.onPrimary },
+        secondary: {
+          main: color.secondaryContainer,
+          contrastText: color.onSecondaryContainer,
+        },
+        error: { main: color.error },
+        background: { default: color.background, paper: color.surface },
+        text: {
+          primary: color.onSurface,
+          secondary: color.onSurfaceVariant,
+        },
+        divider: color.outlineVariant,
       },
+      shape: { borderRadius: 18 },
       typography: {
         htmlFontSize,
+        fontFamily: M3_FONT_FAMILY,
+        button: { textTransform: "none", fontWeight: 650 },
       },
-      ...options,
+      components: {
+        MuiCssBaseline: {
+          styleOverrides: {
+            html: { backgroundColor: color.background },
+            body: { backgroundColor: color.background },
+            "#root": { minHeight: "100%" },
+          },
+        },
+        MuiPaper: {
+          styleOverrides: {
+            root: {
+              backgroundImage: "none",
+              borderColor: color.outlineVariant,
+            },
+          },
+        },
+        MuiButton: {
+          defaultProps: { disableElevation: true },
+          styleOverrides: {
+            root: {
+              minHeight: 40,
+              borderRadius: 999,
+              paddingInline: 18,
+              letterSpacing: ".01em",
+              transition: "background .3s, color .3s, transform .15s",
+              "&:active": { transform: "scale(.98)" },
+            },
+            contained: { boxShadow: "none" },
+          },
+        },
+        MuiIconButton: {
+          styleOverrides: {
+            root: {
+              color: color.onSurfaceVariant,
+              transition: "background .3s, color .3s, transform .15s",
+              "&:hover": { backgroundColor: color.surfaceContainer },
+              "&:active": { transform: "scale(.94)" },
+            },
+          },
+        },
+        MuiTextField: {
+          defaultProps: { variant: "filled" },
+        },
+        MuiFilledInput: {
+          defaultProps: { disableUnderline: true },
+          styleOverrides: {
+            root: {
+              overflow: "hidden",
+              border: "1px solid transparent",
+              borderRadius: 16,
+              backgroundColor: color.surfaceContainer,
+              transition: "background .25s, border-color .25s",
+              "&:hover": { backgroundColor: color.surfaceHigh },
+              "&.Mui-focused": {
+                borderColor: color.primary,
+                backgroundColor: color.surface,
+              },
+            },
+          },
+        },
+        MuiSwitch: {
+          styleOverrides: {
+            root: { width: 52, height: 32, padding: 0, overflow: "visible" },
+            switchBase: {
+              padding: 8,
+              color: color.outline,
+              transition: "all .35s cubic-bezier(.3, 1.4, .4, 1)",
+              "&.Mui-checked": {
+                padding: 4,
+                transform: "translateX(20px)",
+                color: color.onPrimary,
+                "& + .MuiSwitch-track": {
+                  borderColor: color.primary,
+                  backgroundColor: color.primary,
+                  opacity: 1,
+                },
+                "& .MuiSwitch-thumb": { width: 24, height: 24 },
+              },
+            },
+            thumb: { width: 16, height: 16, boxShadow: "none" },
+            track: {
+              border: `2px solid ${color.outline}`,
+              borderRadius: 999,
+              backgroundColor: color.surfaceHigh,
+              opacity: 1,
+            },
+          },
+        },
+        MuiTabs: {
+          styleOverrides: {
+            root: {
+              minHeight: 44,
+              padding: 4,
+              borderRadius: 999,
+              backgroundColor: color.surfaceContainer,
+            },
+            indicator: { display: "none" },
+          },
+        },
+        MuiTab: {
+          styleOverrides: {
+            root: {
+              minHeight: 36,
+              borderRadius: 999,
+              color: color.onSurfaceVariant,
+              textTransform: "none",
+              "&.Mui-selected": {
+                backgroundColor: color.secondaryContainer,
+                color: color.onSecondaryContainer,
+                fontWeight: 650,
+              },
+            },
+          },
+        },
+        MuiCard: {
+          styleOverrides: {
+            root: {
+              border: `1px solid ${color.outlineVariant}`,
+              borderRadius: 22,
+              boxShadow: "none",
+            },
+          },
+        },
+        MuiAccordion: {
+          styleOverrides: {
+            root: {
+              overflow: "hidden",
+              border: `1px solid ${color.outlineVariant}`,
+              borderRadius: "20px !important",
+              boxShadow: "none",
+              "&::before": { display: "none" },
+            },
+          },
+        },
+        MuiAlert: {
+          styleOverrides: { root: { borderRadius: 16 } },
+        },
+        MuiSnackbarContent: {
+          styleOverrides: { root: { borderRadius: 14 } },
+        },
+        ...options.components,
+      },
+      ...Object.fromEntries(
+        Object.entries(options).filter(([key]) => key !== "components")
+      ),
     });
-  }, [darkMode, options, systemMode]);
+  }, [options, resolvedMode]);
 
   return (
     <ThemeProvider theme={theme}>
-      {/* CssBaseline 提供 Material UI 精简统一的基础样式重置 */}
       <CssBaseline />
-      {/* 允许传入全局样式 Styles */}
       <GlobalStyles styles={styles} />
-      {children}
+      <div className="kt-m3-root" data-theme={resolvedMode}>
+        <style>{M3_GLOBAL_CSS}</style>
+        {children}
+      </div>
     </ThemeProvider>
   );
 }

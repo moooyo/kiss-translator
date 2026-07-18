@@ -63,6 +63,14 @@ function renderPrompts(category) {
   };
 }
 
+function openPromptEditor(container) {
+  const editButton = Array.from(container.querySelectorAll("button")).find(
+    (button) => button.textContent === "edit" && !button.disabled
+  );
+  expect(editButton).toBeDefined();
+  act(() => editButton.click());
+}
+
 describe("Prompts", () => {
   afterEach(() => {
     mockUsePromptList.mockReset();
@@ -71,6 +79,7 @@ describe("Prompts", () => {
 
   test("shows system and user prompt fields for dictionary prompts", () => {
     const { container, unmount } = renderPrompts(PROMPT_CATEGORY_DICTIONARY);
+    openPromptEditor(container);
 
     expect(container.textContent).toContain("系统提示词");
     expect(container.textContent).toContain("用户提示词");
@@ -90,12 +99,14 @@ describe("Prompts", () => {
 
     for (const category of visibleCategories) {
       const { container, unmount } = renderPrompts(category);
+      openPromptEditor(container);
       expect(container.textContent).toContain("用户提示词");
       unmount();
     }
 
     for (const category of hiddenCategories) {
       const { container, unmount } = renderPrompts(category);
+      openPromptEditor(container);
       expect(container.textContent).not.toContain("用户提示词");
       unmount();
     }

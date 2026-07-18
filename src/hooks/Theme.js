@@ -2,11 +2,21 @@ import { useEffect, useMemo, useState } from "react";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { CssBaseline, GlobalStyles } from "@mui/material";
 import { useDarkMode } from "./ColorMode";
+import { useSetting } from "./Setting";
 import { THEME_DARK, THEME_LIGHT } from "../config";
-import { M3_COLORS, M3_FONT_FAMILY, M3_GLOBAL_CSS } from "../styles/m3";
+import {
+  M3_BRAND_COLORS,
+  M3_COLORS,
+  M3_FONT_FAMILY,
+  M3_GLOBAL_CSS,
+} from "../styles/m3";
 
 export default function Theme({ children, options = {}, styles = {} }) {
   const { darkMode } = useDarkMode();
+  const { setting } = useSetting();
+  const brandColor = ["blue", "cyan", "violet"].includes(setting.brandColor)
+    ? setting.brandColor
+    : "blue";
   const [systemMode, setSystemMode] = useState(THEME_LIGHT);
 
   useEffect(() => {
@@ -35,7 +45,10 @@ export default function Theme({ children, options = {}, styles = {} }) {
           : THEME_LIGHT;
 
   const theme = useMemo(() => {
-    const color = M3_COLORS[resolvedMode];
+    const color = {
+      ...M3_COLORS[resolvedMode],
+      ...M3_BRAND_COLORS[brandColor][resolvedMode],
+    };
     let htmlFontSize = 16;
     try {
       htmlFontSize = Number.parseInt(
@@ -215,13 +228,17 @@ export default function Theme({ children, options = {}, styles = {} }) {
         Object.entries(options).filter(([key]) => key !== "components")
       ),
     });
-  }, [options, resolvedMode]);
+  }, [brandColor, options, resolvedMode]);
 
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <GlobalStyles styles={styles} />
-      <div className="kt-m3-root" data-theme={resolvedMode}>
+      <div
+        className="kt-m3-root"
+        data-theme={resolvedMode}
+        data-brand={brandColor}
+      >
         <style>{M3_GLOBAL_CSS}</style>
         {children}
       </div>

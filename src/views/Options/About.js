@@ -2,6 +2,8 @@ import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import ReactMarkdown from "react-markdown";
 import { useI18n, useI18nMd } from "../../hooks/I18n";
+import Button from "@mui/material/Button";
+import Logo from "../../components/Logo";
 
 const MARKDOWN_COMPONENTS = {
   a: ({ href, children }) => {
@@ -28,18 +30,62 @@ export default function About() {
   const { data, loading, error } = useI18nMd("about_md");
 
   return (
-    <Box>
-      {loading ? (
-        /* 加载状态中，居中显示圆形等待条 */
-        <center>
-          <CircularProgress />
-        </center>
-      ) : (
-        /* 成功后，使用 ReactMarkdown 渲染排版。若拉取失败，展示后备的纯文本说明 */
-        <ReactMarkdown components={MARKDOWN_COMPONENTS}>
-          {error ? i18n("about_md_local") : data}
-        </ReactMarkdown>
-      )}
+    <Box className="kt-about-page">
+      <section className="kt-about-hero">
+        <Logo size={72} className="kt-about-hero__logo" />
+        <h2>
+          {i18n("app_name")} <span>· {i18n("settings_chinese_name")}</span>
+        </h2>
+        <div className="kt-about-hero__version">
+          v{process.env.REACT_APP_VERSION}
+        </div>
+        <p>{i18n("settings_about_description")}</p>
+        <small>{i18n("settings_about_license")}</small>
+        <div className="kt-about-hero__actions">
+          <Button
+            component="a"
+            variant="contained"
+            href={process.env.REACT_APP_RELEASES_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {i18n("settings_check_updates")}
+          </Button>
+          <Button
+            component="a"
+            variant="outlined"
+            href={process.env.REACT_APP_HOMEPAGE}
+            target="_blank"
+            rel="noreferrer"
+          >
+            GitHub
+          </Button>
+          <Button
+            component="a"
+            variant="outlined"
+            href={process.env.REACT_APP_SITEURL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {i18n("settings_project_website")}
+          </Button>
+        </div>
+      </section>
+
+      <details className="kt-settings-advanced kt-about-details">
+        <summary>{i18n("settings_project_details")}</summary>
+        <div className="kt-settings-advanced__content kt-about-markdown">
+          {loading ? (
+            <div className="kt-about-loading">
+              <CircularProgress size={24} />
+            </div>
+          ) : (
+            <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+              {error ? i18n("about_md_local") : data}
+            </ReactMarkdown>
+          )}
+        </div>
+      </details>
     </Box>
   );
 }

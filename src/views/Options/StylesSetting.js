@@ -16,6 +16,14 @@ import { useAllTextStyles, useStyleList } from "../../hooks/CustomStyles";
 import { css } from "@emotion/css";
 import { getRandomQuote } from "../../config/quotes";
 import { useSetting } from "../../hooks/Setting";
+import { useRules } from "../../hooks/Rules";
+import {
+  SettingsCard,
+  SettingsRow,
+  SettingsSection,
+  SettingsSegmented,
+  SettingsSwitch,
+} from "./SettingsCard";
 
 /**
  * 单个自定义 CSS 样式编辑表单区域
@@ -209,6 +217,9 @@ function StyleAccordion({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
  */
 export default function StylesSetting() {
   const i18n = useI18n();
+  const { setting, updateSetting } = useSetting();
+  const { list: rules, put: updateRule } = useRules();
+  const [showStyleManager, setShowStyleManager] = useState(false);
   // 自定义 CSS 列表 Hook
   const { customStyles, addStyle, deleteStyle, updateStyle } = useStyleList();
   // 系统内置的只读样式配置列表
@@ -220,56 +231,138 @@ export default function StylesSetting() {
     addStyle();
   };
 
+  const brandColor = ["blue", "cyan", "violet"].includes(setting.brandColor)
+    ? setting.brandColor
+    : "blue";
+  const darkMode = setting.darkMode || "auto";
+  const globalRule = rules.find((rule) => rule.pattern === "*");
+  const richTextEnabled =
+    globalRule?.hasRichText === true || globalRule?.hasRichText === "true";
+
   return (
     <Box>
-      <Stack spacing={3}>
-        {/* 新增样式按钮 */}
-        <Box>
-          <Button
-            size="small"
-            id="add-style-button"
-            variant="contained"
-            onClick={handleClick}
-            startIcon={<AddIcon />}
+      <SettingsSection title={i18n("settings_interface_theme")}>
+        <SettingsCard>
+          <SettingsRow
+            label={i18n("settings_brand_color")}
+            description={i18n("settings_brand_color_description")}
           >
-            {i18n("add")}
-          </Button>
-        </Box>
+            <SettingsSegmented
+              value={brandColor}
+              label={i18n("settings_brand_color")}
+              onChange={(value) => updateSetting({ brandColor: value })}
+              items={[
+                { value: "blue", label: i18n("settings_brand_blue") },
+                { value: "cyan", label: i18n("settings_brand_cyan") },
+                { value: "violet", label: i18n("settings_brand_violet") },
+              ]}
+            />
+          </SettingsRow>
+          <SettingsRow label={i18n("settings_appearance_mode")}>
+            <SettingsSegmented
+              value={darkMode}
+              label={i18n("settings_appearance_mode")}
+              onChange={(value) => updateSetting({ darkMode: value })}
+              items={[
+                { value: "light", label: i18n("settings_theme_light") },
+                { value: "dark", label: i18n("settings_theme_dark") },
+                { value: "auto", label: i18n("settings_theme_system") },
+              ]}
+            />
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
 
-        {/* 用户自定义的可修改样式列表 */}
-        <section>
-          <Typography component="h2" className="kt-options-section-title">
-            {i18n("custom_styles")}
-          </Typography>
-          <Box className="kt-style-grid">
-            {customStyles.map((customStyle) => (
-              <StyleAccordion
-                key={customStyle.styleSlug}
-                customStyle={customStyle}
-                deleteStyle={deleteStyle}
-                updateStyle={updateStyle}
-              />
-            ))}
+      <SettingsSection title={i18n("settings_translation_styles")}>
+        <SettingsCard>
+          <SettingsRow
+            label={i18n("settings_custom_css")}
+            description={i18n("settings_custom_css_description")}
+          >
+            <Button
+              size="small"
+              variant="contained"
+              onClick={() => setShowStyleManager(true)}
+            >
+              {i18n("edit")}
+            </Button>
+          </SettingsRow>
+          <SettingsRow
+            label={i18n("richtext_alt")}
+            description={i18n("settings_rich_text_description")}
+          >
+            <SettingsSwitch
+              checked={richTextEnabled}
+              label={i18n("richtext_alt")}
+              onChange={(checked) =>
+                updateRule("*", { hasRichText: checked ? "true" : "false" })
+              }
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={i18n("settings_style_library")}
+            description={i18n("settings_style_library_description")
+              .replace("{0}", String(customStyles.length))
+              .replace("{1}", String(builtinStyles.length))}
+          >
+            <Button
+              size="small"
+              variant="outlined"
+              onClick={() => setShowStyleManager((current) => !current)}
+            >
+              {showStyleManager ? i18n("hide") : i18n("edit")}
+            </Button>
+          </SettingsRow>
+        </SettingsCard>
+      </SettingsSection>
+
+      {showStyleManager && (
+        <Stack className="kt-style-manager" spacing={3}>
+          <Box>
+            <Button
+              size="small"
+              id="add-style-button"
+              variant="contained"
+              onClick={handleClick}
+              startIcon={<AddIcon />}
+            >
+              {i18n("add")}
+            </Button>
           </Box>
-        </section>
-        {/* 插件内置的只读系统样式列表 */}
-        <section>
-          <Typography component="h2" className="kt-options-section-title">
-            {i18n("builtin_styles")}
-          </Typography>
-          <Box className="kt-style-grid">
-            {builtinStyles.map((customStyle) => (
-              <StyleAccordion
-                key={customStyle.styleSlug}
-                customStyle={customStyle}
-                deleteStyle={deleteStyle}
-                updateStyle={updateStyle}
-                isBuiltin={true}
-              />
-            ))}
-          </Box>
-        </section>
-      </Stack>
+
+          <section>
+            <Typography component="h2" className="kt-options-section-title">
+              {i18n("custom_styles")}
+            </Typography>
+            <Box className="kt-style-grid">
+              {customStyles.map((customStyle) => (
+                <StyleAccordion
+                  key={customStyle.styleSlug}
+                  customStyle={customStyle}
+                  deleteStyle={deleteStyle}
+                  updateStyle={updateStyle}
+                />
+              ))}
+            </Box>
+          </section>
+          <section>
+            <Typography component="h2" className="kt-options-section-title">
+              {i18n("builtin_styles")}
+            </Typography>
+            <Box className="kt-style-grid">
+              {builtinStyles.map((customStyle) => (
+                <StyleAccordion
+                  key={customStyle.styleSlug}
+                  customStyle={customStyle}
+                  deleteStyle={deleteStyle}
+                  updateStyle={updateStyle}
+                  isBuiltin={true}
+                />
+              ))}
+            </Box>
+          </section>
+        </Stack>
+      )}
     </Box>
   );
 }

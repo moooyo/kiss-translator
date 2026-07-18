@@ -232,6 +232,7 @@ export const DEFAULT_MOUSE_HOVER_SETTING = {
 export const DEFAULT_SETTING = {
   version: CURRENT_SETTINGS_VERSION,
   extensionEnabled: true, // Global master switch for translation features on newly loaded pages
+  brandColor: "blue",
   darkMode: "auto", // 主题外观模式 ("light" 浅色, "dark" 深色, "auto" 跟随浏览器系统)
   uiLang: "en", // 插件设置面板界面的显示语言
   // fetchLimit: DEFAULT_FETCH_LIMIT, // 最大任务数量(移至rule，作废)

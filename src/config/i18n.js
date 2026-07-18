@@ -2928,8 +2928,8 @@ export const I18N = {
     tr: `Genel varsayılanlar ve ayarlar`,
   },
   options_appearance_description: {
-    zh: `控制译文在网页中的呈现方式`,
-    en: `Control how translations appear on webpages`,
+    zh: `界面主题与译文视觉呈现`,
+    en: `Interface theme and translation presentation`,
     zh_TW: `控制譯文在網頁中的呈現方式`,
     ja: `ウェブページ上の翻訳表示を調整`,
     ko: `웹페이지에서 번역 표시 방식 제어`,
@@ -3022,6 +3022,198 @@ export const I18N = {
     ja: `AI 翻訳、分割、辞書のプロンプトを管理`,
     ko: `AI 번역, 분할 및 사전 프롬프트 관리`,
     tr: `AI çevirisi, bölümleme ve sözlük istemlerini yönetin`,
+  },
+  settings_interface_theme: {
+    zh: `界面主题`,
+    en: `Interface theme`,
+  },
+  settings_brand_color: {
+    zh: `主题色`,
+    en: `Brand color`,
+  },
+  settings_brand_color_description: {
+    zh: `同步应用到弹窗、设置页与页面内组件`,
+    en: `Apply the palette to the popup, settings, and in-page surfaces`,
+  },
+  settings_brand_blue: {
+    zh: `Google 蓝`,
+    en: `Google blue`,
+  },
+  settings_brand_cyan: {
+    zh: `青碧`,
+    en: `Cyan`,
+  },
+  settings_brand_violet: {
+    zh: `紫罗兰`,
+    en: `Violet`,
+  },
+  settings_appearance_mode: {
+    zh: `外观模式`,
+    en: `Appearance mode`,
+  },
+  settings_theme_light: {
+    zh: `浅色`,
+    en: `Light`,
+  },
+  settings_theme_dark: {
+    zh: `深色`,
+    en: `Dark`,
+  },
+  settings_theme_system: {
+    zh: `跟随系统`,
+    en: `System`,
+  },
+  settings_translation_styles: {
+    zh: `译文样式`,
+    en: `Translation styles`,
+  },
+  settings_custom_css: {
+    zh: `自定义 CSS`,
+    en: `Custom CSS`,
+  },
+  settings_custom_css_description: {
+    zh: `为译文编写附加样式规则`,
+    en: `Create additional presentation rules for translated text`,
+  },
+  settings_rich_text_description: {
+    zh: `保留原文链接、加粗与内联样式`,
+    en: `Preserve links, emphasis, and inline formatting from the source`,
+  },
+  settings_style_library: {
+    zh: `样式库`,
+    en: `Style library`,
+  },
+  settings_style_library_description: {
+    zh: `{0} 个自定义样式 · {1} 个内置样式`,
+    en: `{0} custom styles · {1} built-in styles`,
+  },
+  settings_detailed_controls: {
+    zh: `详细设置`,
+    en: `Detailed settings`,
+  },
+  settings_trigger_group: {
+    zh: `触发`,
+    en: `Trigger`,
+  },
+  settings_follow_selection_description: {
+    zh: `结果浮窗贴近选中文本`,
+    en: `Keep the result panel close to the selected text`,
+  },
+  settings_selection_shortcut_description: {
+    zh: `打开翻译框或翻译选中文字`,
+    en: `Open the panel or translate the selected text`,
+  },
+  settings_single_word_dictionary_description: {
+    zh: `划选单词时优先展示词典`,
+    en: `Open the dictionary first for a selected word`,
+  },
+  settings_ai_dictionary_description: {
+    zh: `用大模型生成释义与例句`,
+    en: `Generate definitions and examples with an AI model`,
+  },
+  settings_auto_favorite_description: {
+    zh: `查询过的单词自动加入生词本`,
+    en: `Automatically save looked-up words`,
+  },
+  settings_appearance_group: {
+    zh: `外观`,
+    en: `Appearance`,
+  },
+  settings_simple_style_description: {
+    zh: `使用无边框轻量浮窗`,
+    en: `Use a lightweight borderless panel`,
+  },
+  settings_subtitle_auto_start: {
+    zh: `自动开始`,
+    en: `Start automatically`,
+  },
+  settings_subtitle_auto_start_description: {
+    zh: `解析到字幕后立即翻译`,
+    en: `Start translating as soon as captions are available`,
+  },
+  settings_quality_group: {
+    zh: `质量`,
+    en: `Quality`,
+  },
+  settings_segmentation_method: {
+    zh: `断句方式`,
+    en: `Segmentation method`,
+  },
+  settings_segmentation_description: {
+    zh: `AI 断句可显著提升长句质量`,
+    en: `AI segmentation can improve long-caption quality`,
+  },
+  settings_skip_ad_description: {
+    zh: `识别到广告时跳过字幕处理`,
+    en: `Skip caption processing while an advertisement is playing`,
+  },
+  settings_learning_group: {
+    zh: `学习`,
+    en: `Learning`,
+  },
+  settings_blur_translation_description: {
+    zh: `悬停显示译文，适合听力练习`,
+    en: `Reveal the translation on hover for listening practice`,
+  },
+  settings_prompt_general: {
+    zh: `通用翻译`,
+    en: `General translation`,
+  },
+  settings_prompt_general_description: {
+    zh: `默认 · 应用于所有 AI 接口`,
+    en: `Default · used by AI translation services`,
+  },
+  settings_prompt_subtitle: {
+    zh: `字幕断句`,
+    en: `Subtitle segmentation`,
+  },
+  settings_prompt_subtitle_description: {
+    zh: `用于 AI 智能断句`,
+    en: `Used for AI caption segmentation`,
+  },
+  settings_prompt_dictionary: {
+    zh: `词典释义`,
+    en: `Dictionary definition`,
+  },
+  settings_prompt_dictionary_description: {
+    zh: `生成释义与例句`,
+    en: `Generate definitions and usage examples`,
+  },
+  settings_prompt_new_description: {
+    zh: `从空白或模板开始创建`,
+    en: `Create from a blank prompt or a template`,
+  },
+  settings_create: {
+    zh: `新建`,
+    en: `Create`,
+  },
+  back: {
+    zh: `返回`,
+    en: `Back`,
+  },
+  settings_about_description: {
+    zh: `一个简约、开源的双语对照翻译扩展。`,
+    en: `A minimalist, open-source bilingual translation extension.`,
+  },
+  settings_about_license: {
+    zh: `基于 GPLv3 协议开放源代码。`,
+    en: `Open source under the GPLv3 license.`,
+  },
+  settings_check_updates: {
+    zh: `检查更新`,
+    en: `Check for updates`,
+  },
+  settings_project_website: {
+    zh: `项目网站`,
+    en: `Website`,
+  },
+  settings_project_details: {
+    zh: `项目详情与使用说明`,
+    en: `Project details and usage guide`,
+  },
+  settings_chinese_name: {
+    zh: `简约翻译`,
+    en: `Bilingual Translator`,
   },
   options_no_results: {
     zh: `没有匹配的设置`,

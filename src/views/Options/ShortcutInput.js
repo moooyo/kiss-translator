@@ -7,6 +7,25 @@ import { useEffect, useState, useRef } from "react";
 import { shortcutListener } from "../../libs/shortcut";
 import { useI18n } from "../../hooks/I18n";
 
+export function formatShortcutKey(key) {
+  const aliases = {
+    ControlLeft: "Ctrl",
+    ControlRight: "Ctrl",
+    AltLeft: "Alt",
+    AltRight: "Alt",
+    ShiftLeft: "Shift",
+    ShiftRight: "Shift",
+    MetaLeft: "Meta",
+    MetaRight: "Meta",
+    " ": "Space",
+  };
+
+  if (aliases[key]) return aliases[key];
+  if (/^Key[A-Z]$/.test(key)) return key.slice(3);
+  if (/^Digit[0-9]$/.test(key)) return key.slice(5);
+  return key;
+}
+
 /**
  * 快捷键录入输入框组件 (ShortcutInput)
  * 允许用户点击编辑按钮后，直接在键盘上按下对应的组合键，自动捕获并录入为快捷键配置
@@ -16,6 +35,7 @@ export default function ShortcutInput({
   onChange,
   label,
   helperText,
+  compact = false,
 }) {
   // 控制是否处于快捷键录入编辑状态
   const [isEditing, setIsEditing] = useState(false);
@@ -65,22 +85,30 @@ export default function ShortcutInput({
 
   const displayValue = isEditing ? editingKeys : keys;
   // 将空格键等特异字符转换为直观文字说明 (如 " " 转成 "Space")，然后以 " + " 分隔拼接成可读组合键
-  const formattedValue = displayValue
-    .map((item) => (item === " " ? "Space" : item))
-    .join(" + ");
+  const formattedValue = displayValue.map(formatShortcutKey).join(" + ");
 
   return (
-    <Stack direction="row" alignItems="flex-start">
+    <Stack
+      className={compact ? "kt-shortcut-input kt-shortcut-input--compact" : ""}
+      direction="row"
+      alignItems="flex-start"
+    >
       <TextField
         size="small"
-        label={label}
-        name={label}
+        label={compact ? undefined : label}
+        name={label || "shortcut"}
         value={formattedValue}
         fullWidth
         inputRef={inputRef}
         disabled={!isEditing}
         onBlur={handleBlur}
-        helperText={isEditing ? i18n("pls_press_shortcut") : helperText}
+        helperText={
+          compact
+            ? undefined
+            : isEditing
+              ? i18n("pls_press_shortcut")
+              : helperText
+        }
       />
       {isEditing ? (
         // 编辑中，显示确认保存的 CheckIcon

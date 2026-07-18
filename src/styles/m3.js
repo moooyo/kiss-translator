@@ -43,6 +43,46 @@ export const M3_COLORS = {
   },
 };
 
+export const M3_BRAND_COLORS = {
+  blue: { light: {}, dark: {} },
+  cyan: {
+    light: {
+      primary: "#006874",
+      onPrimary: "#FFFFFF",
+      primaryContainer: "#97F0FF",
+      onPrimaryContainer: "#001F24",
+      secondaryContainer: "#CDE7EC",
+      onSecondaryContainer: "#051F23",
+    },
+    dark: {
+      primary: "#4FD8EB",
+      onPrimary: "#00363D",
+      primaryContainer: "#004F58",
+      onPrimaryContainer: "#97F0FF",
+      secondaryContainer: "#334B4F",
+      onSecondaryContainer: "#CDE7EC",
+    },
+  },
+  violet: {
+    light: {
+      primary: "#6750A4",
+      onPrimary: "#FFFFFF",
+      primaryContainer: "#EADDFF",
+      onPrimaryContainer: "#21005D",
+      secondaryContainer: "#E8DEF8",
+      onSecondaryContainer: "#1D192B",
+    },
+    dark: {
+      primary: "#D0BCFF",
+      onPrimary: "#381E72",
+      primaryContainer: "#4F378B",
+      onPrimaryContainer: "#EADDFF",
+      secondaryContainer: "#4A4458",
+      onSecondaryContainer: "#E8DEF8",
+    },
+  },
+};
+
 export const M3_FONT_FAMILY =
   '"Google Sans Flex", "Google Sans", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
@@ -111,6 +151,42 @@ export const M3_GLOBAL_CSS = String.raw`
   --kt-shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 6px 1px rgba(0, 0, 0, .35);
   --kt-shadow-2: 0 4px 10px 3px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .5);
   color-scheme: dark;
+}
+
+.kt-m3-root[data-brand="cyan"] {
+  --kt-pri: #006874;
+  --kt-onpri: #ffffff;
+  --kt-pric: #97f0ff;
+  --kt-onpric: #001f24;
+  --kt-secc: #cde7ec;
+  --kt-onsecc: #051f23;
+}
+
+.kt-m3-root[data-brand="violet"] {
+  --kt-pri: #6750a4;
+  --kt-onpri: #ffffff;
+  --kt-pric: #eaddff;
+  --kt-onpric: #21005d;
+  --kt-secc: #e8def8;
+  --kt-onsecc: #1d192b;
+}
+
+.kt-m3-root[data-theme="dark"][data-brand="cyan"] {
+  --kt-pri: #4fd8eb;
+  --kt-onpri: #00363d;
+  --kt-pric: #004f58;
+  --kt-onpric: #97f0ff;
+  --kt-secc: #334b4f;
+  --kt-onsecc: #cde7ec;
+}
+
+.kt-m3-root[data-theme="dark"][data-brand="violet"] {
+  --kt-pri: #d0bcff;
+  --kt-onpri: #381e72;
+  --kt-pric: #4f378b;
+  --kt-onpric: #eaddff;
+  --kt-secc: #4a4458;
+  --kt-onsecc: #e8def8;
 }
 
 .kt-m3-root,

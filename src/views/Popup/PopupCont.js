@@ -37,6 +37,7 @@ import {
   ServiceLogo,
 } from "../../components/M3";
 import { POPUP_STYLES } from "./styles";
+import { css } from "@emotion/css";
 
 const API_ICON_FILES = {
   BuiltinAI: "BuiltinAI.svg",
@@ -93,6 +94,16 @@ export default function PopupCont({
   const [translationBusy, setTranslationBusy] = useState(false);
   const busyTimerRef = useRef(null);
   const { allTextStyles } = useAllTextStyles();
+  const popupTextStyles = useMemo(
+    () =>
+      allTextStyles.slice(0, 5).map((style) => ({
+        ...style,
+        previewClass: css`
+          ${style.styleCode || ""}
+        `,
+      })),
+    [allTextStyles]
+  );
 
   const showMessage = useCallback((message) => {
     setSnackbar({ open: true, message });
@@ -632,7 +643,7 @@ export default function PopupCont({
               {i18n("text_style_alt")}
             </div>
             <div className="kt-popup-style-chips">
-              {allTextStyles.slice(0, 5).map((style) => (
+              {popupTextStyles.map((style) => (
                 <button
                   type="button"
                   className="kt-popup-style-chip"
@@ -640,7 +651,10 @@ export default function PopupCont({
                   key={style.styleSlug}
                   onClick={() => putRuleValue("textStyle", style.styleSlug)}
                 >
-                  {style.styleName}
+                  <span className={style.previewClass}>
+                    {i18n("style_preview_translation")}
+                  </span>
+                  <small>{style.styleName}</small>
                 </button>
               ))}
             </div>

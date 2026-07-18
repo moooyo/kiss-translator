@@ -255,6 +255,11 @@ export async function run(isUserscript = false) {
     // 2. 初始化全局日志配置
     logger.setLevel(setting.logLevel);
 
+    if (setting.extensionEnabled === false) {
+      logger.info("KISS Translator is disabled by the global setting.");
+      return;
+    }
+
     // 3. 页面类型拦截：若是 PDF / 图片 / 音视频等非 HTML 或纯文本媒体页面，则终止执行，避免注入多余 DOM
     const contentType = document?.contentType?.toLowerCase() || "";
     const isPdfDocument = contentType.includes("application/pdf");

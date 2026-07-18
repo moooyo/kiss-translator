@@ -163,21 +163,32 @@ function StyleFields({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
  */
 function StyleAccordion({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
   const [expanded, setExpanded] = useState(false);
+  const i18n = useI18n();
+  const previewClass = useMemo(
+    () => css`
+      ${customStyle.styleCode || ""}
+    `,
+    [customStyle.styleCode]
+  );
 
   const handleChange = (e) => {
     setExpanded((pre) => !pre);
   };
 
   return (
-    <Accordion expanded={expanded} onChange={handleChange}>
+    <Accordion
+      className="kt-style-card"
+      expanded={expanded}
+      onChange={handleChange}
+    >
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Typography
-          sx={{
-            overflowWrap: "anywhere",
-          }}
-        >
-          {`${customStyle.styleName}`}
-        </Typography>
+        <Box className="kt-style-card__summary">
+          <span>{i18n("style_preview_source")}</span>
+          <span className={previewClass}>
+            {i18n("style_preview_translation")}
+          </span>
+          <Typography>{customStyle.styleName}</Typography>
+        </Box>
       </AccordionSummary>
       <AccordionDetails>
         {expanded && (
@@ -226,28 +237,38 @@ export default function StylesSetting() {
         </Box>
 
         {/* 用户自定义的可修改样式列表 */}
-        <Box>
-          {customStyles.map((customStyle) => (
-            <StyleAccordion
-              key={customStyle.styleSlug}
-              customStyle={customStyle}
-              deleteStyle={deleteStyle}
-              updateStyle={updateStyle}
-            />
-          ))}
-        </Box>
+        <section>
+          <Typography component="h2" className="kt-options-section-title">
+            {i18n("custom_styles")}
+          </Typography>
+          <Box className="kt-style-grid">
+            {customStyles.map((customStyle) => (
+              <StyleAccordion
+                key={customStyle.styleSlug}
+                customStyle={customStyle}
+                deleteStyle={deleteStyle}
+                updateStyle={updateStyle}
+              />
+            ))}
+          </Box>
+        </section>
         {/* 插件内置的只读系统样式列表 */}
-        <Box>
-          {builtinStyles.map((customStyle) => (
-            <StyleAccordion
-              key={customStyle.styleSlug}
-              customStyle={customStyle}
-              deleteStyle={deleteStyle}
-              updateStyle={updateStyle}
-              isBuiltin={true}
-            />
-          ))}
-        </Box>
+        <section>
+          <Typography component="h2" className="kt-options-section-title">
+            {i18n("builtin_styles")}
+          </Typography>
+          <Box className="kt-style-grid">
+            {builtinStyles.map((customStyle) => (
+              <StyleAccordion
+                key={customStyle.styleSlug}
+                customStyle={customStyle}
+                deleteStyle={deleteStyle}
+                updateStyle={updateStyle}
+                isBuiltin={true}
+              />
+            ))}
+          </Box>
+        </section>
       </Stack>
     </Box>
   );

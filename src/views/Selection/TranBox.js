@@ -12,6 +12,7 @@ import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useI18n } from "../../hooks/I18n";
 import { useCallback, useState } from "react";
 import TranForm from "./TranForm.js";
@@ -21,7 +22,7 @@ import { isExt } from "../../libs/client.js";
 import { useTheme, alpha } from "@mui/material/styles";
 import { isValidWord } from "../../libs/utils";
 import { useDarkMode } from "../../hooks/ColorMode";
-import { M3IconButton } from "../../components/M3";
+import { M3IconButton, M3Segmented } from "../../components/M3";
 import { SELECTION_STYLES } from "./styles";
 
 /**
@@ -44,9 +45,12 @@ function TranBoxHeader({
   setHideClickAway,
   followSelection,
   setFollowSelection,
+  activeView,
+  setActiveView,
 }) {
   const i18n = useI18n();
   const { darkMode, toggleDarkMode } = useDarkMode();
+  const [showMore, setShowMore] = useState(false);
 
   // 请求在独立的无边框小窗口中打开翻译框
   const openSeparateWindow = useCallback(() => {
@@ -63,23 +67,17 @@ function TranBoxHeader({
       <span className="kt-tranbox-header__drag" aria-hidden="true">
         <DragIndicatorRoundedIcon />
       </span>
-      <span className="kt-tranbox-header__title">{i18n("app_name")}</span>
+      <M3Segmented
+        className="kt-tranbox-header__segments"
+        ariaLabel={i18n("translate")}
+        value={activeView}
+        onChange={setActiveView}
+        items={[
+          { value: "translation", label: i18n("translate") },
+          { value: "dictionary", label: i18n("dictionary") },
+        ]}
+      />
       <span className="kt-tranbox-header__actions">
-        {isExt && (
-          <M3IconButton
-            title={i18n("open_separate_window")}
-            onClick={openSeparateWindow}
-          >
-            <OpenInNewIcon />
-          </M3IconButton>
-        )}
-        <M3IconButton
-          title={i18n("btn_tip_simple_style")}
-          aria-pressed={simpleStyle}
-          onClick={() => setSimpleStyle((previous) => !previous)}
-        >
-          {simpleStyle ? <UnfoldMoreIcon /> : <UnfoldLessIcon />}
-        </M3IconButton>
         <M3IconButton
           title={i18n("btn_tip_click_away")}
           aria-pressed={hideClickAway}
@@ -88,28 +86,52 @@ function TranBoxHeader({
           {hideClickAway ? <PushPinIcon /> : <PushPinOutlinedIcon />}
         </M3IconButton>
         <M3IconButton
-          title={i18n("btn_tip_follow_selection")}
-          aria-pressed={!followSelection}
-          onClick={() => setFollowSelection((previous) => !previous)}
+          title={i18n("more")}
+          aria-expanded={showMore}
+          onClick={() => setShowMore((previous) => !previous)}
         >
-          {followSelection ? <PushPinOutlinedIcon /> : <PushPinIcon />}
-        </M3IconButton>
-        <M3IconButton
-          title={i18n("btn_tip_dark_mode")}
-          onClick={toggleDarkMode}
-        >
-          {darkMode === "dark" ? (
-            <DarkModeIcon />
-          ) : darkMode === "auto" ? (
-            <BrightnessAutoIcon />
-          ) : (
-            <LightModeIcon />
-          )}
+          <MoreVertIcon />
         </M3IconButton>
         <M3IconButton title={i18n("close")} onClick={() => setShowBox(false)}>
           <CloseIcon />
         </M3IconButton>
       </span>
+      {showMore && (
+        <div className="kt-tranbox-header__menu">
+          {isExt && (
+            <button type="button" onClick={openSeparateWindow}>
+              <OpenInNewIcon />
+              {i18n("open_separate_window")}
+            </button>
+          )}
+          <button
+            type="button"
+            aria-pressed={simpleStyle}
+            onClick={() => setSimpleStyle((previous) => !previous)}
+          >
+            {simpleStyle ? <UnfoldMoreIcon /> : <UnfoldLessIcon />}
+            {i18n("btn_tip_simple_style")}
+          </button>
+          <button
+            type="button"
+            aria-pressed={!followSelection}
+            onClick={() => setFollowSelection((previous) => !previous)}
+          >
+            {followSelection ? <PushPinOutlinedIcon /> : <PushPinIcon />}
+            {i18n("btn_tip_follow_selection")}
+          </button>
+          <button type="button" onClick={toggleDarkMode}>
+            {darkMode === "dark" ? (
+              <DarkModeIcon />
+            ) : darkMode === "auto" ? (
+              <BrightnessAutoIcon />
+            ) : (
+              <LightModeIcon />
+            )}
+            {i18n("btn_tip_dark_mode")}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -133,6 +155,7 @@ function TranBoxContent({
   aiDictPromptSlug,
   prompts,
   selectionContext,
+  activeView,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -193,6 +216,7 @@ function TranBoxContent({
         aiDictApiSlug={aiDictApiSlug}
         aiDictPromptSlug={aiDictPromptSlug}
         selectionContext={selectionContext}
+        viewMode={activeView}
       />
     </Box>
   );
@@ -203,6 +227,7 @@ function TranBoxContent({
  */
 export default function TranBox(props) {
   const [mouseHover, setMouseHover] = useState(false);
+  const [activeView, setActiveView] = useState("translation");
 
   const simpleStyle = props.simpleStyle;
   const setSimpleStyle = props.setSimpleStyle;
@@ -242,6 +267,8 @@ export default function TranBox(props) {
                 followSelection={followSelection}
                 setFollowSelection={setFollowSelection}
                 mouseHover={mouseHover}
+                activeView={activeView}
+                setActiveView={setActiveView}
               />
             }
             onClick={(e) => e.stopPropagation()}
@@ -264,6 +291,7 @@ export default function TranBox(props) {
               aiDictApiSlug={props.tranboxSetting.aiDictApiSlug}
               aiDictPromptSlug={props.tranboxSetting.aiDictPromptSlug}
               selectionContext={props.selectionContext}
+              activeView={activeView}
             />
           </DraggableResizable>
         )}

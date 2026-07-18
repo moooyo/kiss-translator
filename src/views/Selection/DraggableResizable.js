@@ -41,6 +41,8 @@ function Pointer({
 
   // 指针/触控按下事件
   function handlePointerDown(e) {
+    if (e.target.closest?.("button, input, select, textarea, a")) return;
+
     // 非移动端环境，对指针捕获进行锁定，防止拖出元素边界时事件丢失
     !isMobile && e.target.setPointerCapture(e.pointerId);
 

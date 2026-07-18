@@ -289,3 +289,40 @@ describe("TranForm translation service selection", () => {
     });
   });
 });
+
+describe("TranForm panel views", () => {
+  beforeEach(() => {
+    apiDict.mockReset();
+    document.body.innerHTML = "";
+  });
+
+  test("separates translation and dictionary content", async () => {
+    const translation = renderTranForm({
+      apiSlugs: ["openai"],
+      viewMode: "translation",
+    });
+    await flushEffects();
+
+    expect(
+      translation.container.querySelector('[data-testid="tran-cont"]')
+    ).not.toBeNull();
+    expect(
+      translation.container.querySelector('[data-testid="default-dict"]')
+    ).toBeNull();
+    act(() => translation.root.unmount());
+
+    const dictionary = renderTranForm({
+      apiSlugs: ["openai"],
+      viewMode: "dictionary",
+    });
+    await flushEffects();
+
+    expect(
+      dictionary.container.querySelector('[data-testid="tran-cont"]')
+    ).toBeNull();
+    expect(
+      dictionary.container.querySelector('[data-testid="default-dict"]')
+    ).not.toBeNull();
+    act(() => dictionary.root.unmount());
+  });
+});

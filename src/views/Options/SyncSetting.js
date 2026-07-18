@@ -340,6 +340,9 @@ export default function SyncSetting() {
                 <IconButton
                   size="small"
                   edge="end"
+                  aria-label={`${i18n(showSyncKey ? "hide" : "show")} ${i18n(
+                    "data_sync_key"
+                  )}`}
                   onClick={() => setShowSyncKey((value) => !value)}
                   onMouseDown={(e) => e.preventDefault()}
                 >
@@ -367,6 +370,9 @@ export default function SyncSetting() {
                     <IconButton
                       size="small"
                       edge="end"
+                      aria-label={`${i18n(
+                        showSyncEncryptKey ? "hide" : "show"
+                      )} ${i18n("data_sync_encrypt_key")}`}
                       onClick={() => setShowSyncEncryptKey((value) => !value)}
                       onMouseDown={(e) => e.preventDefault()}
                     >
@@ -472,6 +478,9 @@ export default function SyncSetting() {
                       <IconButton
                         size="small"
                         edge="end"
+                        aria-label={`${i18n(
+                          showOldEncryptKey ? "hide" : "show"
+                        )} ${i18n("old_sync_encrypt_key")}`}
                         onClick={() => setShowOldEncryptKey((value) => !value)}
                         onMouseDown={(e) => e.preventDefault()}
                       >
@@ -498,6 +507,9 @@ export default function SyncSetting() {
                     <IconButton
                       size="small"
                       edge="end"
+                      aria-label={`${i18n(
+                        showNewEncryptKey ? "hide" : "show"
+                      )} ${i18n("new_sync_encrypt_key")}`}
                       onClick={() => setShowNewEncryptKey((value) => !value)}
                       onMouseDown={(e) => e.preventDefault()}
                     >
@@ -525,6 +537,9 @@ export default function SyncSetting() {
                     <IconButton
                       size="small"
                       edge="end"
+                      aria-label={`${i18n(
+                        showConfirmEncryptKey ? "hide" : "show"
+                      )} ${i18n("confirm_sync_encrypt_key")}`}
                       onClick={() =>
                         setShowConfirmEncryptKey((value) => !value)
                       }

@@ -124,8 +124,15 @@ export const M3_GLOBAL_CSS = String.raw`
 .kt-m3-root input,
 .kt-m3-root select,
 .kt-m3-root textarea {
-  color: inherit;
   font: inherit;
+}
+
+.kt-m3-root input,
+.kt-m3-root select,
+.kt-m3-root textarea { color: inherit; }
+
+.kt-m3-root .MuiInputBase-input {
+  box-sizing: content-box;
 }
 
 .kt-m3-root button {

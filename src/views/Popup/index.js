@@ -69,6 +69,7 @@ function TranslationTab() {
         aiDictApiSlug={aiDictApiSlug}
         aiDictPromptSlug={aiDictPromptSlug}
         prompts={prompts}
+        popupStyle
       />
     </div>
   );

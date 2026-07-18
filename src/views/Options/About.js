@@ -3,6 +3,16 @@ import CircularProgress from "@mui/material/CircularProgress";
 import ReactMarkdown from "react-markdown";
 import { useI18n, useI18nMd } from "../../hooks/I18n";
 
+const MARKDOWN_COMPONENTS = {
+  a: ({ href, children }) => {
+    if (!href || href.trim().toLowerCase().startsWith("javascript:")) {
+      return <span>{children}</span>;
+    }
+
+    return <a href={href}>{children}</a>;
+  },
+};
+
 /**
  * 关于面板组件 (在设置页展示关于/帮助的 MD 格式文档)
  */
@@ -20,7 +30,9 @@ export default function About() {
         </center>
       ) : (
         /* 成功后，使用 ReactMarkdown 渲染排版。若拉取失败，展示后备的纯文本说明 */
-        <ReactMarkdown children={error ? i18n("about_md_local") : data} />
+        <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+          {error ? i18n("about_md_local") : data}
+        </ReactMarkdown>
       )}
     </Box>
   );

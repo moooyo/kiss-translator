@@ -178,6 +178,7 @@ export const DEFAULT_SUBTITLE_SETTING = {
   isBilingual: true, // 字幕是否启用双语对照显示
   displayOrder: "original-first", // 字幕双语显示顺序：原文在前或译文在前
   blurTranslation: false, // 是否模糊显示译文 (用于听力/口语训练)
+  fontScale: 100,
   skipAd: false, // 是否在识别到 YouTube 广告字幕时进行特殊快进
   windowStyle: SUBTITLE_WINDOW_STYLE, // 字幕背景及定位样式
   originStyle: SUBTITLE_ORIGIN_STYLE, // 原文字体大小及字重样式
@@ -230,6 +231,7 @@ export const DEFAULT_MOUSE_HOVER_SETTING = {
 // --- 全局默认设置对象，存储于 local storage ---
 export const DEFAULT_SETTING = {
   version: CURRENT_SETTINGS_VERSION,
+  extensionEnabled: true, // Global master switch for translation features on newly loaded pages
   darkMode: "auto", // 主题外观模式 ("light" 浅色, "dark" 深色, "auto" 跟随浏览器系统)
   uiLang: "en", // 插件设置面板界面的显示语言
   // fetchLimit: DEFAULT_FETCH_LIMIT, // 最大任务数量(移至rule，作废)

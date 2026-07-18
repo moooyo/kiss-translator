@@ -68,6 +68,7 @@ import { useApiList } from "../../hooks/Api";
 import ShowMoreButton from "./ShowMoreButton";
 import { useConfirm } from "../../hooks/Confirm";
 import { useAllTextStyles } from "../../hooks/CustomStyles";
+import { css } from "@emotion/css";
 
 // 计算规则的初始表单值
 const calculateInitialValues = (rule) => {
@@ -257,10 +258,54 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
       {GLOBAL_KEY}
     </MenuItem>
   );
+  const featuredStyles = [
+    "dash_line",
+    "under_line",
+    "marker",
+    "blockquote",
+    "style_none",
+  ]
+    .map((slug) => allTextStyles.find((style) => style.styleSlug === slug))
+    .filter(Boolean);
 
   return (
     <form onSubmit={handleSubmit}>
       <Stack spacing={2}>
+        {rule?.pattern === "*" && (
+          <section>
+            <Typography component="h2" className="kt-options-section-title">
+              {i18n("text_style")}
+            </Typography>
+            <div className="kt-rule-style-grid">
+              {featuredStyles.map((style) => {
+                const previewClass = css`
+                  ${style.styleCode || ""}
+                `;
+                return (
+                  <button
+                    type="button"
+                    className="kt-rule-style-card"
+                    aria-pressed={textStyle === style.styleSlug}
+                    disabled={disabled}
+                    onClick={() =>
+                      handleChange({
+                        preventDefault: () => {},
+                        target: { name: "textStyle", value: style.styleSlug },
+                      })
+                    }
+                    key={style.styleSlug}
+                  >
+                    <span>{i18n("style_preview_source")}</span>
+                    <span className={previewClass}>
+                      {i18n("style_preview_translation")}
+                    </span>
+                    <strong>{style.styleName}</strong>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        )}
         {/* 规则匹配模式输入框（如域名或通配符 '*'） */}
         <CodeField
           size="small"

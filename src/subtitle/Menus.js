@@ -23,7 +23,11 @@ const MENU_STYLES = String.raw`
   right: 0;
   bottom: 78px;
   z-index: 2147483647;
-  overflow: visible;
+  max-height: calc(100vh - 112px);
+  max-height: min(640px, calc(100dvh - 112px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 18px;
   border: 1px solid var(--kt-linev);
   border-radius: 24px;
@@ -35,9 +39,12 @@ const MENU_STYLES = String.raw`
   animation: kt-subtitle-up .4s var(--kt-spring);
   display: flex;
   flex-direction: column;
+  scrollbar-gutter: stable;
 }
 .kt-subtitle-panel * { box-sizing: border-box; }
-.kt-subtitle-panel__header { display: flex; align-items: center; gap: 10px; order: -1; margin-bottom: 8px; font-size: 15px; font-weight: 700; }
+.kt-subtitle-panel::-webkit-scrollbar { width: 8px; }
+.kt-subtitle-panel::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: var(--kt-linev); background-clip: content-box; }
+.kt-subtitle-panel__header { display: flex; align-items: center; gap: 10px; order: -1; position: sticky; top: -18px; z-index: 2; margin-bottom: 8px; padding: 10px 0 8px; background: var(--kt-sf0); font-size: 15px; font-weight: 700; }
 .kt-subtitle-panel__header-icon { width: 29px; height: 29px; display: grid; place-items: center; border-radius: 10px; background: var(--kt-pric); color: var(--kt-onpric); font-size: 15px; }
 .kt-subtitle-row { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--kt-linev); }
 .kt-subtitle-row__copy { min-width: 0; }
@@ -52,10 +59,18 @@ const MENU_STYLES = String.raw`
 .kt-subtitle-segmented button { min-height: 34px; flex: 1; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--kt-onv); cursor: pointer; font: inherit; font-size: 11px; }
 .kt-subtitle-segmented button[aria-pressed="true"] { background: var(--kt-secc); color: var(--kt-onsecc); font-weight: 700; }
 .kt-subtitle-section-label { margin-top: 12px; font-size: 11.5px; font-weight: 700; }
+.kt-subtitle-range { min-height: 62px; display: grid; grid-template-columns: minmax(0, 1fr) 104px 42px; align-items: center; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--kt-linev); }
+.kt-subtitle-range label { min-width: 0; overflow: hidden; font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
+.kt-subtitle-range input { width: 100%; accent-color: var(--kt-pri); cursor: pointer; }
+.kt-subtitle-range output { color: var(--kt-onv); font-size: 11px; font-weight: 700; text-align: right; }
 .kt-subtitle-progress { height: 4px; margin-top: 14px; overflow: hidden; border-radius: 999px; background: var(--kt-sf2); }
 .kt-subtitle-progress span { height: 100%; display: block; border-radius: inherit; background: var(--kt-pri); transition: width .3s; }
-.kt-subtitle-download { width: 100%; min-height: 42px; margin-top: 12px; border: 0; border-radius: 999px; background: var(--kt-pric); color: var(--kt-onpric); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.kt-subtitle-download { width: 100%; min-height: 42px; margin-top: 12px; border: 1px solid transparent; border-radius: 999px; background: var(--kt-pric); color: var(--kt-onpric); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; transition: background .3s, border-color .3s, color .3s, transform .15s; }
+.kt-subtitle-download[data-partial="true"] { border-color: var(--kt-linev); background: var(--kt-sf2); color: var(--kt-on); }
+.kt-subtitle-download:not(:disabled):active { transform: scale(.98); }
 .kt-subtitle-download:disabled { cursor: default; opacity: .45; }
+.kt-subtitle-all-settings { width: 100%; min-height: 42px; margin-top: 8px; border: 0; border-radius: 999px; background: transparent; color: var(--kt-pri); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
+.kt-subtitle-all-settings:hover { background: var(--kt-sf2); }
 @media (prefers-color-scheme: dark) {
   .kt-subtitle-panel {
     --kt-pri: #a8c7fa;
@@ -111,6 +126,7 @@ function Select({ label, name, value, options, onChange, disabled = false }) {
       <span className="kt-subtitle-row__label">{label}</span>
       <select
         className="kt-subtitle-select"
+        name={name}
         value={value}
         disabled={disabled}
         onChange={(event) => onChange({ name, value: event.target.value })}
@@ -145,12 +161,33 @@ function Segmented({ label, value, items, onChange }) {
   );
 }
 
+function Range({ label, name, value, min, max, onChange }) {
+  return (
+    <div className="kt-subtitle-range">
+      <label htmlFor={`kt-subtitle-${name}`}>{label}</label>
+      <input
+        id={`kt-subtitle-${name}`}
+        name={name}
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) =>
+          onChange({ name, value: Number(event.target.value) })
+        }
+      />
+      <output htmlFor={`kt-subtitle-${name}`}>{value}%</output>
+    </div>
+  );
+}
+
 export function Menus({
   i18n,
   formData,
   progressed = 0,
   updateSetting,
   downloadSubtitle,
+  openSettings,
   transApis,
 }) {
   const handleChange = useCallback(
@@ -176,6 +213,16 @@ export function Menus({
     ],
     [aiEnabledApis, i18n]
   );
+  const aiContextOptions = useMemo(
+    () => [
+      { value: "-", label: i18n("disable") },
+      ...aiEnabledApis.map((api) => ({
+        value: api.apiSlug,
+        label: api.apiName,
+      })),
+    ],
+    [aiEnabledApis, i18n]
+  );
   const serviceOptions = useMemo(
     () =>
       enabledApis.map((api) => ({
@@ -190,29 +237,36 @@ export function Menus({
     skipAd = false,
     isBilingual = true,
     blurTranslation = false,
+    fontScale = 100,
     autoTranslate = true,
+    aiContextSlug = "-",
     displayOrder = "original-first",
     apiSlug = serviceOptions[0]?.value || "",
     windowStyle = "",
   } = formData;
   const backgroundMode = windowStyle.includes("linear-gradient")
     ? "gradient"
-    : windowStyle === ""
+    : /background(?:-color)?\s*:\s*(?:transparent|none)/i.test(windowStyle)
       ? "none"
       : "translucent";
-  const status =
-    progressed === 0
+  const normalizedProgress = Math.min(
+    100,
+    Math.max(0, Number(progressed) || 0)
+  );
+  const isPartialDownload = normalizedProgress > 0 && normalizedProgress < 100;
+  const downloadLabel =
+    normalizedProgress === 0
       ? i18n("waiting_subtitles")
-      : progressed === 100
+      : normalizedProgress === 100
         ? i18n("download_subtitles")
-        : i18n("processing_subtitles");
+        : i18n("download_processed_subtitles");
 
   const backgroundStyles = {
     translucent:
-      "background:rgba(10,12,16,.62);backdrop-filter:blur(6px);border-radius:16px;padding:12px 20px;",
+      "padding:12px 20px;background:rgba(10,12,16,.62);backdrop-filter:blur(6px);border-radius:16px;color:#fff;line-height:1.45;display:inline-block;",
     gradient:
-      "background:linear-gradient(180deg,rgba(10,12,16,.08),rgba(10,12,16,.78));border-radius:16px;padding:12px 20px;",
-    none: "",
+      "padding:12px 20px;background:linear-gradient(180deg,rgba(10,12,16,.08),rgba(10,12,16,.78));border-radius:16px;color:#fff;line-height:1.45;display:inline-block;",
+    none: "padding:12px 20px;background:transparent;border-radius:16px;color:#fff;line-height:1.45;display:inline-block;",
   };
 
   return (
@@ -221,6 +275,14 @@ export function Menus({
         name="autoTranslate"
         value={autoTranslate}
         label={i18n("enable_subtitle_translate")}
+        onChange={handleChange}
+      />
+      <Range
+        name="fontScale"
+        value={fontScale}
+        min={80}
+        max={150}
+        label={i18n("subtitle_font_scale")}
         onChange={handleChange}
       />
       <div className="kt-subtitle-panel__header">
@@ -256,6 +318,14 @@ export function Menus({
         disabled={segOptions.length <= 1}
         onChange={handleChange}
       />
+      <Select
+        name="aiContextSlug"
+        value={aiContextSlug}
+        options={aiContextOptions}
+        label={i18n("ai_enhanced_context")}
+        disabled={aiContextOptions.length <= 1}
+        onChange={handleChange}
+      />
       <Segmented
         label={i18n("subtitle_background")}
         value={backgroundMode}
@@ -287,16 +357,26 @@ export function Menus({
         onChange={handleChange}
       />
       <div className="kt-subtitle-progress" aria-hidden="true">
-        <span style={{ width: `${progressed}%` }} />
+        <span style={{ width: `${normalizedProgress}%` }} />
       </div>
       <button
         type="button"
         className="kt-subtitle-download"
-        disabled={progressed < 100}
+        data-partial={isPartialDownload}
+        disabled={normalizedProgress === 0}
         onClick={downloadSubtitle}
       >
-        {status} · {progressed}%
+        {downloadLabel} · {normalizedProgress}%
       </button>
+      {openSettings && (
+        <button
+          type="button"
+          className="kt-subtitle-all-settings"
+          onClick={openSettings}
+        >
+          {i18n("all_subtitle_settings")} →
+        </button>
+      )}
       <style>{MENU_STYLES}</style>
     </div>
   );

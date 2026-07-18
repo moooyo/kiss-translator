@@ -115,6 +115,7 @@ export default function Theme({ children, options = {}, styles = {} }) {
           defaultProps: { disableUnderline: true },
           styleOverrides: {
             root: {
+              minHeight: 48,
               overflow: "hidden",
               border: "1px solid transparent",
               borderRadius: 16,

@@ -9,6 +9,8 @@ import IconButton from "@mui/material/IconButton";
 import DoneIcon from "@mui/icons-material/Done";
 import CircularProgress from "@mui/material/CircularProgress";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
 import { useI18n } from "../../hooks/I18n";
 import {
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
@@ -53,6 +55,8 @@ export default function TranForm({
   prompts = [],
   selectionContext = "",
   isPlaygound = false,
+  popupStyle = false,
+  viewMode = "all",
 }) {
   const i18n = useI18n();
 
@@ -69,6 +73,7 @@ export default function TranForm({
   const [enDict, setEnDict] = useState(initEnDict);
   const [enSug, setEnSug] = useState(initEnSug);
   const [dictTab, setDictTab] = useState("default");
+  const [showPopupServices, setShowPopupServices] = useState(false);
   const hasUserChangedDictTabRef = useRef(false);
   // 异步自动检测到的源文本语言代码 (例如 "en", "zh")
   const [deLang, setDeLang] = useState("");
@@ -209,6 +214,23 @@ export default function TranForm({
     };
   }, [aiDictApiSlug, aiDictPromptSlug, prompts, transApis]);
   const aiDictAvailable = Boolean(text?.trim() && aiDictApiSetting);
+  const showTranslation = viewMode !== "dictionary";
+  const showDictionary = viewMode !== "translation";
+
+  const commitText = () => {
+    setEditMode(false);
+    setText(editText.trim());
+  };
+
+  const togglePopupService = (slug) => {
+    setHasUserChangedApiSlugs(true);
+    setApiSlugs((current) => {
+      if (!current.includes(slug)) return [...current, slug];
+      return current.length > 1
+        ? current.filter((currentSlug) => currentSlug !== slug)
+        : current;
+    });
+  };
 
   useEffect(() => {
     if (hasUserChangedDictTabRef.current) {
@@ -226,10 +248,182 @@ export default function TranForm({
     }
   }, [text, defaultDictAvailable, aiDictAvailable]);
 
+  const dictionaryPanels = (
+    <>
+      {(defaultDictAvailable || aiDictAvailable) && (
+        <Box className={popupStyle ? "kt-popup-dictionary" : undefined}>
+          {aiDictAvailable ? (
+            <>
+              <Tabs
+                value={defaultDictAvailable ? dictTab : "ai"}
+                onChange={(_, value) => {
+                  hasUserChangedDictTabRef.current = true;
+                  setDictTab(value);
+                }}
+                variant="scrollable"
+                allowScrollButtonsMobile
+                sx={{ minHeight: 36, mb: 1 }}
+              >
+                {defaultDictAvailable && (
+                  <Tab
+                    value="default"
+                    label={i18n("default_dict", "Default dictionary")}
+                    sx={{ minHeight: 36, py: 0.5 }}
+                  />
+                )}
+                <Tab
+                  value="ai"
+                  label={i18n("ai_dict", "AI dictionary")}
+                  sx={{ minHeight: 36, py: 0.5 }}
+                />
+              </Tabs>
+              {defaultDictAvailable && dictTab === "default" && (
+                <>
+                  {isWord && OPT_DICT_MAP.has(enDict) && (
+                    <DictCont text={text} enDict={enDict} />
+                  )}
+                  {isSingleChineseChar(text) && <Zdic text={text} />}
+                </>
+              )}
+              {(!defaultDictAvailable || dictTab === "ai") && (
+                <AiDictCont
+                  text={text}
+                  fromLang={fromLang}
+                  speechLang={fromLang === "auto" ? deLang : fromLang}
+                  toLang={realToLang}
+                  apiSetting={aiDictApiSetting}
+                  context={
+                    selectionContext && selectionContext.includes(text)
+                      ? selectionContext
+                      : ""
+                  }
+                />
+              )}
+            </>
+          ) : (
+            <>
+              {isWord && OPT_DICT_MAP.has(enDict) && (
+                <DictCont text={text} enDict={enDict} />
+              )}
+              {isSingleChineseChar(text) && <Zdic text={text} />}
+            </>
+          )}
+        </Box>
+      )}
+
+      {isWord && OPT_SUG_MAP.has(enSug) && (
+        <Box className={popupStyle ? "kt-popup-dictionary" : undefined}>
+          <SugCont text={text} enSug={enSug} />
+        </Box>
+      )}
+    </>
+  );
+
+  if (popupStyle) {
+    return (
+      <div className="kt-popup-translation-form">
+        <div className="kt-popup-translation-input">
+          <textarea
+            ref={inputRef}
+            value={editText}
+            maxLength={5000}
+            aria-label={i18n("original_text")}
+            placeholder={i18n("original_text")}
+            onChange={(event) => setEditText(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                commitText();
+              }
+            }}
+          />
+          <div className="kt-popup-translation-input__footer">
+            <span>{editText.length} / 5000</span>
+            <button
+              type="button"
+              className="kt-m3-button"
+              disabled={!editText.trim()}
+              onClick={commitText}
+            >
+              <TranslateRoundedIcon />
+              {i18n("translate")}
+            </button>
+          </div>
+        </div>
+
+        <div className="kt-popup-translation-direction">
+          <select
+            value={fromLang}
+            aria-label={i18n("from_lang")}
+            onChange={(event) => setFromLang(event.target.value)}
+          >
+            {OPT_LANGS_FROM.map(([lang, name]) => (
+              <option key={lang} value={lang}>
+                {name.split(" - ")[0]}
+              </option>
+            ))}
+          </select>
+          <span aria-hidden="true">→</span>
+          <select
+            value={toLang}
+            aria-label={i18n("to_lang")}
+            onChange={(event) => setToLang(event.target.value)}
+          >
+            {OPT_LANGS_TO.map(([lang, name]) => (
+              <option key={lang} value={lang}>
+                {name.split(" - ")[0]}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {showPopupServices && (
+          <div className="kt-popup-translation-services">
+            {optApis.map((api) => (
+              <button
+                type="button"
+                aria-pressed={activeApiSlugs.includes(api.key)}
+                onClick={() => togglePopupService(api.key)}
+                key={api.key}
+              >
+                {api.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="kt-popup-translation-results">
+          {activeApiSlugs.map((slug) => (
+            <TranCont
+              key={slug}
+              text={text}
+              fromLang={fromLang}
+              toLang={realToLang}
+              apiSlug={slug}
+              transApis={transApis}
+              popupStyle
+            />
+          ))}
+        </div>
+
+        <button
+          type="button"
+          className="kt-popup-translation-compare"
+          aria-expanded={showPopupServices}
+          onClick={() => setShowPopupServices((current) => !current)}
+        >
+          {i18n("popup_compare_services")}
+          <ExpandMoreRoundedIcon />
+        </button>
+
+        {dictionaryPanels}
+      </div>
+    );
+  }
+
   return (
     <Stack spacing={simpleStyle ? 1 : 2}>
       {/* 极简模式下不展示任何语言、服务商配置栏以及原始文本框 */}
-      {!simpleStyle && (
+      {!simpleStyle && showTranslation && (
         <>
           <Box>
             {/* 各类服务参数、语种设置下拉菜单网格 */}
@@ -494,85 +688,20 @@ export default function TranForm({
 
       {/* ---------------- 翻译及释义面板的按需渲染分发 ---------------- */}
       {/* 1. 分别为每一个选定的翻译服务引擎渲染对应的 TranCont 内容翻译器 */}
-      {activeApiSlugs.map((slug) => (
-        <TranCont
-          key={slug}
-          text={text}
-          fromLang={fromLang}
-          toLang={realToLang}
-          simpleStyle={simpleStyle}
-          apiSlug={slug}
-          transApis={transApis}
-        />
-      ))}
+      {showTranslation &&
+        activeApiSlugs.map((slug) => (
+          <TranCont
+            key={slug}
+            text={text}
+            fromLang={fromLang}
+            toLang={realToLang}
+            simpleStyle={simpleStyle}
+            apiSlug={slug}
+            transApis={transApis}
+          />
+        ))}
 
-      {/* 2. 根据可用能力在默认词典与 AI 词典之间分流展示 */}
-      {(defaultDictAvailable || aiDictAvailable) && (
-        <Box>
-          {aiDictAvailable ? (
-            <>
-              <Tabs
-                value={defaultDictAvailable ? dictTab : "ai"}
-                onChange={(_, value) => {
-                  hasUserChangedDictTabRef.current = true;
-                  setDictTab(value);
-                }}
-                variant="scrollable"
-                allowScrollButtonsMobile
-                sx={{ minHeight: 36, mb: 1 }}
-              >
-                {defaultDictAvailable && (
-                  <Tab
-                    value="default"
-                    label={i18n("default_dict", "默认词典")}
-                    sx={{ minHeight: 36, py: 0.5 }}
-                  />
-                )}
-                <Tab
-                  value="ai"
-                  label={i18n("ai_dict", "AI词典")}
-                  sx={{ minHeight: 36, py: 0.5 }}
-                />
-              </Tabs>
-              {defaultDictAvailable && dictTab === "default" && (
-                <>
-                  {isWord && OPT_DICT_MAP.has(enDict) && (
-                    <DictCont text={text} enDict={enDict} />
-                  )}
-                  {isSingleChineseChar(text) && <Zdic text={text} />}
-                </>
-              )}
-              {(!defaultDictAvailable || dictTab === "ai") && (
-                <AiDictCont
-                  text={text}
-                  fromLang={fromLang}
-                  speechLang={fromLang === "auto" ? deLang : fromLang}
-                  toLang={realToLang}
-                  apiSetting={aiDictApiSetting}
-                  context={
-                    // 只在段落上下文确实包含当前文本时传入，避免手动输入内容复用旧划词上下文。
-                    selectionContext && selectionContext.includes(text)
-                      ? selectionContext
-                      : ""
-                  }
-                />
-              )}
-            </>
-          ) : (
-            <>
-              {isWord && OPT_DICT_MAP.has(enDict) && (
-                <DictCont text={text} enDict={enDict} />
-              )}
-              {isSingleChineseChar(text) && <Zdic text={text} />}
-            </>
-          )}
-        </Box>
-      )}
-
-      {/* 3. 如果是合法的英文单词且启用了输入建议，渲染联想建议组件 */}
-      {isWord && OPT_SUG_MAP.has(enSug) && (
-        <SugCont text={text} enSug={enSug} />
-      )}
+      {showDictionary && dictionaryPanels}
     </Stack>
   );
 }

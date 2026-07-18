@@ -57,8 +57,10 @@ function getGmStorage() {
  * @param {*} val 待写入的字符串数据
  */
 async function set(key, val) {
-  if (isExt) {
+  if (isExt && browser?.storage?.local) {
     await browser.storage.local.set({ [key]: val });
+  } else if (isExt && process.env.NODE_ENV === "production") {
+    throw new Error("Extension storage API is not available");
   } else if (isGm) {
     await getGmStorage().setValue(key, val);
   } else {
@@ -72,9 +74,11 @@ async function set(key, val) {
  * @returns {Promise<string|null>} 读取到的原始字符串数据
  */
 async function get(key) {
-  if (isExt) {
+  if (isExt && browser?.storage?.local) {
     const val = await browser.storage.local.get([key]);
     return val[key];
+  } else if (isExt && process.env.NODE_ENV === "production") {
+    throw new Error("Extension storage API is not available");
   } else if (isGm) {
     const val = await getGmStorage().getValue(key);
     return val;
@@ -87,8 +91,10 @@ async function get(key) {
  * @param {string} key 键名
  */
 async function del(key) {
-  if (isExt) {
+  if (isExt && browser?.storage?.local) {
     await browser.storage.local.remove([key]);
+  } else if (isExt && process.env.NODE_ENV === "production") {
+    throw new Error("Extension storage API is not available");
   } else if (isGm) {
     await getGmStorage().deleteValue(key);
   } else {

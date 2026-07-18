@@ -114,6 +114,7 @@ describe("common iframe startup", () => {
       start: mockTranslatorManagerStart,
     }));
     getSettingWithDefault.mockResolvedValue({
+      extensionEnabled: true,
       blacklist: "",
       tranboxSetting: { blacklist: "", transOpen: true },
       inputRule: { blacklist: "", transOpen: true },
@@ -202,6 +203,20 @@ describe("common iframe startup", () => {
     expect(TranslatorManager).toHaveBeenCalledTimes(1);
     expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(1);
     expect(runSubtitle).toHaveBeenCalledTimes(1);
+  });
+
+  test("skips all page features when the global extension switch is off", async () => {
+    getSettingWithDefault.mockResolvedValue({
+      extensionEnabled: false,
+      logLevel: 1,
+    });
+
+    await run();
+
+    expect(matchRule).not.toHaveBeenCalled();
+    expect(TranslatorManager).not.toHaveBeenCalled();
+    expect(mockTranslatorManagerStart).not.toHaveBeenCalled();
+    expect(runSubtitle).not.toHaveBeenCalled();
   });
 
   test("inverts the FAB visibility when the top-level page matches its exception list", async () => {

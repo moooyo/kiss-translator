@@ -160,6 +160,7 @@ export class WordTooltipController {
     this.tooltipEl = null;
     this.hoverTimeout = null;
     this.activeWordEl = null;
+    this.isPinned = false;
   }
 
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
@@ -171,8 +172,11 @@ export class WordTooltipController {
       const enterHandler = (event) =>
         this.#handleWordHover(event, getTimestamp);
       const leaveHandler = (event) => this.#handleWordHoverOut(event);
+      const clickHandler = (event) =>
+        this.#handleWordClick(event, getTimestamp);
       span.addEventListener("pointerenter", enterHandler);
       span.addEventListener("pointerleave", leaveHandler);
+      span.addEventListener("click", clickHandler);
       span.dataset.kissListenerAttached = "1";
     });
   }
@@ -188,7 +192,28 @@ export class WordTooltipController {
     }
     this.activeWordEl?.classList.remove("kiss-word-hover");
     this.activeWordEl = null;
+    this.isPinned = false;
     this.hideWordTooltip();
+  }
+
+  #handleWordClick(event, getTimestamp) {
+    const target = event.target;
+    if (!target.classList.contains("kiss-subtitle-word")) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (this.hoverTimeout) {
+      clearTimeout(this.hoverTimeout);
+      this.hoverTimeout = null;
+    }
+
+    this.activeWordEl?.classList.remove("kiss-word-hover");
+    target.classList.add("kiss-word-hover");
+    this.activeWordEl = target;
+    this.isPinned = true;
+    this.showWordTooltip(target.dataset.word, {
+      timestamp: getTimestamp?.() ?? 0,
+    });
   }
 
   #handleWordHover(event, getTimestamp) {
@@ -213,6 +238,8 @@ export class WordTooltipController {
   #handleWordHoverOut(event) {
     const target = event.target;
     if (!target.classList.contains("kiss-subtitle-word")) return;
+
+    if (this.isPinned && this.activeWordEl === target) return;
 
     target.classList.remove("kiss-word-hover");
     if (this.activeWordEl === target) {
@@ -286,9 +313,10 @@ export class WordTooltipController {
         this.tooltipEl.innerHTML =
           trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
         <span>${word}</span>
-        <button class="kiss-word-tooltip-close" onclick="this.closest('.kiss-word-tooltip').remove()">×</button>
+        <button type="button" class="kiss-word-tooltip-close" data-kiss-close aria-label="Close">×</button>
       </div>
       <div class="kiss-word-definition">Failed to load definition</div>`);
+        this.#bindTooltipCloseButton();
       }
     }
   }
@@ -298,6 +326,16 @@ export class WordTooltipController {
       this.tooltipEl.remove();
       this.tooltipEl = null;
     }
+    this.isPinned = false;
+  }
+
+  #bindTooltipCloseButton() {
+    const closeButton = this.tooltipEl?.querySelector("[data-kiss-close]");
+    closeButton?.addEventListener("click", () => {
+      this.activeWordEl?.classList.remove("kiss-word-hover");
+      this.activeWordEl = null;
+      this.hideWordTooltip();
+    });
   }
 
   #extractDictionaryData(dictResult) {
@@ -341,7 +379,7 @@ export class WordTooltipController {
     ) {
       let content = `<div class="kiss-word-tooltip-header">
           <span>${word}</span>
-          <button class="kiss-word-tooltip-close" onclick="this.closest('.kiss-word-tooltip').remove()">×</button>
+          <button type="button" class="kiss-word-tooltip-close" data-kiss-close aria-label="Close">×</button>
         </div>`;
 
       if (dictResult.aus && dictResult.aus.length > 0) {
@@ -372,6 +410,7 @@ export class WordTooltipController {
 
       if (this.tooltipEl) {
         this.tooltipEl.innerHTML = trustedTypesHelper.createHTML(content);
+        this.#bindTooltipCloseButton();
       }
       return;
     }
@@ -380,9 +419,10 @@ export class WordTooltipController {
       this.tooltipEl.innerHTML =
         trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
           <span>${word}</span>
-          <button class="kiss-word-tooltip-close" onclick="this.closest('.kiss-word-tooltip').remove()">×</button>
+          <button type="button" class="kiss-word-tooltip-close" data-kiss-close aria-label="Close">×</button>
         </div>
         <div class="kiss-word-definition">No definition found</div>`);
+      this.#bindTooltipCloseButton();
     }
   }
 }

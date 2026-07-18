@@ -127,5 +127,10 @@ describe("YouTubeCaptionProvider manual translation", () => {
     await act(async () => flushPromises());
 
     expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
+
+    provider.updateSetting({ name: "apiSlug", value: "another-api" });
+    await act(async () => flushPromises());
+
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(2);
   });
 });

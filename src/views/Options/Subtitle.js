@@ -567,6 +567,7 @@ export default function SubtitleSetting() {
               {i18n("font_size") || "字体大小"}
             </Typography>
             <Slider
+              aria-label={`${label} ${i18n("font_size")}`}
               size="small"
               value={fontSize.preferred}
               min={0.5}
@@ -602,6 +603,7 @@ export default function SubtitleSetting() {
             <Box
               component="input"
               type="color"
+              aria-label={`${label} ${i18n("font_color")}`}
               value={colorToHex(cssObj["color"])}
               onChange={(e) => updateCss("color", e.target.value)}
               sx={{
@@ -1066,6 +1068,7 @@ export default function SubtitleSetting() {
                     <Box
                       component="input"
                       type="color"
+                      aria-label={i18n("background_color")}
                       value={windowBgHex}
                       onChange={(e) => {
                         const rgb = hexToRgb(e.target.value);
@@ -1087,6 +1090,7 @@ export default function SubtitleSetting() {
                       {i18n("opacity") || "透明度"}
                     </Typography>
                     <Slider
+                      aria-label={i18n("opacity")}
                       size="small"
                       value={windowBgRgba.a}
                       min={0}
@@ -1119,6 +1123,7 @@ export default function SubtitleSetting() {
                       {i18n("line_height") || "行高"}
                     </Typography>
                     <Slider
+                      aria-label={i18n("line_height")}
                       size="small"
                       value={windowLineHeight}
                       min={1}
@@ -1151,6 +1156,7 @@ export default function SubtitleSetting() {
                       {i18n("vertical") || "上下"}
                     </Typography>
                     <Slider
+                      aria-label={i18n("vertical")}
                       size="small"
                       value={windowPadding.vertical}
                       min={0}
@@ -1168,6 +1174,7 @@ export default function SubtitleSetting() {
                       {i18n("horizontal") || "左右"}
                     </Typography>
                     <Slider
+                      aria-label={i18n("horizontal")}
                       size="small"
                       value={windowPadding.horizontal}
                       min={0}

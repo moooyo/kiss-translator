@@ -9,6 +9,7 @@ import { buildBilingualVtt } from "./vtt.js";
 import { getDocInfo } from "../libs/docInfo.js";
 import { isSubtitleModeEnabled } from "./modes.js";
 import { clearMsgHistory } from "../apis/history.js";
+import { browser } from "../libs/browser.js";
 import {
   buildTrackKey,
   findCaptionTrack,
@@ -329,10 +330,16 @@ export class YouTubeCaptionProvider {
     if (
       name === "isBilingual" ||
       name === "blurTranslation" ||
-      name === "displayOrder"
+      name === "displayOrder" ||
+      name === "fontScale" ||
+      name === "windowStyle"
     ) {
       this.#managerInstance?.updateSetting({ [name]: value });
-    } else if (name === "segSlug" || name === "forceSubtitleRetranslate") {
+    } else if (
+      name === "segSlug" ||
+      name === "apiSlug" ||
+      name === "forceSubtitleRetranslate"
+    ) {
       this.#reProcessEvents();
     } else if (name === "autoTranslate") {
       this.#toggleTranslation();
@@ -432,6 +439,12 @@ export class YouTubeCaptionProvider {
     }
   }
 
+  openSubtitleSettings() {
+    const extensionUrl = browser?.runtime?.getURL?.("options.html#/subtitle");
+    const webUrl = `${process.env.REACT_APP_OPTIONSPAGE}#/subtitle`;
+    window.open(extensionUrl || webUrl, "_blank", "noopener,noreferrer");
+  }
+
   /**
    * 获取字幕菜单 React 组件的 props。
    *
@@ -445,13 +458,18 @@ export class YouTubeCaptionProvider {
       skipAd,
       isBilingual,
       blurTranslation,
+      fontScale,
       autoTranslate,
       aiContextSlug,
+      displayOrder,
+      apiSlug,
+      windowStyle,
     } = this.#setting;
     return {
       i18n: this.#i18n,
       updateSetting: this.updateSetting.bind(this),
       downloadSubtitle: this.downloadSubtitle.bind(this),
+      openSettings: this.openSubtitleSettings.bind(this),
       transApis,
       progressed: this.#progressedNum,
       formData: {
@@ -459,8 +477,12 @@ export class YouTubeCaptionProvider {
         skipAd,
         isBilingual,
         blurTranslation,
+        fontScale,
         autoTranslate,
         aiContextSlug,
+        displayOrder,
+        apiSlug,
+        windowStyle,
       },
     };
   }
@@ -949,6 +971,10 @@ export class YouTubeCaptionProvider {
         // 由渲染管理器按 timeupdate/seeked 上报播放窗口，provider 再决定是否触发后续 AI chunk。
         onSubtitleTimeWindow: ({ currentTimeMs, preTrans }) =>
           this.#scheduleAiChunks(currentTimeMs, preTrans),
+        onCaptionPositionReset: () =>
+          this.#playerUi.showNotification(
+            this.#i18n("subtitle_position_reset")
+          ),
       },
     });
 

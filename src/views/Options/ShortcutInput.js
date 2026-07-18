@@ -84,12 +84,21 @@ export default function ShortcutInput({
       />
       {isEditing ? (
         // 编辑中，显示确认保存的 CheckIcon
-        <IconButton onClick={commitChanges} color="primary">
+        <IconButton
+          onClick={commitChanges}
+          color="primary"
+          aria-label={i18n("save")}
+          title={i18n("save")}
+        >
           <CheckIcon />
         </IconButton>
       ) : (
         // 未编辑，显示铅笔 EditIcon 按钮
-        <IconButton onClick={handleEditClick}>
+        <IconButton
+          onClick={handleEditClick}
+          aria-label={i18n("edit")}
+          title={i18n("edit")}
+        >
           <EditIcon />
         </IconButton>
       )}

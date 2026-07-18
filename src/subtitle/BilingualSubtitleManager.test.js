@@ -1,5 +1,5 @@
 import { BilingualSubtitleManager } from "./BilingualSubtitleManager";
-import { apiTranslate } from "../apis/index.js";
+import { apiMicrosoftDict, apiTranslate } from "../apis/index.js";
 
 jest.mock("../apis/index.js", () => ({
   apiTranslate: jest.fn(),
@@ -112,6 +112,7 @@ async function waitForMutationObserver() {
 describe("BilingualSubtitleManager", () => {
   beforeEach(() => {
     apiTranslate.mockReset();
+    apiMicrosoftDict.mockReset();
   });
 
   test("renders original subtitle before translation by default", () => {
@@ -125,6 +126,69 @@ describe("BilingualSubtitleManager", () => {
     manager.start();
 
     expect(getCaptionLines()).toEqual(["hello world", "你好世界"]);
+    manager.destroy();
+  });
+
+  test("applies updated subtitle window styles immediately", () => {
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting,
+    });
+
+    manager.start();
+    manager.updateSetting({
+      windowStyle: "background: transparent; border-radius: 16px;",
+    });
+
+    const captionWindow = document.querySelector(".kiss-caption-window");
+    expect(captionWindow.style.background).toBe("transparent");
+    expect(captionWindow.style.borderRadius).toBe("16px");
+    expect(captionWindow.style.pointerEvents).toBe("auto");
+    manager.destroy();
+  });
+
+  test("applies and updates the subtitle font scale immediately", () => {
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting: {
+        ...setting,
+        fontScale: 150,
+        originStyle: "font-size: 20px;",
+        translationStyle: "font-size: 10px;",
+      },
+    });
+
+    manager.start();
+    let lines = document.querySelectorAll(".kiss-caption-window p");
+    expect(lines[0].style.fontSize).toBe("30px");
+    expect(lines[1].style.fontSize).toBe("15px");
+
+    manager.updateSetting({ fontScale: 80 });
+    lines = document.querySelectorAll(".kiss-caption-window p");
+    expect(lines[0].style.fontSize).toBe("16px");
+    expect(lines[1].style.fontSize).toBe("8px");
+    manager.destroy();
+  });
+
+  test("reports when the subtitle position is reset", () => {
+    const onCaptionPositionReset = jest.fn();
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting: { ...setting, onCaptionPositionReset },
+    });
+
+    manager.start();
+    document
+      .querySelector(".kiss-caption-window")
+      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+    expect(onCaptionPositionReset).toHaveBeenCalledTimes(1);
     manager.destroy();
   });
 
@@ -143,6 +207,30 @@ describe("BilingualSubtitleManager", () => {
         (node) => node.textContent
       )
     ).toEqual(["hello", "world"]);
+    manager.destroy();
+  });
+
+  test("opens subtitle word lookup immediately on click", async () => {
+    apiMicrosoftDict.mockResolvedValue({
+      trs: [{ pos: "n.", def: "a greeting" }],
+    });
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting: { ...setting, hoverLookupMode: "on" },
+    });
+
+    manager.start();
+    document
+      .querySelector(".kiss-subtitle-word")
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(apiMicrosoftDict).toHaveBeenCalledWith("hello");
+    expect(document.querySelector(".kiss-word-tooltip").textContent).toContain(
+      "a greeting"
+    );
     manager.destroy();
   });
 

@@ -41,6 +41,16 @@ function addCaptionStyles() {
   document.head.appendChild(style);
 }
 
+function scaleFontSize(value, fontScale) {
+  const scale = Math.min(150, Math.max(80, Number(fontScale) || 100)) / 100;
+  if (!value || scale === 1) return value;
+
+  return value.replace(
+    /(-?\d*\.?\d+)(px|cqw|em|rem)/gi,
+    (_, number, unit) => `${Number(number) * scale}${unit}`
+  );
+}
+
 /**
  * @class BilingualSubtitleManager
  * @description 负责控制在 YouTube 原生视频播放器上悬浮渲染双语字幕，以及对字幕进行预翻译缓存管理的核心逻辑类
@@ -233,11 +243,7 @@ export class BilingualSubtitleManager {
     // 3. 字幕文字展示窗口
     this.#captionWindowEl = document.createElement("div");
     this.#captionWindowEl.className = `kiss-caption-window`;
-    // 读取并注入用户自定义的字幕窗口 CSS 样式参数
-    this.#captionWindowEl.style.cssText = this.#setting.windowStyle;
-    this.#captionWindowEl.style.pointerEvents = "auto";
-    this.#captionWindowEl.style.cursor = "grab";
-    this.#captionWindowEl.style.opacity = "1";
+    this.#applyCaptionWindowStyle();
 
     this.#paperEl.appendChild(this.#captionWindowEl);
     container.appendChild(this.#paperEl);
@@ -425,6 +431,7 @@ export class BilingualSubtitleManager {
       dragElement.style.transform = "translateX(-50%)";
       dragElement.style.bottom = `${boundaryContainer.clientHeight * 0.05}px`;
       dragEndCallback?.();
+      this.#setting.onCaptionPositionReset?.();
     });
   }
 
@@ -574,6 +581,10 @@ export class BilingualSubtitleManager {
       const p1 = document.createElement("p");
       p1.className = "kiss-caption-origin";
       p1.style.cssText = this.#setting.originStyle;
+      p1.style.fontSize = scaleFontSize(
+        p1.style.fontSize,
+        this.#setting.fontScale
+      );
       p1.style.margin = "0";
 
       const isHoverLookupEnabled = this.#isHoverLookupEnabled();
@@ -592,6 +603,10 @@ export class BilingualSubtitleManager {
       const p2 = document.createElement("p");
       p2.className = "kiss-caption-translation";
       p2.style.cssText = this.#setting.translationStyle;
+      p2.style.fontSize = scaleFontSize(
+        p2.style.fontSize,
+        this.#setting.fontScale
+      );
       p2.style.margin = "0";
       if (isHoverLookupEnabled) {
         p2.innerHTML = trustedTypesHelper.createHTML(
@@ -806,11 +821,22 @@ export class BilingualSubtitleManager {
   // 更新配置项
   updateSetting(obj) {
     this.#setting = { ...this.#setting, ...obj };
+    if (Object.prototype.hasOwnProperty.call(obj, "windowStyle")) {
+      this.#applyCaptionWindowStyle();
+    }
     const currentSubtitle =
       this.#formattedSubtitles[this.#currentSubtitleIndex];
     if (currentSubtitle) {
       this.#updateCaptionDisplay(currentSubtitle);
     }
+  }
+
+  #applyCaptionWindowStyle() {
+    if (!this.#captionWindowEl) return;
+    this.#captionWindowEl.style.cssText = this.#setting.windowStyle || "";
+    this.#captionWindowEl.style.pointerEvents = "auto";
+    this.#captionWindowEl.style.cursor = "grab";
+    this.#captionWindowEl.style.opacity = "1";
   }
 
   // 获取当前字幕的开始时间（以重新分段分句后的时间轴为准）

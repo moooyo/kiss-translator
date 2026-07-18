@@ -30,6 +30,19 @@ jest.mock("./CopyBtn", () => {
     );
 });
 
+jest.mock("./AudioBtn", () => {
+  const React = require("react");
+
+  return {
+    BrowserTtsBtn: ({ text }) =>
+      React.createElement(
+        "button",
+        { type: "button", "data-speech-text": text },
+        "speak"
+      ),
+  };
+});
+
 /**
  * 创建一个可由测试主动 resolve/reject 的 Promise。
  *

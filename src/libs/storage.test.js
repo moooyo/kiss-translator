@@ -20,6 +20,21 @@ function loadGmStorageModule() {
   return storageModule;
 }
 
+function loadExtensionPreviewStorageModule() {
+  let storageModule;
+  jest.isolateModules(() => {
+    jest.doMock("./client", () => ({
+      isExt: true,
+      isGm: false,
+    }));
+    jest.doMock("./browser", () => ({ browser: undefined }));
+    storageModule = require("./storage");
+  });
+  jest.dontMock("./client");
+  jest.dontMock("./browser");
+  return storageModule;
+}
+
 describe("settings storage migration", () => {
   beforeEach(() => {
     window.localStorage.clear();
@@ -83,6 +98,18 @@ describe("settings storage migration", () => {
       /^prompt_migrated_batch_/
     );
     expect(setting.transApis[0]).not.toHaveProperty("systemPrompt");
+  });
+
+  test("extension development preview falls back to local storage", async () => {
+    const { storage } = loadExtensionPreviewStorageModule();
+
+    await storage.setObj("extension-preview", { ready: true });
+    await expect(storage.getObj("extension-preview")).resolves.toEqual({
+      ready: true,
+    });
+    await storage.del("extension-preview");
+
+    expect(window.localStorage.getItem("extension-preview")).toBeNull();
   });
 
   test("GM storage reports a clear error when GM APIs are unavailable", async () => {

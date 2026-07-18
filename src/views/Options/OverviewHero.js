@@ -6,7 +6,7 @@ import { useSetting } from "../../hooks/Setting";
 export default function OverviewHero() {
   const i18n = useI18n();
   const { setting, updateSetting } = useSetting();
-  const enabled = setting.preInit !== false;
+  const enabled = setting.extensionEnabled !== false;
   const activeApi = (setting.transApis || []).find((api) => !api.isDisabled);
   const serviceName = activeApi?.apiName || activeApi?.apiType || "—";
   const language = setting.tranboxSetting?.toLang || "zh-CN";
@@ -41,7 +41,7 @@ export default function OverviewHero() {
           <M3Switch
             checked={enabled}
             onChange={(event) =>
-              updateSetting({ preInit: event.target.checked })
+              updateSetting({ extensionEnabled: event.target.checked })
             }
             aria-label={i18n("translate_switch")}
           />

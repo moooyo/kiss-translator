@@ -12,6 +12,7 @@ import { useAlert } from "../../hooks/Alert";
 import { isExt } from "../../libs/client";
 import { browser } from "../../libs/browser";
 import Grid from "@mui/material/Grid";
+import Typography from "@mui/material/Typography";
 
 import {
   UI_LANGS,
@@ -56,6 +57,7 @@ function ShortcutItem({ action, label }) {
  */
 function ExtCommands() {
   const [commands, setCommands] = useState([]);
+  const i18n = useI18n();
 
   useEffect(() => {
     if (browser?.commands?.getAll) {
@@ -107,7 +109,11 @@ function ExtCommands() {
                 fullWidth
                 disabled
               />
-              <IconButton onClick={handleEdit}>
+              <IconButton
+                onClick={handleEdit}
+                aria-label={i18n("edit")}
+                title={i18n("edit")}
+              >
                 <EditIcon />
               </IconButton>
             </Stack>
@@ -218,7 +224,10 @@ export default function Settings() {
         </Stack>
 
         {/* 基础参数网格配置区 */}
-        <Box>
+        <Box className="kt-overview-settings">
+          <Typography className="kt-options-section-title">
+            {i18n("general")}
+          </Typography>
           <Grid container spacing={2} columns={12}>
             {/* 设置面板用户界面语言 */}
             <Grid item xs={12} sm={12} md={6} lg={3}>

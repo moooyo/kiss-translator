@@ -1,10 +1,7 @@
 import { act } from "react";
 import { apiSubtitle, apiSummarizeContext } from "../apis/index.js";
 import { YouTubeCaptionProvider } from "./YouTubeCaptionProvider.js";
-import {
-  getCaptionTracks,
-  getSubtitleEvents,
-} from "./youtubeCaptionTracks.js";
+import { getCaptionTracks, getSubtitleEvents } from "./youtubeCaptionTracks.js";
 import { eventsToSubtitles } from "./youtubeAiSegmentation.js";
 import {
   genFlatEvents,
@@ -83,16 +80,15 @@ describe("YouTubeCaptionProvider manual translation", () => {
   beforeEach(() => {
     jest.clearAllMocks();
     window.history.replaceState({}, "", "/watch?v=video-1");
-    document.body.innerHTML = '<video></video><button class="captions" aria-pressed="true"></button>';
+    document.body.innerHTML =
+      '<video></video><button class="captions" aria-pressed="true"></button>';
     getCaptionTracks.mockResolvedValue({
       captionTracks: [{ baseUrl: "https://www.youtube.com/timedtext" }],
       fullDescription: "",
     });
     getSubtitleEvents.mockResolvedValue([{ text: "hello" }]);
     normalizeTimedTextEvents.mockReturnValue([{ text: "hello" }]);
-    genFlatEvents.mockReturnValue([
-      { start: 0, end: 1000, text: "hello" },
-    ]);
+    genFlatEvents.mockReturnValue([{ start: 0, end: 1000, text: "hello" }]);
     eventsToSubtitles.mockResolvedValue([
       [{ start: 0, end: 1000, text: "hello", translation: "你好" }],
       100,

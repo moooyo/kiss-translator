@@ -5,7 +5,7 @@ import { argv, quote, $ } from "zx";
 if (process.platform === "win32") {
   $.shell = "cmd.exe";
   $.prefix = "";
-  $.quote = quote
+  $.quote = quote;
 }
 
 // 用法: zx src/scripts/build-task.mjs --target=chrome

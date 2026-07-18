@@ -1,79 +1,83 @@
 #!/usr/bin/env zx
-import { $ } from "zx";
-
-/**
- * 版本号同步脚本
- * 从 package.json 读取版本号，自动同步到其他配置文件
- */
 
 const rootDir = path.resolve(__dirname, "../..");
+const packagePath = path.join(rootDir, "package.json");
+const packageJson = await fs.readJSON(packagePath);
+const expectedVersion = packageJson.version;
+const checkOnly = process.argv.includes("--check");
 
-// 读取 package.json 中的版本号
-const pkgPath = path.join(rootDir, "package.json");
-const pkg = await fs.readJSON(pkgPath);
-const version = pkg.version;
-
-console.log(chalk.blue(`📦 从 package.json 读取版本号: ${chalk.bold(version)}`));
-
-// 需要同步的文件列表
-const filesToSync = [
-    {
-        path: path.join(rootDir, ".env"),
-        type: "env",
-        pattern: /^REACT_APP_VERSION=.+$/m,
-        replacement: `REACT_APP_VERSION=${version}`,
-    },
-    {
-        path: path.join(rootDir, "public/manifest.json"),
-        type: "json",
-        key: "version",
-    },
-    {
-        path: path.join(rootDir, "public/manifest.firefox.json"),
-        type: "json",
-        key: "version",
-    },
-    {
-        path: path.join(rootDir, "public/manifest.thunderbird.json"),
-        type: "json",
-        key: "version",
-    },
+const targets = [
+  {
+    path: path.join(rootDir, ".env"),
+    type: "env",
+    pattern: /^REACT_APP_VERSION=(.+)$/m,
+  },
+  {
+    path: path.join(rootDir, "public/manifest.json"),
+    type: "json",
+    key: "version",
+  },
+  {
+    path: path.join(rootDir, "public/manifest.firefox.json"),
+    type: "json",
+    key: "version",
+  },
+  {
+    path: path.join(rootDir, "public/manifest.thunderbird.json"),
+    type: "json",
+    key: "version",
+  },
 ];
 
-let syncCount = 0;
+let changedCount = 0;
+const mismatches = [];
 
-// 遍历并更新每个文件
-for (const file of filesToSync) {
-    try {
-        if (file.type === "env") {
-            // 处理 .env 文件
-            let content = await fs.readFile(file.path, "utf-8");
-            const newContent = content.replace(file.pattern, file.replacement);
+for (const target of targets) {
+  const relativePath = path.relative(rootDir, target.path);
 
-            if (content !== newContent) {
-                await fs.writeFile(file.path, newContent, "utf-8");
-                console.log(chalk.green(`✅ 已更新: ${path.relative(rootDir, file.path)}`));
-                syncCount++;
-            } else {
-                console.log(chalk.gray(`⏭️  无需更新: ${path.relative(rootDir, file.path)}`));
-            }
-        } else if (file.type === "json") {
-            // 处理 JSON 文件
-            const jsonData = await fs.readJSON(file.path);
-
-            if (jsonData[file.key] !== version) {
-                jsonData[file.key] = version;
-                await fs.writeJSON(file.path, jsonData, { spaces: 2 });
-                console.log(chalk.green(`✅ 已更新: ${path.relative(rootDir, file.path)}`));
-                syncCount++;
-            } else {
-                console.log(chalk.gray(`⏭️  无需更新: ${path.relative(rootDir, file.path)}`));
-            }
-        }
-    } catch (err) {
-        console.error(chalk.red(`❌ 更新失败: ${path.relative(rootDir, file.path)}`));
-        console.error(err.message);
+  if (target.type === "env") {
+    const content = await fs.readFile(target.path, "utf8");
+    const match = content.match(target.pattern);
+    if (!match) {
+      throw new Error(`Version key is missing from ${relativePath}`);
     }
+
+    if (match[1] === expectedVersion) continue;
+    mismatches.push(`${relativePath}: ${match[1]} -> ${expectedVersion}`);
+    if (!checkOnly) {
+      const updated = content.replace(
+        target.pattern,
+        `REACT_APP_VERSION=${expectedVersion}`
+      );
+      await fs.writeFile(target.path, updated, "utf8");
+      changedCount += 1;
+    }
+    continue;
+  }
+
+  const json = await fs.readJSON(target.path);
+  const currentVersion = json[target.key];
+  if (currentVersion === expectedVersion) continue;
+  mismatches.push(
+    `${relativePath}: ${currentVersion ?? "<missing>"} -> ${expectedVersion}`
+  );
+  if (!checkOnly) {
+    json[target.key] = expectedVersion;
+    await fs.writeJSON(target.path, json, { spaces: 2 });
+    changedCount += 1;
+  }
 }
 
-console.log(chalk.blue(`\n🎉 版本号同步完成！共更新 ${syncCount} 个文件到版本 ${chalk.bold(version)}`));
+if (checkOnly && mismatches.length > 0) {
+  console.error("Version metadata is out of sync:");
+  mismatches.forEach((mismatch) => console.error(`- ${mismatch}`));
+  process.exit(1);
+}
+
+if (checkOnly) {
+  console.log(`Version metadata is synchronized at ${expectedVersion}.`);
+} else {
+  console.log(
+    `Synchronized ${changedCount} file(s) to version ${expectedVersion}.`
+  );
+}

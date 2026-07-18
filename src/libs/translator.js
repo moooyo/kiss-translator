@@ -415,7 +415,8 @@ export class Translator {
   #restoreViewportAnchor(anchor) {
     if (!anchor?.element?.isConnected) return;
 
-    const scrollingElement = document.scrollingElement || document.documentElement;
+    const scrollingElement =
+      document.scrollingElement || document.documentElement;
     if (!scrollingElement) return;
 
     const overflowY = window.getComputedStyle(scrollingElement).overflowY;

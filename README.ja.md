@@ -2,6 +2,8 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
+[![CI](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml)
+
 シンプルでオープンソースの [バイリンガル対照翻訳拡張機能＆ユーザースクリプト](https://github.com/fishjar/kiss-translator)です。
 
 [kiss-translator.webm](https://github.com/fishjar/kiss-translator/assets/1157624/f7ba8a5c-e4a8-4d5a-823a-5c5c67a0a47f)
@@ -160,9 +162,11 @@ APIテストの失敗には、一般的に以下の原因が考えられます�
 ```sh
 git clone [https://github.com/fishjar/kiss-translator.git](https://github.com/fishjar/kiss-translator.git)
 cd kiss-translator
-git checkout dev # PRを送信する場合はdevブランチにプッシュすることをお勧めします
-pnpm install
-pnpm build
+git checkout dev
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test:ci
+pnpm build:ci
 ```
 
 ### 外部トリガーの例

@@ -4,6 +4,11 @@
   "version": "2.0.28",
   "author": "Gabe<yugang2002@gmail.com>",
   "private": true,
+  "packageManager": "pnpm@9.14.4",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=9.14.4 <11"
+  },
   "dependencies": {
     "@emotion/cache": "^11.11.0",
     "@emotion/css": "^11.13.5",
@@ -28,6 +33,7 @@
     "start": "cross-env REACT_APP_CLIENT=web react-app-rewired start",
     "start:userscript": "cross-env REACT_APP_CLIENT=userscript react-app-rewired start",
     "sync-version": "zx src/scripts/sync-version.mjs",
+    "check:version": "zx src/scripts/sync-version.mjs --check",
     "version:patch": "zx src/scripts/update-version.mjs patch",
     "version:minor": "zx src/scripts/update-version.mjs minor",
     "version:major": "zx src/scripts/update-version.mjs major",
@@ -41,11 +47,19 @@
     "build:safari": "node src/scripts/build-safari.mjs",
     "build:userscript-ios": "zx src/scripts/build-ios.mjs",
     "build:rules": "babel-node src/rules.js",
-    "format": "prettier --write \"**/*.{js,json,html}\"",
-    "build": "pnpm sync-version && pnpm format && pnpm build:chrome && pnpm build:edge && pnpm build:thunderbird && pnpm build:firefox && pnpm build:web && pnpm build:userscript-ios && pnpm build:rules",
+    "build:targets": "pnpm build:chrome && pnpm build:edge && pnpm build:thunderbird && pnpm build:firefox && pnpm build:web && pnpm build:userscript-ios",
+    "verify:build": "node src/scripts/verify-build.mjs",
+    "verify:release": "node src/scripts/verify-build.mjs --release",
+    "format": "prettier --write \"**/*.{js,mjs,json,html}\"",
+    "check:format": "prettier --check \"**/*.{js,mjs,json,html}\"",
+    "check": "pnpm check:version && pnpm check:format",
+    "build": "pnpm sync-version && pnpm format && pnpm build:targets && pnpm build:rules && pnpm verify:build",
+    "build:ci": "pnpm check:version && pnpm build:targets && pnpm build:rules && pnpm verify:build",
+    "build:release": "pnpm check && pnpm test:ci && pnpm build:ci && pnpm zip && pnpm verify:release",
     "zip": "zx src/scripts/archive.mjs",
-    "build+zip": "cross-env CI=true pnpm build && pnpm zip",
+    "build+zip": "cross-env CI=true pnpm build:release",
     "test": "react-app-rewired test",
+    "test:ci": "cross-env CI=true react-app-rewired test --watchAll=false --runInBand --silent",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

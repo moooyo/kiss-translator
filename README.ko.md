@@ -2,6 +2,8 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
+[![CI](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml)
+
 심플하고 오픈 소스인 [이중 언어 대조 번역 확장 프로그램 & 유저 스크립트](https://github.com/fishjar/kiss-translator)입니다.
 
 [kiss-translator.webm](https://github.com/fishjar/kiss-translator/assets/1157624/f7ba8a5c-e4a8-4d5a-823a-5c5c67a0a47f)
@@ -160,9 +162,11 @@
 ```sh
 git clone [https://github.com/fishjar/kiss-translator.git](https://github.com/fishjar/kiss-translator.git)
 cd kiss-translator
-git checkout dev # PR 제출 시 dev 브랜치로 푸시하는 것을 권장합니다
-pnpm install
-pnpm build
+git checkout dev
+pnpm install --frozen-lockfile
+pnpm check
+pnpm test:ci
+pnpm build:ci
 ```
 
 ### 외부 트리거 예시

@@ -5,11 +5,17 @@ import { useI18n, useI18nMd } from "../../hooks/I18n";
 
 const MARKDOWN_COMPONENTS = {
   a: ({ href, children }) => {
-    if (!href || href.trim().toLowerCase().startsWith("javascript:")) {
+    const normalizedHref = href?.trim();
+    const hasUnsafeScheme =
+      normalizedHref &&
+      /^[a-z][a-z0-9+.-]*:/i.test(normalizedHref) &&
+      !/^(https?|mailto):/i.test(normalizedHref);
+
+    if (!normalizedHref || hasUnsafeScheme) {
       return <span>{children}</span>;
     }
 
-    return <a href={href}>{children}</a>;
+    return <a href={normalizedHref}>{children}</a>;
   },
 };
 

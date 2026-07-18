@@ -1,12 +1,18 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
-import { sendBgMsg, sendTabMsg } from "../../libs/msg";
+import { sendBgMsg } from "../../libs/msg";
 import { browser } from "../../libs/browser";
 import { useI18n } from "../../hooks/I18n";
 import Header from "./Header";
 import {
   MSG_OPEN_SEPARATE_WINDOW,
-  MSG_TRANS_GETRULE,
   DEFAULT_SETTING,
   GLOBLA_RULE,
   resolveApiPromptList,
@@ -17,6 +23,7 @@ import TranForm from "../Selection/TranForm";
 import { useSetting } from "../../hooks/Setting";
 import { M3Button, M3Segmented } from "../../components/M3";
 import { POPUP_STYLES } from "./styles";
+import { loadPopupData } from "./loadData";
 
 function TranslationTab() {
   const [text, setText] = useState("");
@@ -79,8 +86,55 @@ export default function Popup() {
   const i18n = useI18n();
   const [rule, setRule] = useState(null);
   const [setting, setSetting] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("page");
   const [isSeparate, setIsSeparate] = useState(false);
+  const [pageContentExpanded, setPageContentExpanded] = useState(false);
+  const popupShellRef = useRef(null);
+  const initialFocusGuardRef = useRef(true);
+
+  useLayoutEffect(() => {
+    if (!isSeparate) {
+      popupShellRef.current?.focus({ preventScroll: true });
+    }
+  }, [isSeparate]);
+
+  useEffect(() => {
+    if (isSeparate || isLoading) return undefined;
+
+    let activationTimer;
+    const clearSafariAutofocus = () => {
+      if (!initialFocusGuardRef.current) return;
+      const shell = popupShellRef.current;
+      if (!shell) return;
+      if (shell.contains(document.activeElement)) {
+        document.activeElement?.blur?.();
+      }
+      shell.focus({ preventScroll: true });
+    };
+    const handleWindowFocus = (event) => {
+      if (event.target !== window) return;
+      window.clearTimeout(activationTimer);
+      activationTimer = window.setTimeout(clearSafariAutofocus, 0);
+    };
+
+    initialFocusGuardRef.current = true;
+    window.addEventListener("focus", handleWindowFocus);
+    const mountTimer = window.setTimeout(clearSafariAutofocus, 0);
+    const settleTimer = window.setTimeout(clearSafariAutofocus, 120);
+    const guardTimer = window.setTimeout(() => {
+      initialFocusGuardRef.current = false;
+      window.removeEventListener("focus", handleWindowFocus);
+    }, 300);
+
+    return () => {
+      window.removeEventListener("focus", handleWindowFocus);
+      window.clearTimeout(activationTimer);
+      window.clearTimeout(mountTimer);
+      window.clearTimeout(settleTimer);
+      window.clearTimeout(guardTimer);
+    };
+  }, [isLoading, isSeparate]);
 
   const handleOpenSetting = useCallback(() => {
     browser?.runtime.openOptionsPage();
@@ -119,13 +173,15 @@ export default function Popup() {
           if (active) setIsSeparate(true);
           return;
         }
-        const response = await sendTabMsg(MSG_TRANS_GETRULE);
+        const response = await loadPopupData();
         if (active && response && !response.error) {
           setRule(response.rule);
           setSetting(response.setting);
         }
       } catch (error) {
         kissLog("query rule", error);
+      } finally {
+        if (active) setIsLoading(false);
       }
     })();
     return () => {
@@ -156,7 +212,17 @@ export default function Popup() {
   }
 
   return (
-    <main className="kt-popup-shell">
+    <main
+      className="kt-popup-shell"
+      ref={popupShellRef}
+      tabIndex={-1}
+      onPointerDownCapture={() => {
+        initialFocusGuardRef.current = false;
+      }}
+      onKeyDownCapture={() => {
+        initialFocusGuardRef.current = false;
+      }}
+    >
       <style>{POPUP_STYLES}</style>
       <Header
         openSeparateWindow={openSeparateWindow}
@@ -171,7 +237,11 @@ export default function Popup() {
       />
       <div
         className={`kt-popup-scroll ${
-          activeTab === "text" ? "kt-popup-scroll--text" : ""
+          activeTab === "text"
+            ? "kt-popup-scroll--text"
+            : pageContentExpanded
+              ? "kt-popup-scroll--expanded"
+              : ""
         }`}
       >
         {activeTab === "text" ? (
@@ -183,7 +253,12 @@ export default function Popup() {
             setRule={setRule}
             setSetting={setSetting}
             handleOpenSetting={handleOpenSetting}
+            onExpandedChange={setPageContentExpanded}
           />
+        ) : isLoading ? (
+          <div className="kt-popup-loading" role="status">
+            <AutorenewRoundedIcon />
+          </div>
         ) : (
           <div className="kt-popup-empty">
             <span>{i18n("load_setting_err")}</span>

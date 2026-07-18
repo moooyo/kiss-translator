@@ -56,6 +56,11 @@ export const OPTIONS_STYLES = String.raw`
 .kt-options-page .MuiAccordion-root:not(:last-child) { margin-bottom: 8px; }
 .kt-options-page .MuiAccordionSummary-root { min-height: 58px; padding-inline: 18px; }
 .kt-options-page .MuiButton-root { white-space: nowrap; }
+.kt-options-page .MuiSwitch-root.MuiSwitch-sizeSmall { width: 52px; height: 32px; padding: 0; overflow: visible; }
+.kt-options-page .MuiSwitch-root.MuiSwitch-sizeSmall .MuiSwitch-switchBase { width: 32px; height: 32px; display: grid; place-items: center; top: 0; left: 0; padding: 0; transform: none; }
+.kt-options-page .MuiSwitch-root.MuiSwitch-sizeSmall .MuiSwitch-switchBase.Mui-checked { padding: 0; transform: translateX(20px); }
+.kt-options-page .MuiSwitch-root.MuiSwitch-sizeSmall .MuiSwitch-thumb { width: 16px; height: 16px; }
+.kt-options-page .MuiSwitch-root.MuiSwitch-sizeSmall .MuiSwitch-switchBase.Mui-checked .MuiSwitch-thumb { width: 24px; height: 24px; }
 .kt-options-page .MuiTabs-root { width: fit-content; max-width: 100%; }
 .kt-options-page img { max-width: 100%; height: auto; }
 .kt-options-page pre,
@@ -82,8 +87,13 @@ export const OPTIONS_STYLES = String.raw`
 .kt-settings-row--stacked .kt-settings-row__control { width: 100%; max-width: none; justify-content: stretch; }
 .kt-settings-select { min-width: 112px; max-width: 260px; min-height: 40px; padding: 0 34px 0 14px; border: 0; border-radius: 14px; outline: 0; background: var(--kt-sf2); color: var(--kt-on); cursor: pointer; font-size: 12px; font-weight: 600; text-overflow: ellipsis; }
 .kt-settings-select:focus-visible { outline: 3px solid color-mix(in srgb, var(--kt-pri) 45%, transparent); outline-offset: 2px; }
-.kt-settings-segmented { min-width: 220px; }
-.kt-settings-segmented > button { min-height: 36px; padding-inline: 12px; font-size: 11.5px; white-space: nowrap; }
+.kt-settings-segmented { width: max-content; min-width: 260px; max-width: 100%; gap: 2px; overflow: hidden; padding: 3px; border: 1px solid color-mix(in srgb, var(--kt-linev) 72%, transparent); background: var(--kt-sf2); box-shadow: inset 0 1px 2px rgba(0, 0, 0, .04); }
+.kt-settings-segmented > button { min-height: 34px; overflow: hidden; padding-inline: 12px; border-radius: 999px; font-size: 11.5px; white-space: nowrap; }
+.kt-settings-segmented .kt-m3-segmented__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kt-settings-segmented > button svg { width: 15px; height: 15px; flex: none; }
+.kt-settings-segmented > button:focus { outline: none; }
+.kt-settings-segmented > button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kt-pri) 58%, transparent); }
+.kt-settings-segmented > button[aria-selected="true"]:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kt-onsecc) 55%, transparent); }
 .kt-settings-range { min-width: 220px; display: grid; grid-template-columns: minmax(120px, 1fr) 58px; align-items: center; gap: 12px; }
 .kt-settings-range input { width: 100%; accent-color: var(--kt-pri); cursor: pointer; }
 .kt-settings-range output { padding: 6px 9px; border-radius: 10px; background: var(--kt-sf2); color: var(--kt-onv); font-family: ui-monospace, monospace; font-size: 10.5px; text-align: center; }

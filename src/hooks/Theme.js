@@ -10,6 +10,9 @@ import {
   M3_FONT_FAMILY,
   M3_GLOBAL_CSS,
 } from "../styles/m3";
+import { getMuiSwitchStyleOverrides } from "./themeStyles";
+
+export { getMuiSwitchStyleOverrides } from "./themeStyles";
 
 export default function Theme({ children, options = {}, styles = {} }) {
   const { darkMode } = useDarkMode();
@@ -143,32 +146,7 @@ export default function Theme({ children, options = {}, styles = {} }) {
           },
         },
         MuiSwitch: {
-          styleOverrides: {
-            root: { width: 52, height: 32, padding: 0, overflow: "visible" },
-            switchBase: {
-              padding: 8,
-              color: color.outline,
-              transition: "all .35s cubic-bezier(.3, 1.4, .4, 1)",
-              "&.Mui-checked": {
-                padding: 4,
-                transform: "translateX(20px)",
-                color: color.onPrimary,
-                "& + .MuiSwitch-track": {
-                  borderColor: color.primary,
-                  backgroundColor: color.primary,
-                  opacity: 1,
-                },
-                "& .MuiSwitch-thumb": { width: 24, height: 24 },
-              },
-            },
-            thumb: { width: 16, height: 16, boxShadow: "none" },
-            track: {
-              border: `2px solid ${color.outline}`,
-              borderRadius: 999,
-              backgroundColor: color.surfaceHigh,
-              opacity: 1,
-            },
-          },
+          styleOverrides: getMuiSwitchStyleOverrides(color),
         },
         MuiTabs: {
           styleOverrides: {
@@ -184,10 +162,15 @@ export default function Theme({ children, options = {}, styles = {} }) {
         MuiTab: {
           styleOverrides: {
             root: {
+              minWidth: 0,
+              maxWidth: "100%",
               minHeight: 36,
+              overflow: "hidden",
               borderRadius: 999,
               color: color.onSurfaceVariant,
+              textOverflow: "ellipsis",
               textTransform: "none",
+              whiteSpace: "nowrap",
               "&.Mui-selected": {
                 backgroundColor: color.secondaryContainer,
                 color: color.onSecondaryContainer,

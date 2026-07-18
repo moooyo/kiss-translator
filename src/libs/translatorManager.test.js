@@ -52,6 +52,12 @@ jest.mock("./translator", () => ({
       }),
       rescan: jest.fn(),
       toggle: jest.fn(),
+      enable: jest.fn(function enable() {
+        this.rule.transOpen = "true";
+      }),
+      disable: jest.fn(function disable() {
+        this.rule.transOpen = "false";
+      }),
       toggleTransOnly: jest.fn(),
       toggleStyle: jest.fn(),
       updateRule: jest.fn(),
@@ -153,6 +159,12 @@ function setupMockConstructors() {
       }),
       rescan: jest.fn(),
       toggle: jest.fn(),
+      enable: jest.fn(function enable() {
+        this.rule.transOpen = "true";
+      }),
+      disable: jest.fn(function disable() {
+        this.rule.transOpen = "false";
+      }),
       toggleTransOnly: jest.fn(),
       toggleStyle: jest.fn(),
       updateRule: jest.fn(),
@@ -374,6 +386,43 @@ describe("TranslatorManager SPA lifecycle", () => {
     });
 
     document.removeEventListener("kiss-inner", eventHandler);
+  });
+
+  test("sets an explicit translation state without accidentally toggling twice", () => {
+    const manager = createManager({ rule: { transOpen: "false" } });
+    manager.start();
+    const translator = mockTranslatorInstances[0];
+    const runtimeHandler =
+      browser.runtime.onMessage.addListener.mock.calls[0][0];
+    const sendResponse = jest.fn();
+
+    runtimeHandler(
+      { action: "trans-toggle", args: { enabled: true } },
+      {},
+      sendResponse
+    );
+
+    expect(translator.enable).toHaveBeenCalledTimes(1);
+    expect(translator.toggle).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        rule: expect.objectContaining({ transOpen: "true" }),
+      })
+    );
+
+    runtimeHandler(
+      { action: "trans-toggle", args: { enabled: false } },
+      {},
+      sendResponse
+    );
+
+    expect(translator.disable).toHaveBeenCalledTimes(1);
+    expect(translator.toggle).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        rule: expect.objectContaining({ transOpen: "false" }),
+      })
+    );
   });
 
   test("cleans up transbox-only runtime on stop", () => {

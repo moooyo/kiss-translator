@@ -2,6 +2,8 @@ import ShadowDomManager from "./shadowDomManager";
 import { APP_CONSTS, EVENT_KISS_INNER, MSG_POPUP_TOGGLE } from "../config";
 import Action from "../views/Action";
 
+const POPUP_MANAGER_KEY = Symbol.for("kiss-translator.popup-manager");
+
 /**
  * 网页内交互面板（Popup Panel / Action Menu）管理器
  * 负责在 Shadow DOM 隔离环境中挂载及管理 Action 控制面板的显示、隐藏和事件触发。
@@ -20,6 +22,21 @@ export class PopupManager extends ShadowDomManager {
       reactComponent: Action,
       props: { translator, processActions },
     });
+
+    const previousManager = globalThis[POPUP_MANAGER_KEY];
+    if (previousManager && previousManager !== this) {
+      previousManager.destroy?.();
+    }
+
+    document.getElementById(APP_CONSTS.popupID)?.remove();
+    globalThis[POPUP_MANAGER_KEY] = this;
+  }
+
+  destroy() {
+    super.destroy();
+    if (globalThis[POPUP_MANAGER_KEY] === this) {
+      delete globalThis[POPUP_MANAGER_KEY];
+    }
   }
 
   /**

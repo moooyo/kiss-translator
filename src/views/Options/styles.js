@@ -49,7 +49,7 @@ export const OPTIONS_STYLES = String.raw`
 .kt-options-page .MuiGrid-container { width: 100%; margin: 0; padding: 8px; border: 1px solid var(--kt-linev); border-radius: 20px; background: var(--kt-sf0); }
 .kt-options-page .MuiGrid-item { padding: 8px !important; }
 .kt-options-page .MuiTextField-root { min-width: 0; }
-.kt-options-page .MuiFormControlLabel-root { min-height: 48px; margin: 0; padding: 4px 8px 4px 14px; border-radius: 14px; background: var(--kt-sf1); }
+.kt-options-page .MuiFormControlLabel-root { min-height: 48px; gap: 8px; margin: 0; padding: 4px 8px 4px 14px; border-radius: 14px; background: var(--kt-sf1); }
 .kt-options-page .MuiFormControlLabel-label { font-size: 13px; font-weight: 550; }
 .kt-options-page .MuiAccordion-root { border-radius: 20px !important; background: var(--kt-sf0); }
 .kt-options-page .MuiAccordion-root:not(:last-child) { margin-bottom: 8px; }

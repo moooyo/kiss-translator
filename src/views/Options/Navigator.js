@@ -17,7 +17,7 @@ import { NavLink } from "react-router-dom";
 import Logo from "../../components/Logo";
 import { useI18n } from "../../hooks/I18n";
 
-export default function Navigator({ open }) {
+export default function Navigator({ open, isMobile = false }) {
   const i18n = useI18n();
   const [query, setQuery] = useState("");
 
@@ -112,7 +112,10 @@ export default function Navigator({ open }) {
 
   return (
     <aside
+      id="kt-options-navigation"
       className={`kt-options-sidebar ${open ? "kt-options-sidebar--open" : ""}`}
+      aria-hidden={isMobile && !open}
+      inert={isMobile && !open ? "" : undefined}
     >
       <a
         className="kt-options-brand"

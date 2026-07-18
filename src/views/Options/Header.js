@@ -4,11 +4,16 @@ import { M3IconButton } from "../../components/M3";
 import { useI18n } from "../../hooks/I18n";
 import DarkModeButton from "./DarkModeButton";
 
-export default function Header({ onDrawerToggle }) {
+export default function Header({ onDrawerToggle, navigationOpen }) {
   const i18n = useI18n();
   return (
     <header className="kt-options-mobile-header">
-      <M3IconButton onClick={onDrawerToggle} aria-label="Open navigation">
+      <M3IconButton
+        onClick={onDrawerToggle}
+        aria-label="Open navigation"
+        aria-controls="kt-options-navigation"
+        aria-expanded={navigationOpen}
+      >
         <MenuRoundedIcon />
       </M3IconButton>
       <Logo size={25} />

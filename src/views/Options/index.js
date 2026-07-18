@@ -173,7 +173,12 @@ export default function Options() {
         <AlertProvider>
           <ConfirmProvider>
             {/* React 页面端路由管理 */}
-            <HashRouter>
+            <HashRouter
+              future={{
+                v7_startTransition: true,
+                v7_relativeSplatPath: true,
+              }}
+            >
               <Routes>
                 <Route path="/" element={<Layout />}>
                   {/* 子页面路由注册 */}

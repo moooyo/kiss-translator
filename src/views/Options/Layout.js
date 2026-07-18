@@ -10,10 +10,28 @@ export default function Layout() {
   const i18n = useI18n();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [latestVersion, setLatestVersion] = useState("");
+  const [isMobile, setIsMobile] = useState(
+    () =>
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(max-width: 859px)").matches
+  );
 
   useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const mediaQuery = window.matchMedia("(max-width: 859px)");
+    const handleChange = (event) => setIsMobile(event.matches);
+    setIsMobile(mediaQuery.matches);
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, []);
+
+  useEffect(() => {
+    if (process.env.NODE_ENV === "test") return undefined;
     let active = true;
-    fetch(`${process.env.REACT_APP_VERSION_URL}?t=${Date.now()}`)
+    const controller = new AbortController();
+    fetch(`${process.env.REACT_APP_VERSION_URL}?t=${Date.now()}`, {
+      signal: controller.signal,
+    })
       .then((response) => response.text())
       .then((text) => {
         const version = text.trim();
@@ -26,9 +44,14 @@ export default function Layout() {
           setLatestVersion(version);
         }
       })
-      .catch((error) => console.error("fetch version error:", error));
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          console.error("fetch version error:", error);
+        }
+      });
     return () => {
       active = false;
+      controller.abort();
     };
   }, []);
 
@@ -81,17 +104,20 @@ export default function Layout() {
   return (
     <div className="kt-options-shell">
       <style>{OPTIONS_STYLES}</style>
-      <Header onDrawerToggle={() => setNavigationOpen(true)} />
+      <Header
+        navigationOpen={navigationOpen}
+        onDrawerToggle={() => setNavigationOpen(true)}
+      />
       <div className="kt-options-layout">
-        <Navigator open={navigationOpen} />
-        <button
-          type="button"
-          className={`kt-options-overlay ${
-            navigationOpen ? "kt-options-overlay--open" : ""
-          }`}
-          aria-label="Close navigation"
-          onClick={() => setNavigationOpen(false)}
-        />
+        <Navigator open={navigationOpen} isMobile={isMobile} />
+        {isMobile && navigationOpen && (
+          <button
+            type="button"
+            className="kt-options-overlay kt-options-overlay--open"
+            aria-label="Close navigation"
+            onClick={() => setNavigationOpen(false)}
+          />
+        )}
         <main className="kt-options-main">
           <div className="kt-options-main__inner">
             <header className="kt-options-page-header">

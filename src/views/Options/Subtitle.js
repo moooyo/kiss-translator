@@ -52,6 +52,20 @@ const parseCssToObject = (cssString) => {
   return result;
 };
 
+const cssObjectToReactStyle = (cssObject) =>
+  Object.fromEntries(
+    Object.entries(cssObject).map(([property, value]) => {
+      if (property.startsWith("--")) return [property, value];
+      const camelProperty = property.replace(/-([a-z])/g, (_, letter) =>
+        letter.toUpperCase()
+      );
+      const reactProperty = camelProperty.startsWith("webkit")
+        ? `W${camelProperty.slice(1)}`
+        : camelProperty;
+      return [reactProperty, value];
+    })
+  );
+
 /**
  * 将 JavaScript CSS 样式对象转换回标准 CSS 字符串
  */
@@ -223,11 +237,25 @@ function SubtitleStylePreview({
     () => parseCssToObject(translationStyle),
     [translationStyle]
   );
+  const windowReactStyle = useMemo(
+    () => cssObjectToReactStyle(windowCss),
+    [windowCss]
+  );
+  const originReactStyle = useMemo(
+    () => cssObjectToReactStyle(originCss),
+    [originCss]
+  );
+  const transReactStyle = useMemo(
+    () => cssObjectToReactStyle(transCss),
+    [transCss]
+  );
   const originPreview = (
-    <p style={{ ...originCss, margin: 0 }}>This is an example subtitle</p>
+    <p style={{ ...originReactStyle, margin: 0 }}>
+      This is an example subtitle
+    </p>
   );
   const translationPreview = (
-    <p style={{ ...transCss, margin: 0 }}>
+    <p style={{ ...transReactStyle, margin: 0 }}>
       {i18n("subtitle_preview_sample") || "这是示例字幕文本"}
     </p>
   );
@@ -259,7 +287,7 @@ function SubtitleStylePreview({
           }}
         >
           {/* 渲染模拟网页上的字幕窗格 */}
-          <div style={{ ...windowCss, textAlign: "center" }}>
+          <div style={{ ...windowReactStyle, textAlign: "center" }}>
             {displayOrder === "translation-first" ? (
               <>
                 {translationPreview}

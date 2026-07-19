@@ -2,6 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import PopupCont from "./PopupCont";
 import { getVisibleServices } from "./services";
+import { MSG_RUNTIME_SETTING_PATCH } from "../../config";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -10,6 +11,9 @@ const mockStyles = Array.from({ length: 7 }, (_, index) => ({
   styleName: `Style ${index}`,
   styleCode: `color: rgb(${index}, 0, 0);`,
 }));
+const mockUpdateSetting = jest.fn();
+const mockSendBgMsg = jest.fn(async () => []);
+let mockIsExt = false;
 
 jest.mock("../../hooks/I18n", () => ({
   useI18n: () => (key, fallback) => fallback || key,
@@ -18,7 +22,7 @@ jest.mock("../../hooks/I18n", () => ({
 jest.mock("../../hooks/Setting", () => ({
   useSetting: () => ({
     setting: { blacklist: "" },
-    updateSetting: jest.fn(),
+    updateSetting: mockUpdateSetting,
   }),
 }));
 
@@ -28,11 +32,15 @@ jest.mock("../../hooks/CustomStyles", () => ({
 
 jest.mock("../../libs/msg", () => ({
   getCurTab: jest.fn(async () => ({ url: "https://example.com/page" })),
-  sendBgMsg: jest.fn(async () => []),
+  sendBgMsg: (...args) => mockSendBgMsg(...args),
   sendTabMsg: jest.fn(async () => undefined),
 }));
 
-jest.mock("../../libs/client", () => ({ isExt: false }));
+jest.mock("../../libs/client", () => ({
+  get isExt() {
+    return mockIsExt;
+  },
+}));
 jest.mock("../../libs/cache", () => ({ tryClearCaches: jest.fn() }));
 jest.mock("../../libs/rules", () => ({ saveRule: jest.fn() }));
 
@@ -96,6 +104,13 @@ function renderPopupCont() {
 }
 
 describe("PopupCont capability parity", () => {
+  beforeEach(() => {
+    mockIsExt = false;
+    mockSendBgMsg.mockReset();
+    mockSendBgMsg.mockResolvedValue([]);
+    mockUpdateSetting.mockClear();
+  });
+
   afterEach(() => {
     document.body.innerHTML = "";
   });
@@ -108,6 +123,7 @@ describe("PopupCont capability parity", () => {
       view.container.querySelectorAll("button")
     ).find((button) => button.textContent.includes("popup_advanced_options"));
     act(() => advancedButton.click());
+    expect(view.container.querySelectorAll("label label")).toHaveLength(0);
 
     let styleButtons = view.container.querySelectorAll(".kt-popup-style-chip");
     expect(styleButtons).toHaveLength(5);
@@ -155,6 +171,26 @@ describe("PopupCont capability parity", () => {
     expect(
       view.container.querySelector(".kt-popup-hero__subtitle").textContent
     ).not.toContain("AltLeft+KeyQ");
+    view.cleanup();
+  });
+
+  test("uses the background as the only extension setting writer", async () => {
+    mockIsExt = true;
+    const view = renderPopupCont();
+    await flushEffects();
+    mockSendBgMsg.mockClear();
+
+    const subtitleButton = Array.from(
+      view.container.querySelectorAll(".kt-popup-scene")
+    ).find((button) => button.textContent.includes("subtitle_translate"));
+    act(() => subtitleButton.click());
+    await flushEffects();
+
+    expect(mockSendBgMsg).toHaveBeenCalledWith(MSG_RUNTIME_SETTING_PATCH, {
+      scope: "current",
+      patch: { subtitleSetting: { enabled: false } },
+    });
+    expect(mockUpdateSetting).not.toHaveBeenCalled();
     view.cleanup();
   });
 });

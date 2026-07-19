@@ -56,7 +56,7 @@ export async function loadPopupData({
 
   try {
     const injection = executeScript({
-      target: { tabId: tab.id },
+      target: { tabId: tab.id, allFrames: true },
       files: ["content.js"],
     });
     if (!injection) return response;

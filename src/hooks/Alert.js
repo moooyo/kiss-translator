@@ -2,36 +2,25 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
 } from "react";
-import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
-import ErrorRoundedIcon from "@mui/icons-material/ErrorRounded";
-import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
-import WarningRoundedIcon from "@mui/icons-material/WarningRounded";
+import Alert from "@mui/material/Alert";
+import Snackbar from "@mui/material/Snackbar";
 
 const AlertContext = createContext(null);
-
-const ALERT_ICONS = {
-  error: ErrorRoundedIcon,
-  warning: WarningRoundedIcon,
-  info: InfoRoundedIcon,
-  success: CheckCircleRoundedIcon,
-};
 
 export function AlertProvider({ children }) {
   const [alert, setAlert] = useState(null);
 
   const showAlert = useCallback((message, severity) => {
-    setAlert({ id: Date.now(), message, severity });
+    setAlert({ message, severity });
   }, []);
 
-  useEffect(() => {
-    if (!alert) return undefined;
-    const timer = window.setTimeout(() => setAlert(null), 2600);
-    return () => window.clearTimeout(timer);
-  }, [alert]);
+  const handleClose = useCallback((_event, reason) => {
+    if (reason === "clickaway") return;
+    setAlert(null);
+  }, []);
 
   const value = useMemo(
     () => ({
@@ -43,21 +32,24 @@ export function AlertProvider({ children }) {
     [showAlert]
   );
 
-  const Icon = alert ? ALERT_ICONS[alert.severity] || InfoRoundedIcon : null;
-
   return (
     <AlertContext.Provider value={value}>
       {children}
-      {alert && (
-        <div
-          className={`kt-m3-snackbar kt-m3-snackbar--${alert.severity}`}
-          role={alert.severity === "error" ? "alert" : "status"}
-          onClick={() => setAlert(null)}
+      <Snackbar
+        open={Boolean(alert)}
+        autoHideDuration={2600}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
+        onClose={handleClose}
+      >
+        <Alert
+          severity={alert?.severity || "info"}
+          variant="filled"
+          onClose={handleClose}
+          sx={{ maxWidth: "min(480px, calc(100vw - 32px))" }}
         >
-          <Icon className="kt-m3-snackbar__status-icon" />
-          <span>{alert.message}</span>
-        </div>
-      )}
+          {alert?.message || ""}
+        </Alert>
+      </Snackbar>
     </AlertContext.Provider>
   );
 }

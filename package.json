@@ -52,7 +52,8 @@
     "verify:release": "node src/scripts/verify-build.mjs --release",
     "format": "prettier --write \"**/*.{js,mjs,json,html}\"",
     "check:format": "prettier --check \"**/*.{js,mjs,json,html}\"",
-    "check": "pnpm check:version && pnpm check:format",
+    "check:lint": "eslint src --ext .js --max-warnings=0",
+    "check": "pnpm check:version && pnpm check:format && pnpm check:lint",
     "build": "pnpm sync-version && pnpm format && pnpm build:targets && pnpm build:rules && pnpm verify:build",
     "build:ci": "pnpm check:version && pnpm build:targets && pnpm build:rules && pnpm verify:build",
     "build:release": "pnpm check && pnpm test:ci && pnpm build:ci && pnpm zip && pnpm verify:release",
@@ -74,7 +75,24 @@
       "messenger": true,
       "LanguageDetector": true,
       "Translator": true
-    }
+    },
+    "overrides": [
+      {
+        "files": [
+          "**/*.test.js",
+          "**/*.spec.js"
+        ],
+        "rules": {
+          "import/first": "off",
+          "no-useless-constructor": "off",
+          "require-yield": "off",
+          "testing-library/no-container": "off",
+          "testing-library/no-unnecessary-act": "off",
+          "testing-library/prefer-screen-queries": "off",
+          "testing-library/render-result-naming-convention": "off"
+        }
+      }
+    ]
   },
   "browserslist": {
     "production": [
@@ -96,6 +114,7 @@
     "bestzip": "^2.2.1",
     "cross-env": "^7.0.3",
     "dotenv": "^17.2.1",
+    "eslint": "8.57.1",
     "find-up": "^7.0.0",
     "prettier": "3.6.2",
     "react-app-rewired": "^2.2.1",

@@ -5,6 +5,7 @@ import Tab from "@mui/material/Tab";
 import MenuItem from "@mui/material/MenuItem";
 import Grid from "@mui/material/Grid";
 import Box from "@mui/material/Box";
+import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import DoneIcon from "@mui/icons-material/Done";
 import CircularProgress from "@mui/material/CircularProgress";
@@ -338,15 +339,14 @@ export default function TranForm({
           />
           <div className="kt-popup-translation-input__footer">
             <span>{editText.length} / 5000</span>
-            <button
-              type="button"
-              className="kt-m3-button"
+            <Button
+              variant="contained"
               disabled={!editText.trim()}
               onClick={commitText}
             >
               <TranslateRoundedIcon />
               {i18n("translate")}
-            </button>
+            </Button>
           </div>
         </div>
 
@@ -637,11 +637,7 @@ export default function TranForm({
               onFocus={() => {
                 setEditMode(true);
               }}
-              // REVIEW: TextField 的 onBlur 会立即触发 setEditMode(false) 并提交数据，而 DoneIcon 的 onClick 也会执行相同逻辑。这会在点击提交按钮时产生多余重入。更关键的是，在某些系统或移动端环境下，onBlur 优先于 click 触发会使 EditMode 瞬间置为 false，导致 DoneIcon 被提早销毁而无法正常响应 onClick 事件。建议在图标按钮上改用 onMouseDown + preventDefault，或使用 onCommit 统一提交通道。
-              onBlur={() => {
-                setEditMode(false);
-                setText(editText.trim());
-              }}
+              onBlur={commitText}
               InputProps={{
                 endAdornment: (
                   <Stack
@@ -656,11 +652,8 @@ export default function TranForm({
                       /* 编辑模式：显示提交勾选图标 */
                       <IconButton
                         size="small"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setEditMode(false);
-                          setText(editText.trim());
-                        }}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={commitText}
                         title={i18n("submit")}
                       >
                         <DoneIcon fontSize="inherit" />

@@ -41,7 +41,7 @@ describe("loadPopupData", () => {
     ).resolves.toBe(popupData);
 
     expect(executeScript).toHaveBeenCalledWith({
-      target: { tabId: 17 },
+      target: { tabId: 17, allFrames: true },
       files: ["content.js"],
     });
     expect(sendMessage).toHaveBeenCalledTimes(3);

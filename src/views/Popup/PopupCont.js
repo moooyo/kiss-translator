@@ -8,6 +8,11 @@ import SelectAllRoundedIcon from "@mui/icons-material/SelectAllRounded";
 import SubtitlesRoundedIcon from "@mui/icons-material/SubtitlesRounded";
 import SwapHorizRoundedIcon from "@mui/icons-material/SwapHorizRounded";
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
+import Alert from "@mui/material/Alert";
+import Button from "@mui/material/Button";
+import IconButton from "@mui/material/IconButton";
+import Snackbar from "@mui/material/Snackbar";
+import Switch from "@mui/material/Switch";
 import { sendBgMsg, sendTabMsg, getCurTab } from "../../libs/msg";
 import { isExt } from "../../libs/client";
 import { useI18n } from "../../hooks/I18n";
@@ -15,7 +20,6 @@ import {
   MSG_TRANS_TOGGLE,
   MSG_TRANS_PUTRULE,
   MSG_SAVE_RULE,
-  MSG_COMMAND_SHORTCUTS,
   MSG_TRANSBOX_TOGGLE,
   MSG_MOUSEHOVER_TOGGLE,
   MSG_TRANSINPUT_TOGGLE,
@@ -27,54 +31,13 @@ import { saveRule } from "../../libs/rules";
 import { tryClearCaches } from "../../libs/cache";
 import { kissLog } from "../../libs/log";
 import { getDomainOptions, truncateMiddle } from "../../libs/url";
-import { normalizeShortcutKeys } from "../../libs/shortcutLabel";
 import { useAllTextStyles } from "../../hooks/CustomStyles";
+import { useOverviewShortcuts } from "../../hooks/Commands";
 import { isInBlacklist } from "../../libs/blacklist";
 import { useSetting } from "../../hooks/Setting";
-import {
-  M3Button,
-  M3IconButton,
-  M3Snackbar,
-  M3Switch,
-  ServiceLogo,
-} from "../../components/M3";
-import { POPUP_STYLES } from "./styles";
+import ApiProviderIcon from "../../components/ApiProviderIcon";
 import { COLLAPSED_SERVICE_LIMIT, getVisibleServices } from "./services";
 import { css } from "@emotion/css";
-
-const API_ICON_FILES = {
-  BuiltinAI: "BuiltinAI.svg",
-  Google: "Google.svg",
-  Google2: "Google.svg",
-  Microsoft: "Microsoft.svg",
-  AzureAI: "AzureAI.svg",
-  DeepSeek: "DeepSeek.svg",
-  OpenCodeGo: "OpenCodeGo.svg",
-  SiliconFlow: "SiliconFlow.svg",
-  XiaomiMimo: "XiaomiMimo.svg",
-  AliyunBailian: "AliyunBailian.svg",
-  Cerebras: "Cerebras.svg",
-  Zai: "Zai.svg",
-  DeepL: "DeepL.svg",
-  DeepLFree: "DeepL.svg",
-  DeepLX: "DeepL.svg",
-  Baidu: "Baidu.svg",
-  Tencent: "Tencent.svg",
-  Volcengine: "Volcengine.svg",
-  ePhoneAI: "ePhoneAI.png",
-  OpenAI: "OpenAI.svg",
-  Gemini: "Gemini.svg",
-  Gemini2: "Gemini.svg",
-  Claude: "Claude.svg",
-  CloudflareAI: "CloudflareAI.svg",
-  Ollama: "Ollama.svg",
-  OpenRouter: "OpenRouter.svg",
-};
-
-function getApiIconSrc(apiType) {
-  const fileName = API_ICON_FILES[apiType];
-  return fileName ? `${process.env.PUBLIC_URL || "."}/api/${fileName}` : "";
-}
 
 export function resolvePopupTextStyles(
   allTextStyles,
@@ -109,7 +72,7 @@ export default function PopupCont({
 }) {
   const i18n = useI18n();
   const { setting: contextSetting, updateSetting } = useSetting();
-  const [commands, setCommands] = useState({});
+  const shortcutMap = useOverviewShortcuts(setting);
   const [domainOptions, setDomainOptions] = useState([]);
   const [selectedDomain, setSelectedDomain] = useState("");
   const [currentHref, setCurrentHref] = useState("");
@@ -138,15 +101,6 @@ export default function PopupCont({
   const showMessage = useCallback((message) => {
     setSnackbar({ open: true, message });
   }, []);
-
-  useEffect(() => {
-    if (!snackbar.open) return undefined;
-    const timer = window.setTimeout(
-      () => setSnackbar({ open: false, message: "" }),
-      2200
-    );
-    return () => window.clearTimeout(timer);
-  }, [snackbar.open]);
 
   useEffect(
     () => () => {
@@ -327,14 +281,17 @@ export default function PopupCont({
         ...previous,
         subtitleSetting: { ...previous.subtitleSetting, enabled },
       }));
-      updateSetting((previous) => ({
-        ...previous,
-        subtitleSetting: { ...previous.subtitleSetting, enabled },
-      }));
-      void sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
-        scope: "current",
-        patch: { subtitleSetting: { enabled } },
-      }).catch((error) => kissLog("apply runtime subtitle setting", error));
+      if (isExt) {
+        void sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
+          scope: "current",
+          patch: { subtitleSetting: { enabled } },
+        }).catch((error) => kissLog("apply runtime subtitle setting", error));
+      } else {
+        updateSetting((previous) => ({
+          ...previous,
+          subtitleSetting: { ...previous.subtitleSetting, enabled },
+        }));
+      }
     },
     [setSetting, updateSetting]
   );
@@ -377,31 +334,6 @@ export default function PopupCont({
     };
   }, [isContent]);
 
-  useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const nextCommands = {};
-        if (isExt) {
-          const response = await sendBgMsg(MSG_COMMAND_SHORTCUTS);
-          (response || []).forEach(({ name, shortcut }) => {
-            nextCommands[name] = normalizeShortcutKeys(shortcut).join("+");
-          });
-        } else {
-          Object.entries(setting?.shortcuts || {}).forEach(([key, value]) => {
-            nextCommands[key] = normalizeShortcutKeys(value).join("+");
-          });
-        }
-        if (active) setCommands(nextCommands);
-      } catch (error) {
-        kissLog("query commands", error);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [setting?.shortcuts]);
-
   const services = useMemo(
     () =>
       (setting?.transApis || [])
@@ -437,6 +369,14 @@ export default function PopupCont({
     OPT_LANGS_TO.find(([key]) => key === toLang)?.[1] || toLang;
   const activeService = services.find(({ key }) => key === apiSlug);
   const activeServiceName = activeService?.name || apiSlug || "—";
+  const pageShortcutLabel = shortcutMap.page.join("+");
+  const enabledSummary = [
+    i18n("popup_enabled"),
+    `${activeServiceName} → ${targetName}`,
+    pageShortcutLabel,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const isAutoSource =
     !fromLang || fromLang === "auto" || fromLang === "$global";
 
@@ -485,7 +425,6 @@ export default function PopupCont({
 
   return (
     <section className="kt-popup-content">
-      <style>{POPUP_STYLES}</style>
       <div
         className={`kt-popup-hero ${
           translationEnabled ? "" : "kt-popup-hero--off"
@@ -509,17 +448,16 @@ export default function PopupCont({
             {translationBusy
               ? i18n("popup_translating")
               : translationEnabled
-                ? `${i18n("popup_enabled")} · ${activeServiceName} → ${targetName} · ${
-                    commands.toggleTranslate || "Alt+Q"
-                  }`
+                ? enabledSummary
                 : i18n("popup_disabled")}
           </span>
         </span>
-        <M3Switch
+        <Switch
           className="kt-popup-main-switch"
           checked={translationEnabled}
           onChange={handleTransToggle}
-          aria-label={i18n("popup_translate_page")}
+          onClick={(event) => event.stopPropagation()}
+          inputProps={{ "aria-label": i18n("popup_translate_page") }}
         />
         {translationBusy && <span className="kt-popup-hero__progress" />}
       </div>
@@ -538,7 +476,7 @@ export default function PopupCont({
             ))}
           </select>
         </label>
-        <M3IconButton
+        <IconButton
           className="kt-popup-swap"
           disabled={isAutoSource}
           title={i18n("swap_languages")}
@@ -548,7 +486,7 @@ export default function PopupCont({
           }}
         >
           <SwapHorizRoundedIcon />
-        </M3IconButton>
+        </IconButton>
         <label className="kt-popup-language">
           <span>{i18n("to_lang")}</span>
           <select
@@ -581,7 +519,10 @@ export default function PopupCont({
               key={service.key}
               onClick={() => putRuleValue("apiSlug", service.key)}
             >
-              <ServiceLogo src={getApiIconSrc(service.type)} />
+              <ApiProviderIcon
+                apiType={service.type}
+                className="kt-service-logo"
+              />
               <span className="kt-popup-service__name">{service.name}</span>
             </button>
           ))}
@@ -652,15 +593,17 @@ export default function PopupCont({
           </span>
         </div>
         <div className="kt-popup-site__actions">
-          <M3Button
-            variant="tonal"
+          <Button
+            variant="contained"
+            color="secondary"
             onClick={handleSaveRule}
             disabled={!domainOptions.length}
           >
             {i18n("save_rule")}
-          </M3Button>
-          <M3Button
-            variant={isInCurrentBlacklist ? "danger" : "outlined"}
+          </Button>
+          <Button
+            variant={isInCurrentBlacklist ? "contained" : "outlined"}
+            color={isInCurrentBlacklist ? "error" : "primary"}
             onClick={
               isInCurrentBlacklist
                 ? handleRemoveFromBlacklist
@@ -673,13 +616,13 @@ export default function PopupCont({
                 ? "remove_from_blacklist"
                 : "add_to_blacklist"
             )}
-          </M3Button>
-          <M3IconButton
+          </Button>
+          <IconButton
             onClick={handleClearCache}
             aria-label={i18n("clear_cache")}
           >
             <DeleteSweepRoundedIcon />
-          </M3IconButton>
+          </IconButton>
         </div>
       </div>
 
@@ -694,14 +637,14 @@ export default function PopupCont({
           <ExpandMoreRoundedIcon />
         </button>
         {!isContent && (
-          <M3Button
+          <Button
             className="kt-popup-disclosure-support"
             variant="text"
             aria-expanded={showSupport}
             onClick={() => setShowSupport((current) => !current)}
           >
             {i18n("popup_support")}
-          </M3Button>
+          </Button>
         )}
       </div>
 
@@ -745,9 +688,10 @@ export default function PopupCont({
           </div>
           <div className="kt-popup-advanced-grid">
             {advancedRows.map(([name, label, checked]) => (
-              <label className="kt-popup-advanced-row" key={name}>
+              <div className="kt-popup-advanced-row" key={name}>
                 <span>{label}</span>
-                <M3Switch
+                <Switch
+                  size="small"
                   checked={checked}
                   onChange={(event) =>
                     putRuleValue(
@@ -759,14 +703,15 @@ export default function PopupCont({
                           : "false"
                     )
                   }
-                  aria-label={label}
+                  inputProps={{ "aria-label": label }}
                 />
-              </label>
+              </div>
             ))}
           </div>
-          <label className="kt-popup-advanced-row">
+          <div className="kt-popup-advanced-row">
             <span>{i18n("autoscan_alt")}</span>
-            <M3Switch
+            <Switch
+              size="small"
               checked={autoScan === "true"}
               onChange={(event) =>
                 putRuleValue(
@@ -774,9 +719,9 @@ export default function PopupCont({
                   event.target.checked ? "true" : "false"
                 )
               }
-              aria-label={i18n("autoscan_alt")}
+              inputProps={{ "aria-label": i18n("autoscan_alt") }}
             />
-          </label>
+          </div>
         </div>
       )}
 
@@ -803,35 +748,43 @@ export default function PopupCont({
 
       {isContent && (
         <footer className="kt-popup-footer">
-          <>
-            <span className="kt-popup-footer__keys">
-              <kbd>Alt</kbd>
-              <kbd>Q</kbd>
-            </span>
-            <span className="kt-popup-footer__keys">
-              <kbd>Alt</kbd>
-              <kbd>S</kbd>
-            </span>
-          </>
+          {[shortcutMap.page, shortcutMap.selection]
+            .filter((keys) => keys.length > 0)
+            .map((keys) => (
+              <span className="kt-popup-footer__keys" key={keys.join("+")}>
+                {keys.map((key) => (
+                  <kbd key={key}>{key}</kbd>
+                ))}
+              </span>
+            ))}
           <span className="kt-popup-footer__spacer" />
-          <M3Button
+          <Button
             variant="text"
             aria-expanded={showSupport}
             onClick={() => setShowSupport((current) => !current)}
           >
             {i18n("popup_support")}
-          </M3Button>
-          <M3Button variant="text" onClick={handleOpenSetting}>
+          </Button>
+          <Button variant="text" onClick={handleOpenSetting}>
             {i18n("popup_all_settings")}
-          </M3Button>
+          </Button>
         </footer>
       )}
 
-      <M3Snackbar
+      <Snackbar
         open={snackbar.open}
-        message={snackbar.message}
+        autoHideDuration={2200}
+        anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
         onClose={() => setSnackbar({ open: false, message: "" })}
-      />
+      >
+        <Alert
+          severity="success"
+          variant="filled"
+          onClose={() => setSnackbar({ open: false, message: "" })}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </section>
   );
 }

@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
-import { M3Segmented, M3Switch } from "../../components/M3";
+import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
+import Accordion from "@mui/material/Accordion";
+import AccordionDetails from "@mui/material/AccordionDetails";
+import AccordionSummary from "@mui/material/AccordionSummary";
+import Box from "@mui/material/Box";
+import Card from "@mui/material/Card";
+import ListItem from "@mui/material/ListItem";
+import ListItemText from "@mui/material/ListItemText";
+import MenuItem from "@mui/material/MenuItem";
+import Slider from "@mui/material/Slider";
+import Switch from "@mui/material/Switch";
+import TextField from "@mui/material/TextField";
+import ToggleButton from "@mui/material/ToggleButton";
+import ToggleButtonGroup from "@mui/material/ToggleButtonGroup";
+import Typography from "@mui/material/Typography";
 
 export function SettingsSection({ title, children, className = "" }) {
   return (
@@ -12,7 +26,9 @@ export function SettingsSection({ title, children, className = "" }) {
 
 export function SettingsCard({ children, className = "" }) {
   return (
-    <div className={`kt-settings-card ${className}`.trim()}>{children}</div>
+    <Card variant="outlined" className={`kt-settings-card ${className}`.trim()}>
+      {children}
+    </Card>
   );
 }
 
@@ -24,25 +40,29 @@ export function SettingsRow({
   className = "",
 }) {
   return (
-    <div
+    <ListItem
+      disableGutters
       className={`kt-settings-row ${stacked ? "kt-settings-row--stacked" : ""} ${className}`.trim()}
     >
-      <div className="kt-settings-row__copy">
-        <strong>{label}</strong>
-        {description && <span>{description}</span>}
-      </div>
-      <div className="kt-settings-row__control">{children}</div>
-    </div>
+      <ListItemText
+        className="kt-settings-row__copy"
+        primary={label}
+        secondary={description || null}
+        primaryTypographyProps={{ component: "strong" }}
+        secondaryTypographyProps={{ component: "span" }}
+      />
+      <Box className="kt-settings-row__control">{children}</Box>
+    </ListItem>
   );
 }
 
 export function SettingsSwitch({ checked, onChange, label, disabled = false }) {
   return (
-    <M3Switch
+    <Switch
       checked={checked}
       disabled={disabled}
       onChange={(event) => onChange(event.target.checked)}
-      aria-label={label}
+      inputProps={{ "aria-label": label }}
     />
   );
 }
@@ -55,14 +75,41 @@ export function SettingsSegmented({
   className = "",
 }) {
   return (
-    <M3Segmented
-      className={`kt-settings-segmented ${className}`.trim()}
+    <ToggleButtonGroup
+      exclusive
       value={value}
-      onChange={onChange}
-      items={items}
-      ariaLabel={label}
-      mode="radio"
-    />
+      onChange={(_event, nextValue) => {
+        if (nextValue !== null) onChange(nextValue);
+      }}
+      className={`kt-settings-segmented ${className}`.trim()}
+      aria-label={label}
+      role="radiogroup"
+    >
+      {items.map((item) => {
+        const normalized =
+          typeof item === "object"
+            ? item
+            : { value: item, label: String(item) };
+        const selected = normalized.value === value;
+        return (
+          <ToggleButton
+            value={normalized.value}
+            role="radio"
+            aria-checked={selected}
+            aria-label={
+              typeof normalized.label === "string"
+                ? normalized.label
+                : undefined
+            }
+            key={normalized.value}
+          >
+            <span className="kt-settings-segmented__label">
+              {normalized.label}
+            </span>
+          </ToggleButton>
+        );
+      })}
+    </ToggleButtonGroup>
   );
 }
 
@@ -75,30 +122,29 @@ export function SettingsSelect({
   disabled = false,
 }) {
   return (
-    <select
+    <TextField
+      select
+      hiddenLabel
+      size="small"
+      variant="filled"
       className="kt-settings-select"
       value={value}
-      multiple={multiple}
       disabled={disabled}
-      aria-label={label}
-      onChange={(event) => {
-        const nextValue = multiple
-          ? Array.from(event.target.selectedOptions, (option) => option.value)
-          : event.target.value;
-        onChange(nextValue);
-      }}
+      SelectProps={{ multiple }}
+      inputProps={{ "aria-label": label }}
+      onChange={(event) => onChange(event.target.value)}
     >
       {options.map((option) => {
         const normalized = Array.isArray(option)
           ? { value: option[0], label: option[1] }
           : option;
         return (
-          <option key={normalized.value} value={normalized.value}>
+          <MenuItem key={normalized.value} value={normalized.value}>
             {normalized.label}
-          </option>
+          </MenuItem>
         );
       })}
-    </select>
+    </TextField>
   );
 }
 
@@ -112,22 +158,25 @@ export function SettingsRange({
   onChange,
 }) {
   return (
-    <div className="kt-settings-range">
-      <input
-        type="range"
+    <Box className="kt-settings-range">
+      <Slider
         value={value}
         min={min}
         max={max}
         step={step}
         aria-label={label}
-        onChange={(event) => onChange(Number(event.target.value))}
+        onChange={(_event, nextValue) => onChange(Number(nextValue))}
       />
-      <output>{`${value}${unit}`}</output>
-    </div>
+      <Typography component="output">{`${value}${unit}`}</Typography>
+    </Box>
   );
 }
 
-export function ShortcutKeys({ keys }) {
+export function ShortcutKeys({ keys = [] }) {
+  if (keys.length === 0) {
+    return <span className="kt-settings-keys kt-settings-keys--empty">—</span>;
+  }
+
   return (
     <span className="kt-settings-keys" aria-label={keys.join("+")}>
       {keys.map((key) => (
@@ -150,15 +199,18 @@ export function SettingsAdvanced({
   }, [open]);
 
   return (
-    <details
+    <Accordion
+      disableGutters
+      expanded={expanded}
+      onChange={(_event, nextExpanded) => setExpanded(nextExpanded)}
       className={`kt-settings-advanced ${className}`.trim()}
-      open={expanded}
-      onToggle={(event) => setExpanded(event.currentTarget.open)}
     >
-      <summary>{label}</summary>
-      {expanded && (
-        <div className="kt-settings-advanced__content">{children}</div>
-      )}
-    </details>
+      <AccordionSummary expandIcon={<ExpandMoreRoundedIcon />}>
+        {label}
+      </AccordionSummary>
+      <AccordionDetails className="kt-settings-advanced__content">
+        {expanded ? children : null}
+      </AccordionDetails>
+    </Accordion>
   );
 }

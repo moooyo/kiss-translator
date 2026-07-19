@@ -50,13 +50,18 @@ export async function applyRuntimeSettingPatch() {
     }
   }
 
+  if (!activeTranslatorManager) {
+    stopSubtitle();
+    return { enabled: true, active: false };
+  }
+
   if (setting.subtitleSetting?.enabled === false) {
     stopSubtitle();
   } else if (!isIframe) {
     runSubtitle({ href: document?.location?.href || "", setting });
   }
 
-  return { enabled: true };
+  return { enabled: true, active: true };
 }
 
 function ensureRuntimeControlListener(isUserscript) {

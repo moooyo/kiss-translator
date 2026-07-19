@@ -88,13 +88,14 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-hero__progress { height: 4px; position: absolute; right: 0; bottom: 0; left: 0; background: color-mix(in srgb, var(--kt-pri) 18%, transparent); }
 .kt-popup-hero__progress::after { content: ""; position: absolute; inset-block: 0; border-radius: 999px; background: var(--kt-pri); animation: kt-m3-sweep 1.05s ease-in-out infinite; }
 
-.kt-popup-main-switch { width: 46px; height: 26px; }
-.kt-popup-main-switch .kt-m3-switch__track { border-width: 1.5px; background: var(--kt-sf4); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kt-line) 14%, transparent); transition: background .25s, border-color .25s, transform .15s; }
-.kt-popup-main-switch .kt-m3-switch__thumb { width: 18px; height: 18px; left: 4px; top: 50%; background: var(--kt-line); transform: translateY(-50%); }
-.kt-popup-main-switch .kt-m3-switch__thumb svg { display: none; }
-.kt-popup-main-switch > input:checked + .kt-m3-switch__track { border-color: var(--kt-pri); background: var(--kt-pri); box-shadow: none; }
-.kt-popup-main-switch > input:checked + .kt-m3-switch__track .kt-m3-switch__thumb { width: 20px; height: 20px; left: 23px; top: 50%; background: var(--kt-onpri); }
-.kt-popup-main-switch:active .kt-m3-switch__track { transform: scale(.96); }
+.kt-popup-main-switch.MuiSwitch-root { width: 46px; height: 28px; padding: 0; overflow: visible; }
+.kt-popup-main-switch .MuiSwitch-switchBase { width: 28px; height: 28px; display: grid; place-items: center; padding: 0; color: var(--kt-line); transform: none; }
+.kt-popup-main-switch .MuiSwitch-thumb { width: 18px; height: 18px; box-shadow: none; }
+.kt-popup-main-switch .MuiSwitch-track { border: 1.5px solid var(--kt-line); border-radius: 999px; background: var(--kt-sf4); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kt-line) 14%, transparent); opacity: 1; transition: background .25s, border-color .25s, transform .15s; }
+.kt-popup-main-switch .MuiSwitch-switchBase.Mui-checked { color: var(--kt-onpri); transform: translateX(18px); }
+.kt-popup-main-switch .MuiSwitch-switchBase.Mui-checked .MuiSwitch-thumb { width: 20px; height: 20px; }
+.kt-popup-main-switch .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track { border-color: var(--kt-pri); background: var(--kt-pri); box-shadow: none; opacity: 1; }
+.kt-popup-main-switch:active .MuiSwitch-track { transform: scale(.96); }
 
 .kt-popup-language-row { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 8px; }
 .kt-popup-language {
@@ -169,9 +170,9 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-site__badge { flex: none; padding: 4px 8px; border-radius: 999px; background: var(--kt-terc); color: var(--kt-onterc); font-size: 10.5px; font-weight: 700; }
 .kt-popup-site__badge--blocked { background: var(--kt-errc); color: var(--kt-onerrc); }
 .kt-popup-site__actions { display: flex; align-items: center; gap: 4px; margin: 10px -4px -4px; }
-.kt-popup-site__actions .kt-m3-button { min-height: 36px; padding-inline: 12px; font-size: 11.5px; }
-.kt-popup-site__actions .kt-m3-button:first-child { flex: 1; }
-.kt-popup-site__actions .kt-m3-icon-button { width: 36px; height: 36px; }
+.kt-popup-site__actions .MuiButton-root { min-height: 36px; padding-inline: 12px; font-size: 11.5px; }
+.kt-popup-site__actions .MuiButton-root:first-child { flex: 1; }
+.kt-popup-site__actions .MuiIconButton-root { width: 36px; height: 36px; }
 
 .kt-popup-disclosure-row { display: flex; align-items: center; gap: 4px; }
 .kt-popup-disclosure { width: auto; min-height: 38px; display: flex; flex: 1; align-items: center; gap: 8px; padding: 0 4px; border: 0; background: transparent; color: var(--kt-onv); cursor: pointer; font-size: 12.5px; font-weight: 650; }
@@ -193,7 +194,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-style-more[aria-expanded="true"] svg { transform: rotate(180deg); }
 .kt-popup-advanced-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .kt-popup-advanced-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px 10px 9px 12px; border-radius: 15px; background: var(--kt-sf2); font-size: 11.5px; font-weight: 550; }
-.kt-popup-advanced-row .kt-m3-switch { transform: scale(.76); transform-origin: right center; }
+.kt-popup-advanced-row .MuiSwitch-root { margin: -4px -6px; transform: scale(.76); transform-origin: right center; }
 
 .kt-popup-support { display: flex; justify-content: flex-end; gap: 6px; margin-top: -4px; padding: 8px; border-radius: 16px; background: var(--kt-sf1); animation: kt-m3-rise .3s var(--kt-spring); }
 .kt-popup-support a { min-height: 34px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 999px; color: var(--kt-pri); font-size: 11px; font-weight: 700; text-decoration: none; }
@@ -203,7 +204,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-footer__keys { display: flex; align-items: center; gap: 4px; }
 .kt-popup-footer kbd { padding: 2px 6px; border: 1px solid var(--kt-linev); border-bottom-width: 2px; border-radius: 6px; background: var(--kt-sf1); color: var(--kt-on); font-family: ui-monospace, monospace; font-size: 9.5px; }
 .kt-popup-footer__spacer { flex: 1; }
-.kt-popup-footer .kt-m3-button { min-height: 34px; padding-inline: 10px; font-size: 11.5px; }
+.kt-popup-footer .MuiButton-root { min-height: 34px; padding-inline: 10px; font-size: 11.5px; }
 
 .kt-popup-text-panel { padding: 14px 18px 18px; animation: kt-m3-rise .35s var(--kt-spring); }
 .kt-popup-text-panel .MuiTabs-root { margin-bottom: 12px; }
@@ -212,7 +213,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-translation-input:focus-within { border-color: var(--kt-pri); background: var(--kt-sf0); }
 .kt-popup-translation-input textarea { width: 100%; min-height: 112px; display: block; resize: vertical; padding: 15px 15px 4px; border: 0; outline: 0; background: transparent; color: var(--kt-on); font-size: 13px; line-height: 1.55; }
 .kt-popup-translation-input__footer { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 10px 9px 15px; color: var(--kt-onv); font-size: 10.5px; }
-.kt-popup-translation-input__footer .kt-m3-button { min-height: 38px; padding-inline: 15px; }
+.kt-popup-translation-input__footer .MuiButton-root { min-height: 38px; padding-inline: 15px; }
 .kt-popup-translation-input__footer svg { width: 18px; height: 18px; }
 .kt-popup-translation-direction { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--kt-pri); font-size: 12px; font-weight: 650; }
 .kt-popup-translation-direction select { max-width: 130px; min-width: 0; padding: 7px 24px 7px 10px; border: 0; border-radius: 999px; outline: 0; background: var(--kt-sf2); color: var(--kt-on); font-size: 11.5px; font-weight: 650; text-align: center; }
@@ -240,7 +241,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-disabled { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin: 14px 18px 18px; padding: 28px 24px; border: 1px solid var(--kt-linev); border-radius: 24px; background: var(--kt-sf1); color: var(--kt-onv); text-align: center; }
 .kt-popup-disabled strong { color: var(--kt-on); font-size: 16px; }
 .kt-popup-disabled span { max-width: 280px; font-size: 12px; line-height: 1.55; }
-.kt-popup-disabled .kt-m3-button { margin-top: 6px; }
+.kt-popup-disabled .MuiButton-root { margin-top: 6px; }
 
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-content { gap: 9px; padding: 10px 16px 12px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero { padding: 12px 14px; border-radius: 20px; }
@@ -252,7 +253,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene { padding: 7px 10px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site { padding: 10px 12px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions { margin: 7px -2px -2px; }
-.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions .kt-m3-button { min-height: 34px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions .MuiButton-root { min-height: 34px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-disclosure { min-height: 34px; }
 
 @media (max-width: 395px) {

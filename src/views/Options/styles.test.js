@@ -12,7 +12,7 @@ describe("settings segmented controls", () => {
       /\.kt-settings-segmented > button:focus-visible\s*\{([^}]*)\}/
     )?.[1];
     const labelRule = OPTIONS_STYLES.match(
-      /\.kt-settings-segmented \.kt-m3-segmented__label\s*\{([^}]*)\}/
+      /\.kt-settings-segmented__label\s*\{([^}]*)\}/
     )?.[1];
 
     expect(trackRule).toContain("overflow: hidden");

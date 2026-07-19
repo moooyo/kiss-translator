@@ -329,6 +329,27 @@ describe("common iframe startup", () => {
     expect(runSubtitle).toHaveBeenCalledTimes(1);
   });
 
+  test("does not start subtitles when runtime startup is blocked", async () => {
+    getSettingWithDefault.mockResolvedValue({
+      extensionEnabled: true,
+      blacklist: "blocked.example",
+      subtitleSetting: { enabled: true },
+      logLevel: 1,
+    });
+    isInBlacklist.mockImplementation(
+      (_href, blacklist) => blacklist === "blocked.example"
+    );
+
+    await expect(applyRuntimeSettingPatch()).resolves.toEqual({
+      enabled: true,
+      active: false,
+    });
+
+    expect(TranslatorManager).not.toHaveBeenCalled();
+    expect(runSubtitle).not.toHaveBeenCalled();
+    expect(stopSubtitle).toHaveBeenCalledTimes(1);
+  });
+
   test("inverts the FAB visibility when the top-level page matches its exception list", async () => {
     getFabWithDefault.mockResolvedValue({
       isHide: false,

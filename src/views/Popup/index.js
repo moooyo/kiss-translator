@@ -7,6 +7,9 @@ import {
   useState,
 } from "react";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
+import Button from "@mui/material/Button";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
 import { sendBgMsg } from "../../libs/msg";
 import { browser } from "../../libs/browser";
 import { useI18n } from "../../hooks/I18n";
@@ -21,7 +24,6 @@ import { kissLog } from "../../libs/log";
 import PopupCont from "./PopupCont";
 import TranForm from "../Selection/TranForm";
 import { useSetting } from "../../hooks/Setting";
-import { M3Button, M3Segmented } from "../../components/M3";
 import { POPUP_STYLES } from "./styles";
 import { loadPopupData } from "./loadData";
 
@@ -241,13 +243,23 @@ export default function Popup() {
         openSeparateWindow={openSeparateWindow}
         openSettings={handleOpenSetting}
       />
-      <M3Segmented
+      <Tabs
         className="kt-popup-tabs"
-        items={tabs}
         value={activeTab}
-        onChange={setActiveTab}
-        ariaLabel={i18n("translate")}
-      />
+        onChange={(_event, value) => setActiveTab(value)}
+        aria-label={i18n("translate")}
+        variant="fullWidth"
+      >
+        {tabs.map((tab) => (
+          <Tab
+            value={tab.value}
+            label={tab.label}
+            id={tab.tabId}
+            aria-controls={tab.panelId}
+            key={tab.value}
+          />
+        ))}
+      </Tabs>
       <div
         id="kt-popup-active-panel"
         role="tabpanel"
@@ -264,9 +276,13 @@ export default function Popup() {
           <div className="kt-popup-disabled" role="status">
             <strong>{i18n("popup_extension_disabled")}</strong>
             <span>{i18n("popup_extension_disabled_description")}</span>
-            <M3Button variant="tonal" onClick={handleOpenSetting}>
+            <Button
+              variant="contained"
+              color="secondary"
+              onClick={handleOpenSetting}
+            >
               {i18n("setting")}
-            </M3Button>
+            </Button>
           </div>
         ) : activeTab === "text" ? (
           <TranslationTab />
@@ -287,25 +303,25 @@ export default function Popup() {
           <div className="kt-popup-empty">
             <span>{i18n("load_setting_err")}</span>
             <div className="kt-popup-empty__actions">
-              <M3Button
+              <Button
                 variant="text"
                 onClick={() =>
                   window.open(process.env.REACT_APP_REVIEW_URL, "_blank")
                 }
               >
                 {i18n("comment_support")}
-              </M3Button>
-              <M3Button
+              </Button>
+              <Button
                 variant="text"
                 onClick={() =>
                   window.open(process.env.REACT_APP_SUPPORT_URL, "_blank")
                 }
               >
                 {i18n("appreciate_support")}
-              </M3Button>
-              <M3Button variant="text" onClick={handleOpenSetting}>
+              </Button>
+              <Button variant="text" onClick={handleOpenSetting}>
                 {i18n("setting")}
-              </M3Button>
+              </Button>
             </div>
           </div>
         )}

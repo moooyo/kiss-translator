@@ -5,7 +5,15 @@ import SelectAllRoundedIcon from "@mui/icons-material/SelectAllRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
 import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
-import { useCallback, useMemo, useState } from "react";
+import ClickAwayListener from "@mui/material/ClickAwayListener";
+import Fab from "@mui/material/Fab";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
+import MenuItem from "@mui/material/MenuItem";
+import MenuList from "@mui/material/MenuList";
+import Paper from "@mui/material/Paper";
+import Popper from "@mui/material/Popper";
+import { useCallback, useMemo, useRef, useState } from "react";
 import ThemeProvider from "../../hooks/Theme";
 import { SettingProvider } from "../../hooks/Setting";
 import { useI18n } from "../../hooks/I18n";
@@ -22,6 +30,28 @@ import useWindowSize from "../../hooks/WindowSize";
 import Draggable from "./Draggable";
 import { ACTION_STYLES } from "./styles";
 
+export const FAB_POPPER_MODIFIERS = [
+  {
+    name: "flip",
+    enabled: true,
+    options: {
+      fallbackPlacements: [
+        "top-start",
+        "bottom-end",
+        "bottom-start",
+        "right",
+        "left",
+      ],
+    },
+  },
+  {
+    name: "preventOverflow",
+    enabled: true,
+    options: { padding: 12 },
+  },
+  { name: "offset", options: { offset: [0, 10] } },
+];
+
 export function ContentFabContent({
   fabConfig: { x: fabX, y: fabY, fabClickAction = 0 } = {},
   processActions,
@@ -31,6 +61,7 @@ export function ContentFabContent({
   const windowSize = useWindowSize();
   const [moved, setMoved] = useState(false);
   const [open, setOpen] = useState(false);
+  const anchorRef = useRef(null);
 
   const runAction = useCallback(
     (action) => {
@@ -54,6 +85,13 @@ export function ContentFabContent({
     }
     setOpen((current) => !current);
   }, [fabClickAction, moved, open, runAction]);
+
+  const handleMenuKeyDown = useCallback((event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    setOpen(false);
+    anchorRef.current?.focus();
+  }, []);
 
   const fabProps = useMemo(
     () => ({
@@ -103,33 +141,51 @@ export function ContentFabContent({
       onStart={() => setMoved(false)}
       onMove={() => setMoved(true)}
       handler={
-        <button
-          type="button"
+        <Fab
+          ref={anchorRef}
           className="kt-content-fab"
           aria-expanded={open}
+          aria-haspopup="menu"
           aria-label={i18n("translate")}
           onClick={handleMainClick}
         >
           {open ? <CloseRoundedIcon /> : <GTranslateRoundedIcon />}
-        </button>
+        </Fab>
       }
     >
-      {open && (
-        <div className="kt-content-fab-menu">
-          {items.map(({ label, icon: Icon, action }, index) => (
-            <button
-              type="button"
-              className="kt-content-fab-menu__item"
-              style={{ animationDelay: `${index * 0.045}s` }}
-              onClick={action}
-              key={label}
-            >
-              <Icon />
-              {label}
-            </button>
-          ))}
-        </div>
-      )}
+      <Popper
+        open={open && Boolean(anchorRef.current)}
+        anchorEl={anchorRef.current}
+        placement="top-end"
+        disablePortal
+        popperOptions={{ strategy: "fixed" }}
+        modifiers={FAB_POPPER_MODIFIERS}
+      >
+        <ClickAwayListener
+          onClickAway={(event) => {
+            if (anchorRef.current?.contains(event.target)) return;
+            setOpen(false);
+          }}
+        >
+          <Paper className="kt-content-fab-menu" elevation={6}>
+            <MenuList autoFocusItem onKeyDown={handleMenuKeyDown}>
+              {items.map(({ label, icon: Icon, action }, index) => (
+                <MenuItem
+                  className="kt-content-fab-menu__item"
+                  style={{ animationDelay: `${index * 0.045}s` }}
+                  onClick={action}
+                  key={label}
+                >
+                  <ListItemIcon>
+                    <Icon />
+                  </ListItemIcon>
+                  <ListItemText>{label}</ListItemText>
+                </MenuItem>
+              ))}
+            </MenuList>
+          </Paper>
+        </ClickAwayListener>
+      </Popper>
     </Draggable>
   );
 }

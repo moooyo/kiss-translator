@@ -21,16 +21,16 @@ describe("Safari popup sizing", () => {
     expect(expandedRule).toContain("overflow-y: auto");
     expect(expandedRule).toContain("scrollbar-width: none");
     expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-scroll--expanded::\-webkit-scrollbar[\s\S]*?display:\s*none;/
+      /\.kt-popup-scroll--expanded::-webkit-scrollbar[\s\S]*?display:\s*none;/
     );
     expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-main-switch\s*\{[^}]*width:\s*46px;[^}]*height:\s*26px;/
+      /\.kt-popup-main-switch\.MuiSwitch-root\s*\{[^}]*width:\s*46px;[^}]*height:\s*28px;/
     );
     expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-main-switch \.kt-m3-switch__thumb svg\s*\{\s*display:\s*none;/
+      /\.kt-popup-main-switch \.MuiSwitch-switchBase\.Mui-checked\s*\{[^}]*transform:\s*translateX\(18px\);/
     );
     expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-main-switch \.kt-m3-switch__thumb\s*\{[^}]*top:\s*50%;[^}]*transform:\s*translateY\(-50%\);/
+      /\.kt-popup-main-switch \.MuiSwitch-switchBase\.Mui-checked \+ \.MuiSwitch-track\s*\{[^}]*background:\s*var\(--kt-pri\);/
     );
     expect(POPUP_STYLES).not.toMatch(
       /@media\s*\(max-width:\s*395px\)[\s\S]*?\.kt-popup-shell\s*\{\s*width:\s*100vw;/

@@ -13,6 +13,9 @@ import DarkModeIcon from "@mui/icons-material/DarkMode";
 import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
+import IconButton from "@mui/material/IconButton";
+import Tab from "@mui/material/Tab";
+import Tabs from "@mui/material/Tabs";
 import { useI18n } from "../../hooks/I18n";
 import { useCallback, useEffect, useState } from "react";
 import TranForm from "./TranForm.js";
@@ -22,7 +25,6 @@ import { isExt } from "../../libs/client.js";
 import { useTheme, alpha } from "@mui/material/styles";
 import { isValidWord } from "../../libs/utils";
 import { useDarkMode } from "../../hooks/ColorMode";
-import { M3IconButton, M3Segmented } from "../../components/M3";
 import { SELECTION_STYLES } from "./styles";
 
 /**
@@ -55,8 +57,8 @@ function TranBoxHeader({
   // 请求在独立的无边框小窗口中打开翻译框
   const openSeparateWindow = useCallback(() => {
     sendBgMsg(MSG_OPEN_SEPARATE_WINDOW);
-    // REVIEW: 在独立小窗口中打开翻译后，并未同时调用 setShowBox(false) 来隐藏当前页面上的划词翻译框，这可能导致页面上残留已打开的翻译框，体验上可进一步优化。
-  }, []);
+    setShowBox(false);
+  }, [setShowBox]);
 
   return (
     <div
@@ -67,44 +69,44 @@ function TranBoxHeader({
       <span className="kt-tranbox-header__drag" aria-hidden="true">
         <DragIndicatorRoundedIcon />
       </span>
-      <M3Segmented
+      <Tabs
         className="kt-tranbox-header__segments"
-        ariaLabel={i18n("translate")}
+        aria-label={i18n("translate")}
         value={activeView}
-        onChange={setActiveView}
-        items={[
-          {
-            value: "translation",
-            label: i18n("translate"),
-            tabId: "kt-tranbox-translation-tab",
-            panelId: "kt-tranbox-active-panel",
-          },
-          {
-            value: "dictionary",
-            label: i18n("dictionary"),
-            tabId: "kt-tranbox-dictionary-tab",
-            panelId: "kt-tranbox-active-panel",
-          },
-        ]}
-      />
+        onChange={(_event, value) => setActiveView(value)}
+        variant="fullWidth"
+      >
+        <Tab
+          value="translation"
+          label={i18n("translate")}
+          id="kt-tranbox-translation-tab"
+          aria-controls="kt-tranbox-active-panel"
+        />
+        <Tab
+          value="dictionary"
+          label={i18n("dictionary")}
+          id="kt-tranbox-dictionary-tab"
+          aria-controls="kt-tranbox-active-panel"
+        />
+      </Tabs>
       <span className="kt-tranbox-header__actions">
-        <M3IconButton
+        <IconButton
           title={i18n("btn_tip_click_away")}
           aria-pressed={hideClickAway}
           onClick={() => setHideClickAway((previous) => !previous)}
         >
           {hideClickAway ? <PushPinIcon /> : <PushPinOutlinedIcon />}
-        </M3IconButton>
-        <M3IconButton
+        </IconButton>
+        <IconButton
           title={i18n("more")}
           aria-expanded={showMore}
           onClick={() => setShowMore((previous) => !previous)}
         >
           <MoreVertIcon />
-        </M3IconButton>
-        <M3IconButton title={i18n("close")} onClick={() => setShowBox(false)}>
+        </IconButton>
+        <IconButton title={i18n("close")} onClick={() => setShowBox(false)}>
           <CloseIcon />
-        </M3IconButton>
+        </IconButton>
       </span>
       {showMore && (
         <div className="kt-tranbox-header__menu">

@@ -14,6 +14,7 @@ import {
 import PopupCont from "../Popup/PopupCont";
 import { isExt } from "../../libs/client";
 import { sendBgMsg } from "../../libs/msg";
+import { POPUP_STYLES } from "../Popup/styles";
 
 /**
  * 内容页悬浮控制面板的主入口视图组件
@@ -85,6 +86,7 @@ export default function Action({ translator, processActions }) {
   return (
     <SettingProvider context="contentPopup">
       <ThemeProvider>
+        <style>{POPUP_STYLES}</style>
         {showPopup && (
           <Draggable
             key="pop"

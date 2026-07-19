@@ -1,7 +1,7 @@
 import BrightnessAutoRoundedIcon from "@mui/icons-material/BrightnessAutoRounded";
 import DarkModeRoundedIcon from "@mui/icons-material/DarkModeRounded";
 import LightModeRoundedIcon from "@mui/icons-material/LightModeRounded";
-import { M3IconButton } from "../../components/M3";
+import IconButton from "@mui/material/IconButton";
 import { useDarkMode } from "../../hooks/ColorMode";
 
 export default function DarkModeButton() {
@@ -14,8 +14,8 @@ export default function DarkModeButton() {
         : BrightnessAutoRoundedIcon;
 
   return (
-    <M3IconButton onClick={toggleDarkMode} aria-label="Change color theme">
+    <IconButton onClick={toggleDarkMode} aria-label="Change color theme">
       <Icon />
-    </M3IconButton>
+    </IconButton>
   );
 }

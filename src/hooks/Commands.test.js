@@ -39,4 +39,18 @@ describe("buildOverviewShortcutMap", () => {
       })
     );
   });
+
+  test("preserves intentionally unassigned browser commands", () => {
+    expect(
+      buildOverviewShortcutMap(setting, [
+        { name: "toggleTranslate", shortcut: "" },
+        { name: "openTranbox", shortcut: "" },
+      ])
+    ).toEqual(
+      expect.objectContaining({
+        page: [],
+        selection: [],
+      })
+    );
+  });
 });

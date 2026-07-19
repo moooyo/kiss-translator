@@ -16,14 +16,13 @@ describe("SettingsAdvanced", () => {
       );
     });
 
-    const details = container.querySelector("details");
+    const summary = container.querySelector(".MuiAccordionSummary-root");
     expect(
       container.querySelector('[data-testid="advanced-content"]')
     ).toBeNull();
 
     act(() => {
-      details.open = true;
-      details.dispatchEvent(new Event("toggle"));
+      summary.click();
     });
     expect(
       container.querySelector('[data-testid="advanced-content"]')

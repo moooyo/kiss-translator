@@ -16,7 +16,14 @@ import { useSystemDarkPreference } from "./SystemColorScheme";
 
 export { getMuiSwitchStyleOverrides } from "./themeStyles";
 
-export default function Theme({ children, options = {}, styles = {} }) {
+const EMPTY_THEME_OPTIONS = Object.freeze({});
+const EMPTY_GLOBAL_STYLES = Object.freeze({});
+
+export default function Theme({
+  children,
+  options = EMPTY_THEME_OPTIONS,
+  styles = EMPTY_GLOBAL_STYLES,
+}) {
   const { darkMode } = useDarkMode();
   const { setting } = useSetting();
   const brandColor = ["blue", "cyan", "violet"].includes(setting.brandColor)

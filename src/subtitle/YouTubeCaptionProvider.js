@@ -2,7 +2,11 @@ import { logger } from "../libs/log.js";
 import { apiSubtitle, apiSummarizeContext } from "../apis/index.js";
 import { BilingualSubtitleManager } from "./BilingualSubtitleManager.js";
 import { YouTubeSubtitleList } from "./YouTubeSubtitleList.js";
-import { MSG_XHR_DATA_YOUTUBE, API_SPE_TYPES } from "../config";
+import {
+  API_SPE_TYPES,
+  DEFAULT_API_SETTING,
+  MSG_XHR_DATA_YOUTUBE,
+} from "../config";
 import { downloadBlobFile } from "../libs/utils.js";
 import { newI18n } from "../config";
 import { buildBilingualVtt } from "./vtt.js";
@@ -80,6 +84,7 @@ export class YouTubeCaptionProvider {
   // YouTube 底部控制条原生字幕激活状态的 DOM 监听器
   #ytSubtitleStateObserver = null;
   #adObserver = null;
+  #playbackRateBeforeAd = null;
   #messageEventHandler = null;
   #navigationEventHandler = null;
   #waitCleanups = [];
@@ -169,6 +174,7 @@ export class YouTubeCaptionProvider {
     this.#navigationEventHandler = () => {
       logger.debug("Youtube Provider: yt-navigate-finish", this.#videoId);
 
+      this.#restorePlaybackRate();
       this.#destroyManager();
       clearMsgHistory(this.#setting.apiSlug);
 
@@ -215,6 +221,7 @@ export class YouTubeCaptionProvider {
     this.#subtitleAbortController?.abort();
     this.#subtitleAbortController = null;
     this.#aiChunkScheduler = null;
+    this.#restorePlaybackRate();
 
     if (this.#messageEventHandler) {
       window.removeEventListener("message", this.#messageEventHandler);
@@ -309,8 +316,9 @@ export class YouTubeCaptionProvider {
           if (node.matches(adLayoutSelector)) {
             logger.debug("Youtube Provider: AD start playing!", node);
             if (videoEl && skipAd) {
-              // REVIEW: 沿用原有直接 16 倍速并跳到广告末尾的行为，可能触发 YouTube 风控。
-              // REVIEW: 广告结束时仍会重置到 1 倍速，可能覆盖用户自定义倍速；后续应单独修复。
+              if (this.#playbackRateBeforeAd === null) {
+                this.#playbackRateBeforeAd = videoEl.playbackRate;
+              }
               videoEl.playbackRate = 16;
               videoEl.currentTime = videoEl.duration;
             }
@@ -337,9 +345,7 @@ export class YouTubeCaptionProvider {
             if (this.#setting.autoTranslate) {
               this.#playerUi.hideYtCaption();
             }
-            if (videoEl && skipAd) {
-              videoEl.playbackRate = 1;
-            }
+            this.#restorePlaybackRate();
             this.#managerInstance?.setIsAdPlaying(false);
           }
         });
@@ -351,6 +357,13 @@ export class YouTubeCaptionProvider {
       subtree: true,
     });
     this.#adObserver = observer;
+  }
+
+  #restorePlaybackRate() {
+    if (this.#playbackRateBeforeAd === null) return;
+    const videoEl = this.#videoEl;
+    if (videoEl) videoEl.playbackRate = this.#playbackRateBeforeAd;
+    this.#playbackRateBeforeAd = null;
   }
 
   /**
@@ -366,7 +379,13 @@ export class YouTubeCaptionProvider {
     if (this.#setting[name] === value) return;
 
     logger.debug("Youtube Provider: update setting", name, value);
-    this.#setting[name] = value;
+    const patch = { [name]: value };
+    if (name === "apiSlug") {
+      patch.apiSetting =
+        this.#setting.transApis?.find((api) => api.apiSlug === value) ||
+        DEFAULT_API_SETTING;
+    }
+    this.#setting = { ...this.#setting, ...patch };
 
     this.#playerUi.updateMenuProps();
 

@@ -22,8 +22,6 @@ import {
   getPromptDisplayName,
 } from "../../config";
 import ShortcutInput from "./ShortcutInput";
-import FormControlLabel from "@mui/material/FormControlLabel";
-import Switch from "@mui/material/Switch";
 import { useCallback, useMemo } from "react";
 import { limitNumber } from "../../libs/utils";
 import { useTranbox } from "../../hooks/Tranbox";
@@ -31,6 +29,7 @@ import { isExt } from "../../libs/client";
 import { useApiList } from "../../hooks/Api";
 import ValidationInput from "../../hooks/ValidationInput";
 import { usePromptList } from "../../hooks/Prompt";
+import { useOverviewShortcuts } from "../../hooks/Commands";
 import {
   SettingsAdvanced,
   SettingsCard,
@@ -49,6 +48,7 @@ export default function Tranbox() {
   const i18n = useI18n();
   // 查词翻译框配置管理 Hook
   const { tranboxSetting, updateTranbox } = useTranbox();
+  const shortcutMap = useOverviewShortcuts({ tranboxSetting });
   // 启用的 API 引擎
   // AI 词典只能调用大模型接口，因此这里额外读取已启用的 AI API 列表。
   const { enabledApis, aiEnabledApis } = useApiList();
@@ -156,7 +156,7 @@ export default function Tranbox() {
               description={i18n("settings_selection_shortcut_description")}
             >
               {isExt ? (
-                <ShortcutKeys keys={["Alt", "S"]} />
+                <ShortcutKeys keys={shortcutMap.selection} />
               ) : (
                 <ShortcutInput
                   compact
@@ -240,22 +240,6 @@ export default function Tranbox() {
         </SettingsSection>
 
         <SettingsAdvanced label={i18n("settings_detailed_controls")}>
-          {/* 开关：是否启用划词翻译触发小按钮与悬浮翻译框 */}
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                name="transOpen"
-                checked={transOpen}
-                onChange={() => {
-                  updateTranbox({ transOpen: !transOpen });
-                }}
-              />
-            }
-            label={i18n("toggle_selection_translate")}
-            sx={{ width: "fit-content" }}
-          />
-
           {/* 各项具体参数网格配置区 */}
           <Box>
             <Grid container spacing={2} columns={12}>
@@ -278,35 +262,6 @@ export default function Tranbox() {
                       {api.apiName}
                     </MenuItem>
                   ))}
-                </TextField>
-              </Grid>
-              {/* 对单个英文单词是否跳过完整的大模型/机翻 (直接使用词典)，以此提高查词效率与节省 token 额度 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="singleWordNoTrans"
-                  value={singleWordNoTrans}
-                  label={i18n("single_word_no_trans")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                </TextField>
-              </Grid>
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="autoFavWord"
-                  value={autoFavWord}
-                  label={i18n("auto_fav_word")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
                 </TextField>
               </Grid>
               {/* 默认源语言 */}
@@ -366,44 +321,6 @@ export default function Tranbox() {
                 </TextField>
               </Grid>
 
-              {/* 本地查词词典选择 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="enDict"
-                  value={enDict}
-                  label={i18n("english_dict")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={"-"}>{i18n("disable")}</MenuItem>
-                  {OPT_DICT_ALL.map((item) => (
-                    <MenuItem value={item} key={item}>
-                      {item}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              {/* AI 词典所使用的大模型接口；关闭时仅保留默认本地/在线词典。 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="aiDictApiSlug"
-                  value={aiDictApiSlug}
-                  label={i18n("ai_dict_api", "AI词典接口")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={"-"}>{i18n("disable")}</MenuItem>
-                  {aiEnabledApis.map((api) => (
-                    <MenuItem value={api.apiSlug} key={api.apiSlug}>
-                      {api.apiName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
               {/* AI 词典提示词来源：跟随接口默认配置，或指定全局词典提示词。 */}
               <Grid item xs={12} sm={12} md={6} lg={3}>
                 <TextField
@@ -439,24 +356,6 @@ export default function Tranbox() {
                   {OPT_SUG_ALL.map((item) => (
                     <MenuItem value={item} key={item}>
                       {item}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              {/* 划词翻译框的触发模式 (点击小球触发、选中直接触发、或者带辅助按键) */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="triggerMode"
-                  value={triggerMode}
-                  label={i18n("trigger_mode")}
-                  onChange={handleChange}
-                >
-                  {OPT_TRANBOX_TRIGGER_ALL.map((item) => (
-                    <MenuItem key={item} value={item}>
-                      {i18n(`trigger_${item}`)}
                     </MenuItem>
                   ))}
                 </TextField>
@@ -503,36 +402,6 @@ export default function Tranbox() {
                   name="hideClickAway"
                   value={hideClickAway}
                   label={i18n("hide_click_away")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 是否开启轻量极简无背景毛玻璃外观样式 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="simpleStyle"
-                  value={simpleStyle}
-                  label={i18n("use_simple_style")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 翻译弹框的定位是否紧随选定文字的最下方, 否则固定在相对小图标的偏移位置 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="followSelection"
-                  value={followSelection}
-                  label={i18n("follow_selection")}
                   onChange={handleChange}
                 >
                   <MenuItem value={false}>{i18n("disable")}</MenuItem>

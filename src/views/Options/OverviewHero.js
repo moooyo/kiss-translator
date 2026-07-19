@@ -1,5 +1,5 @@
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
-import { M3Switch } from "../../components/M3";
+import Switch from "@mui/material/Switch";
 import { useI18n } from "../../hooks/I18n";
 import { useSetting } from "../../hooks/Setting";
 import { useRules } from "../../hooks/Rules";
@@ -45,12 +45,13 @@ export default function OverviewHero() {
 
   const handleExtensionEnabledChange = (event) => {
     const extensionEnabled = event.target.checked;
-    updateSetting({ extensionEnabled });
     if (isExt) {
       void sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
         scope: "all",
         patch: { extensionEnabled },
       }).catch((error) => kissLog("apply runtime extension setting", error));
+    } else {
+      updateSetting({ extensionEnabled });
     }
   };
 
@@ -73,10 +74,10 @@ export default function OverviewHero() {
               {enabled ? i18n("popup_enabled") : i18n("popup_disabled")}
             </span>
           </span>
-          <M3Switch
+          <Switch
             checked={enabled}
             onChange={handleExtensionEnabledChange}
-            aria-label={i18n("translate_switch")}
+            inputProps={{ "aria-label": i18n("translate_switch") }}
           />
         </div>
         <div className="kt-overview-hero__chips">

@@ -30,10 +30,9 @@ describe("About", () => {
     act(() => root.render(<About />));
 
     expect(mockUseI18nMd).not.toHaveBeenCalled();
-    const details = container.querySelector("details");
+    const summary = container.querySelector(".MuiAccordionSummary-root");
     act(() => {
-      details.open = true;
-      details.dispatchEvent(new Event("toggle"));
+      summary.click();
     });
     expect(mockUseI18nMd).toHaveBeenCalledTimes(1);
     expect(container.textContent).toContain("Project details");

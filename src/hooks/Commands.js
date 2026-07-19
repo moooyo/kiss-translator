@@ -9,23 +9,27 @@ export function buildOverviewShortcutMap(setting, browserCommands = []) {
     browserCommands.map(({ name, shortcut }) => [name, shortcut])
   );
   const configured = setting?.shortcuts || {};
+  const resolveCommand = (name, fallback) =>
+    Object.prototype.hasOwnProperty.call(commandMap, name)
+      ? commandMap[name]
+      : fallback;
 
   return {
     page: normalizeShortcutKeys(
-      commandMap.toggleTranslate || configured.toggleTranslate
+      resolveCommand("toggleTranslate", configured.toggleTranslate)
     ),
     popup: normalizeShortcutKeys(
-      commandMap._execute_action || configured.togglePopup
+      resolveCommand("_execute_action", configured.togglePopup)
     ),
     style: normalizeShortcutKeys(
-      commandMap.toggleStyle || configured.toggleStyle
+      resolveCommand("toggleStyle", configured.toggleStyle)
     ),
     selection: normalizeShortcutKeys(
-      commandMap.openTranbox || setting?.tranboxSetting?.tranboxShortcut
+      resolveCommand("openTranbox", setting?.tranboxSetting?.tranboxShortcut)
     ),
     input: normalizeShortcutKeys(setting?.inputRule?.triggerShortcut),
     settings: normalizeShortcutKeys(
-      commandMap.openOptions || configured.openSetting
+      resolveCommand("openOptions", configured.openSetting)
     ),
   };
 }

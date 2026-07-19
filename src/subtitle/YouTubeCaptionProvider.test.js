@@ -106,10 +106,14 @@ describe("YouTubeCaptionProvider manual translation", () => {
   });
 
   test("prepares source subtitles and waits for the menu before translating", async () => {
+    const initialApi = { apiSlug: "mock-api", apiType: "Microsoft" };
+    const nextApi = { apiSlug: "another-api", apiType: "Google" };
     const provider = new YouTubeCaptionProvider({
       autoTranslate: false,
       aiContextSlug: "-",
       apiSlug: "mock-api",
+      apiSetting: initialApi,
+      transApis: [initialApi, nextApi],
       showList: "off",
     });
     provider.initialize();
@@ -140,6 +144,12 @@ describe("YouTubeCaptionProvider manual translation", () => {
     await act(async () => flushPromises());
 
     expect(eventsToSubtitles).toHaveBeenCalledTimes(2);
+    expect(eventsToSubtitles.mock.calls[1][0].setting).toEqual(
+      expect.objectContaining({
+        apiSlug: "another-api",
+        apiSetting: nextApi,
+      })
+    );
   });
 
   test("destroys and recreates the singleton provider", async () => {

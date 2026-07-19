@@ -803,89 +803,9 @@ export default function SubtitleSetting() {
             {i18n("subtitle_helper_3")}
           </Alert>
 
-          {/* 开关：是否在支持的视频网站上加载双语字幕翻译逻辑 */}
-          <FormControlLabel
-            control={
-              <Switch
-                size="small"
-                name="enabled"
-                checked={enabled}
-                onChange={() => {
-                  updateSubtitle({ enabled: !enabled });
-                }}
-              />
-            }
-            label={i18n("toggle_subtitle_translate")}
-            sx={{ width: "fit-content" }}
-          />
-
           {/* 字幕分句分词策略、翻译引擎、超前预翻译等参数配置网格区域 */}
           <Box>
             <Grid container spacing={2} columns={12}>
-              {/* 是否在获取字幕后立即启动翻译 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  name="autoTranslate"
-                  value={autoTranslate}
-                  label={i18n("default_subtitle_translate")}
-                  onChange={handleChange}
-                  disabled={!enabled}
-                >
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 字幕翻译首选的翻译引擎服务商 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  name="apiSlug"
-                  value={apiSlug}
-                  label={i18n("translate_service")}
-                  onChange={handleChange}
-                >
-                  {enabledApis.map((api) => (
-                    <MenuItem key={api.apiSlug} value={api.apiSlug}>
-                      {api.apiName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-              {/* 字幕长句断句首选的大语言 AI 引擎服务商 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  name="segSlug"
-                  value={segSlug}
-                  label={i18n("ai_segmentation")}
-                  onChange={handleChange}
-                  helperText={
-                    forceSubtitleRetranslate &&
-                    segSlug !== "-" &&
-                    segSlug !== apiSlug
-                      ? i18n("seg_trans_diff_warning") ||
-                        "断句和翻译服务不同，翻译引擎会重复翻译字幕"
-                      : ""
-                  }
-                  FormHelperTextProps={{
-                    sx: { color: "error.main" },
-                  }}
-                >
-                  <MenuItem value={"-"}>{i18n("disable")}</MenuItem>
-                  {aiEnabledApis.map((api) => (
-                    <MenuItem key={api.apiSlug} value={api.apiSlug}>
-                      {api.apiName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
               {segSlug !== "-" && (
                 <Grid item xs={12} sm={12} md={6} lg={3}>
                   <TextField
@@ -921,25 +841,6 @@ export default function SubtitleSetting() {
                 >
                   <MenuItem value={true}>{i18n("enable")}</MenuItem>
                   <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 系统内置的轻量断句算法类型 (基于固定句尾符号断句，或统计学概率断句) */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  name="useAlgorithmBreaker"
-                  value={useAlgorithmBreaker}
-                  label={i18n("builtin_sentence_break")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={"rule"}>
-                    {i18n("rule_sentence_break")}
-                  </MenuItem>
-                  <MenuItem value={"statistical"}>
-                    {i18n("statistical_sentence_break")}
-                  </MenuItem>
                 </TextField>
               </Grid>
               {/* 字幕翻译是否使用 AI 增强上下文，并指定提供服务的 AI 引擎 */}
@@ -1036,88 +937,6 @@ export default function SubtitleSetting() {
                 </TextField>
               </Grid>
 
-              {/* 是否保留双语字幕 (若禁用则在视频窗口上仅显示翻译后的目标语字幕) */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="isBilingual"
-                  value={isBilingual}
-                  label={i18n("is_bilingual_view")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 双语字幕在视频画面中的显示顺序 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="displayOrder"
-                  value={displayOrder}
-                  label={i18n("trans_order")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={"original-first"}>
-                    {i18n("original_first")}
-                  </MenuItem>
-                  <MenuItem value={"translation-first"}>
-                    {i18n("translation_first")}
-                  </MenuItem>
-                </TextField>
-              </Grid>
-              {/* 是否开启磨砂模糊译文字幕显示效果 (鼠标划过时才高亮看清译文，用于英语听力训练备考) */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="blurTranslation"
-                  value={blurTranslation}
-                  label={i18n("is_blur_translation")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 视频插播商业广告时是否自动识别并跳过翻译网络请求 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="skipAd"
-                  value={skipAd}
-                  label={i18n("is_skip_ad")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={true}>{i18n("enable")}</MenuItem>
-                  <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                </TextField>
-              </Grid>
-              {/* 鼠标悬停在视频窗口字幕单字词上时是否允许悬浮框划词查词解释 */}
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  fullWidth
-                  select
-                  size="small"
-                  name="hoverLookupMode"
-                  value={hoverLookupModeValue}
-                  label={i18n("subtitle_hover_lookup")}
-                  onChange={handleChange}
-                >
-                  <MenuItem value={OPT_ENHANCE_ON}>{i18n("enable")}</MenuItem>
-                  <MenuItem value={OPT_ENHANCE_OFF}>{i18n("disable")}</MenuItem>
-                  <MenuItem value={OPT_ENHANCE_MOBILE_OFF}>
-                    {i18n("disable_on_mobile")}
-                  </MenuItem>
-                </TextField>
-              </Grid>
               {/* 视频侧边/下方的独立字幕全文滚动列表显示模式 */}
               <Grid item xs={12} sm={12} md={6} lg={3}>
                 <TextField

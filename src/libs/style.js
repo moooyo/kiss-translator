@@ -1,4 +1,4 @@
-import { css, keyframes } from "@emotion/css";
+import { keyframes } from "@emotion/css";
 import {
   OPT_STYLE_NONE,
   OPT_STYLE_LINE,
@@ -50,7 +50,7 @@ const glow = keyframes`
   }
 `;
 
-const genLineStyle = (style, color, thickness = 2) => `
+const genLineStyle = (style, color, thickness = 1) => `
   text-decoration-line: underline;
   text-decoration-style: ${style};
   text-decoration-color: ${color};
@@ -168,16 +168,30 @@ const genBuiltinStyles = (color = "#7CACF8") => ({
   `,
 });
 
+function hashStyle(value) {
+  let hash = 2166136261;
+  for (let index = 0; index < value.length; index += 1) {
+    hash ^= value.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash >>> 0).toString(36);
+}
+
+function createStyleClassName(slug, styleCode) {
+  const normalizedSlug = String(slug || "custom")
+    .replace(/[^a-z0-9_-]+/gi, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 40);
+  return `kiss-style-${normalizedSlug || "custom"}-${hashStyle(styleCode)}`;
+}
+
 /**
- * 根据内置样式和用户自定义样式，生成唯一的 CSS Class 类名映射与全局样式表字符串
- * // REVIEW: 样式生成冗余与潜在冲突风险。
- * // 在 `genTextClass` 中，直接调用了 `@emotion/css` 的 `css` 方法。
- * // 这一步会将生成的样式规则自动同步插入到当前宿主文档的全局 `<style>` 标签中。
- * // 随后，代码又遍历了一遍样式拼装为 `textStyles` 字符串，并在 `translator.js` 中放入 `adoptedStyleSheets` 中挂载。
- * // 这样会在同一页面产生双重样式渲染（一次在顶层文档，一次在 Shadow DOM 内部），产生了内存和渲染性能冗余，
- * // 且如果 `@emotion/css` 被运行在限制了 CSP 或者隔离的 Shadow 环境下，可能会由于无法直接操作全局 document 的头部导致运行期报错。
- * @param {Array} customStyles - 用户自定义样式表
- * @returns {Array} [textClass, textStyles] 返回 Class 映射字典及完整样式表字符串
+ * Builds isolated class names and the stylesheet adopted by translated nodes.
+ * Class rules are emitted only into the returned stylesheet, avoiding duplicate
+ * Emotion insertion into the host document.
+ *
+ * @param {Array} customStyles user-defined translation styles
+ * @returns {Array} class-name map and stylesheet text
  */
 export const genTextClass = (customStyles = []) => {
   const styles = genBuiltinStyles();
@@ -199,14 +213,11 @@ export const genTextClass = (customStyles = []) => {
     }
   `;
   Object.entries(styles).forEach(([k, v]) => {
-    textClass[k] = css`
-      ${v}
-    `;
-  });
-  Object.entries(styles).forEach(([k, v]) => {
+    const styleCode = String(v || "");
+    textClass[k] = createStyleClassName(k, styleCode);
     textStyles += `
       .${textClass[k]} {
-        ${v}
+        ${styleCode}
       }
     `;
   });

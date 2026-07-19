@@ -2,8 +2,8 @@ import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import IconButton from "@mui/material/IconButton";
 import Logo from "../../components/Logo";
-import { M3IconButton } from "../../components/M3";
 import { useI18n } from "../../hooks/I18n";
 
 export default function Header({ onClose, openSeparateWindow, openSettings }) {
@@ -34,20 +34,20 @@ export default function Header({ onClose, openSeparateWindow, openSettings }) {
       </span>
       <span className="kt-popup-header__spacer" />
       {onClose ? (
-        <M3IconButton onClick={onClose} aria-label={i18n("close")}>
+        <IconButton onClick={onClose} aria-label={i18n("close")}>
           <CloseRoundedIcon />
-        </M3IconButton>
+        </IconButton>
       ) : (
         <>
-          <M3IconButton
+          <IconButton
             onClick={openSeparateWindow}
             aria-label={i18n("open_separate_window")}
           >
             <OpenInNewRoundedIcon />
-          </M3IconButton>
-          <M3IconButton onClick={openSettings} aria-label={i18n("setting")}>
+          </IconButton>
+          <IconButton onClick={openSettings} aria-label={i18n("setting")}>
             <SettingsRoundedIcon />
-          </M3IconButton>
+          </IconButton>
         </>
       )}
     </header>

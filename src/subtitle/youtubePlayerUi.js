@@ -40,7 +40,7 @@ export function waitForElement(selector, callback) {
   const element = document.querySelector(selector);
   if (element) {
     callback(element);
-    return;
+    return () => {};
   }
 
   const observer = new MutationObserver((mutations, obs) => {
@@ -55,6 +55,7 @@ export function waitForElement(selector, callback) {
     childList: true,
     subtree: true,
   });
+  return () => observer.disconnect();
 }
 
 /**

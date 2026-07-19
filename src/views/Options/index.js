@@ -47,6 +47,13 @@ const getOptionsStartupSyncTasks = () => {
     };
   }
 
+  if (hashPath === "/" || hashPath === "/styles") {
+    return {
+      requiredSync: () => Promise.all([trySyncSetting(), trySyncRules()]),
+      backgroundSyncs: [trySyncWords],
+    };
+  }
+
   return {
     requiredSync: trySyncSetting,
     backgroundSyncs: [trySyncRules, trySyncWords],

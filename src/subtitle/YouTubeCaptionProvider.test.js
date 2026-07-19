@@ -1,6 +1,9 @@
 import { act } from "react";
 import { apiSubtitle, apiSummarizeContext } from "../apis/index.js";
-import { YouTubeCaptionProvider } from "./YouTubeCaptionProvider.js";
+import {
+  YouTubeCaptionProvider,
+  YouTubeInitializer,
+} from "./YouTubeCaptionProvider.js";
 import { getCaptionTracks, getSubtitleEvents } from "./youtubeCaptionTracks.js";
 import { eventsToSubtitles } from "./youtubeAiSegmentation.js";
 import {
@@ -78,6 +81,7 @@ const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe("YouTubeCaptionProvider manual translation", () => {
   beforeEach(() => {
+    YouTubeInitializer.destroy();
     jest.clearAllMocks();
     window.history.replaceState({}, "", "/watch?v=video-1");
     document.body.innerHTML =
@@ -95,6 +99,10 @@ describe("YouTubeCaptionProvider manual translation", () => {
       null,
     ]);
     apiSummarizeContext.mockResolvedValue("");
+  });
+
+  afterEach(() => {
+    YouTubeInitializer.destroy();
   });
 
   test("prepares source subtitles and waits for the menu before translating", async () => {
@@ -132,5 +140,16 @@ describe("YouTubeCaptionProvider manual translation", () => {
     await act(async () => flushPromises());
 
     expect(eventsToSubtitles).toHaveBeenCalledTimes(2);
+  });
+
+  test("destroys and recreates the singleton provider", async () => {
+    const first = await YouTubeInitializer({ autoTranslate: false });
+    const second = await YouTubeInitializer({ autoTranslate: true });
+    expect(second).toBe(first);
+
+    YouTubeInitializer.destroy();
+    const third = await YouTubeInitializer({ autoTranslate: true });
+    expect(third).not.toBe(first);
+    YouTubeInitializer.destroy();
   });
 });

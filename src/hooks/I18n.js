@@ -14,13 +14,13 @@ const useSettingSafe =
  * @param {string} defaultText 默认备用文本
  * @returns {string} 本地化后的文本
  */
-export const getI18n = (uiLang, key, defaultText = "") => {
-  return I18N?.[key]?.[uiLang] ?? I18N?.[key]?.en ?? defaultText;
+export const getI18n = (uiLang, key, defaultText) => {
+  return I18N?.[key]?.[uiLang] ?? defaultText ?? I18N?.[key]?.en ?? "";
 };
 
 // 预柯里化语言参数，返回一个只需传入 key 的获取翻译函数
 export const useLangMap = (uiLang) => {
-  return (key, defaultText = "") => getI18n(uiLang, key, defaultText);
+  return (key, defaultText) => getI18n(uiLang, key, defaultText);
 };
 
 /**

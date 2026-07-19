@@ -1,15 +1,23 @@
 const mockTranslatorManagerStart = jest.fn();
+const mockTranslatorManagerStop = jest.fn();
 let mockIsIframe = false;
 
 jest.mock("./config", () => ({
   OPT_HIGHLIGHT_WORDS_DISABLE: "-",
+  MSG_RUNTIME_SETTING_PATCH: "runtime-setting-patch",
+  STOKEY_SETTING: "setting",
 }));
+
+const mockStorageSubscribeObj = jest.fn(() => jest.fn());
 
 jest.mock("./libs/storage", () => ({
   getSettingWithDefault: jest.fn(),
   getFabWithDefault: jest.fn(),
   getWordsWithDefault: jest.fn(),
   runDataMigration: jest.fn(),
+  storage: {
+    subscribeObj: mockStorageSubscribeObj,
+  },
 }));
 
 jest.mock("./libs/iframe", () => ({
@@ -37,6 +45,18 @@ jest.mock("./libs/blacklist", () => ({
 
 jest.mock("./subtitle/subtitle", () => ({
   runSubtitle: jest.fn(),
+  stopSubtitle: jest.fn(),
+}));
+
+jest.mock("./libs/browser", () => ({
+  browser: {
+    runtime: {
+      onMessage: {
+        addListener: jest.fn(),
+        removeListener: jest.fn(),
+      },
+    },
+  },
 }));
 
 jest.mock("./libs/log", () => ({
@@ -54,6 +74,7 @@ jest.mock("./libs/translatorManager", () => ({
   __esModule: true,
   default: jest.fn().mockImplementation(() => ({
     start: mockTranslatorManagerStart,
+    stop: mockTranslatorManagerStop,
   })),
 }));
 
@@ -65,10 +86,14 @@ const {
 } = require("./libs/storage");
 const { matchRule } = require("./libs/rules");
 const { isInBlacklist } = require("./libs/blacklist");
-const { runSubtitle } = require("./subtitle/subtitle");
+const { runSubtitle, stopSubtitle } = require("./subtitle/subtitle");
 const { injectInlineJs } = require("./libs/injector");
 const TranslatorManager = require("./libs/translatorManager").default;
-const { run } = require("./common");
+const {
+  applyRuntimeSettingPatch,
+  resetRuntimeStateForTests,
+  run,
+} = require("./common");
 
 function setReadyState(value) {
   Object.defineProperty(document, "readyState", {
@@ -97,6 +122,7 @@ describe("common iframe startup", () => {
   const originalOptionsPageLocal = process.env.REACT_APP_OPTIONSPAGE_LOCAL;
 
   beforeEach(() => {
+    resetRuntimeStateForTests();
     document.documentElement.innerHTML = "<head></head><body></body>";
     setReadyState("complete");
     setContentType("text/html");
@@ -112,6 +138,7 @@ describe("common iframe startup", () => {
 
     TranslatorManager.mockImplementation(() => ({
       start: mockTranslatorManagerStart,
+      stop: mockTranslatorManagerStop,
     }));
     getSettingWithDefault.mockResolvedValue({
       extensionEnabled: true,
@@ -159,6 +186,15 @@ describe("common iframe startup", () => {
     expect(TranslatorManager).toHaveBeenCalledTimes(1);
     expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(1);
     expect(runSubtitle).not.toHaveBeenCalled();
+  });
+
+  test("subscribes to setting changes in userscript mode", async () => {
+    await run(true);
+
+    expect(mockStorageSubscribeObj).toHaveBeenCalledWith(
+      "setting",
+      expect.any(Function)
+    );
   });
 
   test("skips empty iframe before rule matching and manager startup", async () => {
@@ -217,6 +253,80 @@ describe("common iframe startup", () => {
     expect(TranslatorManager).not.toHaveBeenCalled();
     expect(mockTranslatorManagerStart).not.toHaveBeenCalled();
     expect(runSubtitle).not.toHaveBeenCalled();
+  });
+
+  test("stops and restarts the active runtime without a page reload", async () => {
+    await run();
+    expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(1);
+
+    getSettingWithDefault.mockResolvedValueOnce({
+      extensionEnabled: false,
+      logLevel: 1,
+    });
+    await applyRuntimeSettingPatch();
+    expect(mockTranslatorManagerStop).toHaveBeenCalledTimes(1);
+    expect(stopSubtitle).toHaveBeenCalled();
+
+    getSettingWithDefault.mockResolvedValueOnce({
+      extensionEnabled: true,
+      blacklist: "",
+      tranboxSetting: { blacklist: "", transOpen: true },
+      inputRule: { blacklist: "", transOpen: true },
+      mouseHoverSetting: { blacklist: "", useMouseHover: true },
+      subtitleSetting: { enabled: true },
+      logLevel: 1,
+    });
+    await applyRuntimeSettingPatch();
+    expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(2);
+  });
+
+  test("does not finish a stale startup after the global switch turns off", async () => {
+    let releaseRule;
+    let signalRuleReached;
+    const ruleReached = new Promise((resolve) => {
+      signalRuleReached = resolve;
+    });
+    matchRule.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          releaseRule = resolve;
+          signalRuleReached();
+        })
+    );
+
+    const starting = run();
+    await ruleReached;
+    getSettingWithDefault.mockResolvedValueOnce({
+      extensionEnabled: false,
+      logLevel: 1,
+    });
+    await applyRuntimeSettingPatch();
+    releaseRule({ transOpen: "true", highlightWords: "-" });
+    await starting;
+
+    expect(TranslatorManager).not.toHaveBeenCalled();
+    expect(mockTranslatorManagerStart).not.toHaveBeenCalled();
+  });
+
+  test("applies subtitle enablement to the active runtime", async () => {
+    await run();
+    runSubtitle.mockClear();
+    stopSubtitle.mockClear();
+
+    getSettingWithDefault.mockResolvedValueOnce({
+      extensionEnabled: true,
+      subtitleSetting: { enabled: false },
+    });
+    await applyRuntimeSettingPatch();
+    expect(stopSubtitle).toHaveBeenCalledTimes(1);
+    expect(runSubtitle).not.toHaveBeenCalled();
+
+    getSettingWithDefault.mockResolvedValueOnce({
+      extensionEnabled: true,
+      subtitleSetting: { enabled: true },
+    });
+    await applyRuntimeSettingPatch();
+    expect(runSubtitle).toHaveBeenCalledTimes(1);
   });
 
   test("inverts the FAB visibility when the top-level page matches its exception list", async () => {

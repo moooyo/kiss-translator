@@ -4,6 +4,7 @@ import ReactMarkdown from "react-markdown";
 import { useI18n, useI18nMd } from "../../hooks/I18n";
 import Button from "@mui/material/Button";
 import Logo from "../../components/Logo";
+import { SettingsAdvanced } from "./SettingsCard";
 
 const MARKDOWN_COMPONENTS = {
   a: ({ href, children }) => {
@@ -24,10 +25,23 @@ const MARKDOWN_COMPONENTS = {
 /**
  * 关于面板组件 (在设置页展示关于/帮助的 MD 格式文档)
  */
+function AboutDetails() {
+  const i18n = useI18n();
+  const { data, loading, error } = useI18nMd("about_md");
+
+  return loading ? (
+    <div className="kt-about-loading">
+      <CircularProgress size={24} />
+    </div>
+  ) : (
+    <ReactMarkdown components={MARKDOWN_COMPONENTS}>
+      {error ? i18n("about_md_local") : data}
+    </ReactMarkdown>
+  );
+}
+
 export default function About() {
   const i18n = useI18n();
-  // 异步拉取名为 "about_md" 的本地化 Markdown 文档数据
-  const { data, loading, error } = useI18nMd("about_md");
 
   return (
     <Box className="kt-about-page">
@@ -72,20 +86,14 @@ export default function About() {
         </div>
       </section>
 
-      <details className="kt-settings-advanced kt-about-details">
-        <summary>{i18n("settings_project_details")}</summary>
-        <div className="kt-settings-advanced__content kt-about-markdown">
-          {loading ? (
-            <div className="kt-about-loading">
-              <CircularProgress size={24} />
-            </div>
-          ) : (
-            <ReactMarkdown components={MARKDOWN_COMPONENTS}>
-              {error ? i18n("about_md_local") : data}
-            </ReactMarkdown>
-          )}
+      <SettingsAdvanced
+        className="kt-about-details"
+        label={i18n("settings_project_details")}
+      >
+        <div className="kt-about-markdown">
+          <AboutDetails />
         </div>
-      </details>
+      </SettingsAdvanced>
     </Box>
   );
 }

@@ -10,15 +10,20 @@ export const M3_COLORS = {
     onTertiaryContainer: "#072711",
     error: "#B3261E",
     errorContainer: "#F9DEDC",
+    onErrorContainer: "#8C1D18",
+    success: "#146C2E",
     background: "#F8FAFD",
     surface: "#FFFFFF",
     surfaceLow: "#F3F6FB",
     surfaceContainer: "#F0F4F9",
     surfaceHigh: "#E9EEF6",
+    surfaceHighest: "#DDE3EA",
     onSurface: "#1F1F1F",
     onSurfaceVariant: "#444746",
     outline: "#747775",
     outlineVariant: "#C9CDD3",
+    inverseSurface: "#2F3033",
+    onInverseSurface: "#F1F1F1",
   },
   dark: {
     primary: "#A8C7FA",
@@ -31,15 +36,20 @@ export const M3_COLORS = {
     onTertiaryContainer: "#C4EED0",
     error: "#F2B8B5",
     errorContainer: "#601410",
+    onErrorContainer: "#F9DEDC",
+    success: "#6DD58C",
     background: "#131314",
     surface: "#1E1F20",
     surfaceLow: "#232426",
     surfaceContainer: "#282A2C",
     surfaceHigh: "#2D2F31",
+    surfaceHighest: "#37393B",
     onSurface: "#E3E3E3",
     onSurfaceVariant: "#C4C7C5",
     outline: "#8E918F",
     outlineVariant: "#3F4245",
+    inverseSurface: "#E3E3E3",
+    onInverseSurface: "#303030",
   },
 };
 
@@ -83,110 +93,60 @@ export const M3_BRAND_COLORS = {
   },
 };
 
+export function resolveM3Colors(mode = "light", brand = "blue") {
+  return {
+    ...M3_COLORS[mode],
+    ...(M3_BRAND_COLORS[brand]?.[mode] || {}),
+  };
+}
+
+export function createM3CssVariables(colors) {
+  return {
+    "--kt-pri": colors.primary,
+    "--kt-onpri": colors.onPrimary,
+    "--kt-pric": colors.primaryContainer,
+    "--kt-onpric": colors.onPrimaryContainer,
+    "--kt-secc": colors.secondaryContainer,
+    "--kt-onsecc": colors.onSecondaryContainer,
+    "--kt-terc": colors.tertiaryContainer,
+    "--kt-onterc": colors.onTertiaryContainer,
+    "--kt-grn": colors.success,
+    "--kt-err": colors.error,
+    "--kt-errc": colors.errorContainer,
+    "--kt-onerrc": colors.onErrorContainer,
+    "--kt-bg": colors.background,
+    "--kt-sf0": colors.surface,
+    "--kt-sf1": colors.surfaceLow,
+    "--kt-sf2": colors.surfaceContainer,
+    "--kt-sf3": colors.surfaceHigh,
+    "--kt-sf4": colors.surfaceHighest,
+    "--kt-on": colors.onSurface,
+    "--kt-onv": colors.onSurfaceVariant,
+    "--kt-line": colors.outline,
+    "--kt-linev": colors.outlineVariant,
+    "--kt-inv": colors.inverseSurface,
+    "--kt-oninv": colors.onInverseSurface,
+  };
+}
+
 export const M3_FONT_FAMILY =
   '"Google Sans Flex", "Google Sans", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 
 export const M3_GLOBAL_CSS = String.raw`
 :host,
 .kt-m3-root {
-  --kt-pri: #0b57d0;
-  --kt-onpri: #ffffff;
-  --kt-pric: #d3e3fd;
-  --kt-onpric: #041e49;
-  --kt-secc: #c2e7ff;
-  --kt-onsecc: #001d35;
-  --kt-terc: #c4eed0;
-  --kt-onterc: #072711;
-  --kt-grn: #146c2e;
-  --kt-err: #b3261e;
-  --kt-errc: #f9dedc;
-  --kt-onerrc: #8c1d18;
-  --kt-bg: #f8fafd;
-  --kt-sf0: #ffffff;
-  --kt-sf1: #f3f6fb;
-  --kt-sf2: #f0f4f9;
-  --kt-sf3: #e9eef6;
-  --kt-sf4: #dde3ea;
-  --kt-on: #1f1f1f;
-  --kt-onv: #444746;
-  --kt-line: #747775;
-  --kt-linev: #c9cdd3;
-  --kt-inv: #2f3033;
-  --kt-oninv: #f1f1f1;
   --kt-spring: cubic-bezier(.3, 1.4, .4, 1);
   --kt-shadow-1: 0 1px 2px rgba(0, 0, 0, .14), 0 1px 6px 1px rgba(0, 0, 0, .08);
   --kt-shadow-2: 0 4px 8px 3px rgba(0, 0, 0, .1), 0 1px 3px rgba(0, 0, 0, .18);
   color: var(--kt-on);
-  color-scheme: light;
   font-family: "Google Sans Flex", "Google Sans", "Noto Sans SC", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 .kt-m3-root[data-theme="dark"] {
-  --kt-pri: #a8c7fa;
-  --kt-onpri: #062e6f;
-  --kt-pric: #0842a0;
-  --kt-onpric: #d3e3fd;
-  --kt-secc: #004a77;
-  --kt-onsecc: #c2e7ff;
-  --kt-terc: #0f5223;
-  --kt-onterc: #c4eed0;
-  --kt-grn: #6dd58c;
-  --kt-err: #f2b8b5;
-  --kt-errc: #601410;
-  --kt-onerrc: #f9dedc;
-  --kt-bg: #131314;
-  --kt-sf0: #1e1f20;
-  --kt-sf1: #232426;
-  --kt-sf2: #282a2c;
-  --kt-sf3: #2d2f31;
-  --kt-sf4: #37393b;
-  --kt-on: #e3e3e3;
-  --kt-onv: #c4c7c5;
-  --kt-line: #8e918f;
-  --kt-linev: #3f4245;
-  --kt-inv: #e3e3e3;
-  --kt-oninv: #303030;
   --kt-shadow-1: 0 1px 2px rgba(0, 0, 0, .5), 0 1px 6px 1px rgba(0, 0, 0, .35);
   --kt-shadow-2: 0 4px 10px 3px rgba(0, 0, 0, .45), 0 1px 3px rgba(0, 0, 0, .5);
-  color-scheme: dark;
-}
-
-.kt-m3-root[data-brand="cyan"] {
-  --kt-pri: #006874;
-  --kt-onpri: #ffffff;
-  --kt-pric: #97f0ff;
-  --kt-onpric: #001f24;
-  --kt-secc: #cde7ec;
-  --kt-onsecc: #051f23;
-}
-
-.kt-m3-root[data-brand="violet"] {
-  --kt-pri: #6750a4;
-  --kt-onpri: #ffffff;
-  --kt-pric: #eaddff;
-  --kt-onpric: #21005d;
-  --kt-secc: #e8def8;
-  --kt-onsecc: #1d192b;
-}
-
-.kt-m3-root[data-theme="dark"][data-brand="cyan"] {
-  --kt-pri: #4fd8eb;
-  --kt-onpri: #00363d;
-  --kt-pric: #004f58;
-  --kt-onpric: #97f0ff;
-  --kt-secc: #334b4f;
-  --kt-onsecc: #cde7ec;
-}
-
-.kt-m3-root[data-theme="dark"][data-brand="violet"] {
-  --kt-pri: #d0bcff;
-  --kt-onpri: #381e72;
-  --kt-pric: #4f378b;
-  --kt-onpric: #eaddff;
-  --kt-secc: #4a4458;
-  --kt-onsecc: #e8def8;
 }
 
 .kt-m3-root,

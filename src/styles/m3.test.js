@@ -1,4 +1,4 @@
-import { M3_BRAND_COLORS } from "./m3";
+import { createM3CssVariables, M3_BRAND_COLORS, resolveM3Colors } from "./m3";
 
 describe("M3 brand colors", () => {
   test("matches the handoff tokens for alternate brands", () => {
@@ -12,6 +12,18 @@ describe("M3 brand colors", () => {
       expect.objectContaining({
         primary: "#D0BCFF",
         primaryContainer: "#4F378B",
+      })
+    );
+  });
+
+  test("generates CSS variables from the same resolved token object", () => {
+    const colors = resolveM3Colors("dark", "cyan");
+    expect(createM3CssVariables(colors)).toEqual(
+      expect.objectContaining({
+        "--kt-pri": "#4FD8EB",
+        "--kt-pric": "#004F58",
+        "--kt-bg": "#131314",
+        "--kt-on": "#E3E3E3",
       })
     );
   });

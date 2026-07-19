@@ -51,6 +51,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState(defaultVal);
   const skipRemoteSyncValueRef = useRef();
+  const externalStorageValueRef = useRef();
 
   // 首次挂载时从本地存储异步加载初始数据
   useEffect(() => {
@@ -81,6 +82,19 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     };
   }, [key, defaultVal]);
 
+  useEffect(() => {
+    if (!storage.subscribeObj) return undefined;
+    return storage.subscribeObj(key, (storedValue) => {
+      const nextValue = storedValue ?? defaultVal;
+      setData((currentValue) => {
+        if (isSameStorageValue(currentValue, nextValue)) return currentValue;
+        externalStorageValueRef.current = nextValue;
+        skipRemoteSyncValueRef.current = { value: nextValue };
+        return nextValue;
+      });
+    });
+  }, [defaultVal, key]);
+
   // 远端同步处理器
   const runSync = useCallback(async (keyToSync, valueToSync) => {
     try {
@@ -103,6 +117,12 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     }
 
     if (data === null) {
+      return;
+    }
+
+    if (isSameStorageValue(externalStorageValueRef.current, data)) {
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
       return;
     }
 

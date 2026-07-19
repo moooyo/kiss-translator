@@ -11,6 +11,10 @@ const providers = [
   { pattern: "https://www.youtube.com", start: YouTubeInitializer },
 ];
 
+export function stopSubtitle() {
+  providers.forEach((provider) => provider.start.destroy?.());
+}
+
 /**
  * 运行双语字幕翻译服务的主入口。
  * 该函数根据当前网页的 href URL，匹配已注册的视频服务提供商列表。
@@ -28,6 +32,7 @@ export function runSubtitle({ href, setting }) {
 
     // 如果用户在设置中关闭了视频双语字幕翻译功能，则不执行任何后续操作，直接返回
     if (!subtitleSetting.enabled) {
+      stopSubtitle();
       return;
     }
 
@@ -48,7 +53,7 @@ export function runSubtitle({ href, setting }) {
 
       // 3. 启动特定平台的字幕翻译与渲染引擎 (如 YouTubeCaptionProvider)
       // 将整理好的字幕配置、翻译 API 配置、所有已启用的 API 列表以及 UI 界面语言传递给对应的 provider
-      provider.start({
+      return provider.start({
         ...subtitleSetting,
         apiSetting,
         transApis,

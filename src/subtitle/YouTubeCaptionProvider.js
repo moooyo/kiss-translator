@@ -79,6 +79,11 @@ export class YouTubeCaptionProvider {
   #playerUi = null;
   // YouTube 底部控制条原生字幕激活状态的 DOM 监听器
   #ytSubtitleStateObserver = null;
+  #adObserver = null;
+  #messageEventHandler = null;
+  #navigationEventHandler = null;
+  #waitCleanups = [];
+  #initialized = false;
 
   // 挂载在视频右侧/下方的双语字幕列表面板管理器实例
   #subtitleListManager = null;
@@ -148,16 +153,20 @@ export class YouTubeCaptionProvider {
    * @returns {void}
    */
   initialize() {
-    window.addEventListener("message", (event) => {
+    if (this.#initialized) return;
+    this.#initialized = true;
+
+    this.#messageEventHandler = (event) => {
       if (event.data?.type === MSG_XHR_DATA_YOUTUBE) {
         const { url, response } = event.data;
         if (url && response) {
           this.#handleInterceptedRequest(url, response);
         }
       }
-    });
+    };
+    window.addEventListener("message", this.#messageEventHandler);
 
-    window.addEventListener("yt-navigate-finish", () => {
+    this.#navigationEventHandler = () => {
       logger.debug("Youtube Provider: yt-navigate-finish", this.#videoId);
 
       this.#destroyManager();
@@ -179,22 +188,54 @@ export class YouTubeCaptionProvider {
       this.#subtitleAbortController = null;
       this.#setting.autoTranslate = this.#defaultAutoTranslate;
       this.#playerUi.updateMenuProps();
-    });
+    };
+    window.addEventListener("yt-navigate-finish", this.#navigationEventHandler);
 
-    waitForElement(CONTROLS_SELECTOR, (ytControls) => {
-      const ytSubtitleBtn = ytControls.querySelector(
-        YT_SUBTITLE_BUTTON_SELECTOR
+    this.#waitCleanups.push(
+      waitForElement(CONTROLS_SELECTOR, (ytControls) => {
+        const ytSubtitleBtn = ytControls.querySelector(
+          YT_SUBTITLE_BUTTON_SELECTOR
+        );
+        if (ytSubtitleBtn) {
+          this.#observeYtSubtitleState(ytSubtitleBtn);
+        }
+
+        this.#playerUi.injectToggleButton(ytControls);
+      }),
+      waitForElement(YT_AD_SELECTOR, (adContainer) => {
+        this.#moAds(adContainer);
+      })
+    );
+  }
+
+  destroy() {
+    if (!this.#initialized) return;
+    this.#initialized = false;
+    this.#processingVersion += 1;
+    this.#subtitleAbortController?.abort();
+    this.#subtitleAbortController = null;
+    this.#aiChunkScheduler = null;
+
+    if (this.#messageEventHandler) {
+      window.removeEventListener("message", this.#messageEventHandler);
+      this.#messageEventHandler = null;
+    }
+    if (this.#navigationEventHandler) {
+      window.removeEventListener(
+        "yt-navigate-finish",
+        this.#navigationEventHandler
       );
-      if (ytSubtitleBtn) {
-        this.#observeYtSubtitleState(ytSubtitleBtn);
-      }
-
-      this.#playerUi.injectToggleButton(ytControls);
-    });
-
-    waitForElement(YT_AD_SELECTOR, (adContainer) => {
-      this.#moAds(adContainer);
-    });
+      this.#navigationEventHandler = null;
+    }
+    this.#waitCleanups.forEach((cleanup) => cleanup?.());
+    this.#waitCleanups = [];
+    this.#ytSubtitleStateObserver?.disconnect();
+    this.#ytSubtitleStateObserver = null;
+    this.#adObserver?.disconnect();
+    this.#adObserver = null;
+    this.#destroyManager();
+    this.#playerUi.hideNotification();
+    this.#playerUi.removeToggleButton();
   }
 
   /**
@@ -255,6 +296,7 @@ export class YouTubeCaptionProvider {
     const adLayoutSelector = ".ytp-ad-player-overlay-layout";
     const skipBtnSelector =
       ".ytp-skip-ad-button, .ytp-ad-skip-button, .ytp-ad-skip-button-modern";
+    this.#adObserver?.disconnect();
     const observer = new MutationObserver((mutations) => {
       const { skipAd = false } = this.#setting;
       for (const mutation of mutations) {
@@ -308,6 +350,7 @@ export class YouTubeCaptionProvider {
       childList: true,
       subtree: true,
     });
+    this.#adObserver = observer;
   }
 
   /**
@@ -1017,15 +1060,12 @@ export class YouTubeCaptionProvider {
   #destroyManager() {
     this.#playerUi.showYtCaption();
 
-    if (!this.#managerInstance) {
-      return;
+    if (this.#managerInstance) {
+      logger.info("Youtube Provider: Destroying manager...");
+      this.#managerInstance.onSubtitleUpdate = null;
+      this.#managerInstance.destroy();
+      this.#managerInstance = null;
     }
-
-    logger.info("Youtube Provider: Destroying manager...");
-
-    this.#managerInstance.onSubtitleUpdate = null;
-    this.#managerInstance.destroy();
-    this.#managerInstance = null;
 
     if (this.#subtitleListManager) {
       this.#subtitleListManager.destroy();
@@ -1042,16 +1082,21 @@ export class YouTubeCaptionProvider {
  * @returns {Promise<void>}
  */
 export const YouTubeInitializer = (() => {
-  let initialized = false;
+  let provider = null;
 
-  return async (setting) => {
-    if (initialized) {
-      return;
-    }
-    initialized = true;
+  const initialize = async (setting) => {
+    if (provider) return provider;
 
     logger.info("Bilingual Subtitle Extension: Initializing...");
-    const provider = new YouTubeCaptionProvider(setting);
+    provider = new YouTubeCaptionProvider(setting);
     provider.initialize();
+    return provider;
   };
+
+  initialize.destroy = () => {
+    provider?.destroy();
+    provider = null;
+  };
+  initialize.getProvider = () => provider;
+  return initialize;
 })();

@@ -112,6 +112,35 @@ describe("settings storage migration", () => {
     expect(window.localStorage.getItem("extension-preview")).toBeNull();
   });
 
+  test("notifies object subscribers after local writes", async () => {
+    const { storage } = require("./storage");
+    const listener = jest.fn();
+    const unsubscribe = storage.subscribeObj("subscribed-key", listener);
+
+    await storage.setObj("subscribed-key", { synced: true });
+    expect(listener).toHaveBeenCalledWith({ synced: true });
+
+    unsubscribe();
+    await storage.setObj("subscribed-key", { synced: false });
+    expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  test("isolates subscriber failures from successful storage writes", async () => {
+    const { storage } = require("./storage");
+    const unsubscribe = storage.subscribe("throwing-subscriber", () => {
+      throw new Error("listener failed");
+    });
+
+    await expect(
+      storage.setObj("throwing-subscriber", { saved: true })
+    ).resolves.toBeUndefined();
+    await expect(storage.getObj("throwing-subscriber")).resolves.toEqual({
+      saved: true,
+    });
+
+    unsubscribe();
+  });
+
   test("GM storage reports a clear error when GM APIs are unavailable", async () => {
     const { storage } = loadGmStorageModule();
 

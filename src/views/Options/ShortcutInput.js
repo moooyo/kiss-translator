@@ -6,25 +6,9 @@ import CheckIcon from "@mui/icons-material/Check";
 import { useEffect, useState, useRef } from "react";
 import { shortcutListener } from "../../libs/shortcut";
 import { useI18n } from "../../hooks/I18n";
+import { formatShortcutKey } from "../../libs/shortcutLabel";
 
-export function formatShortcutKey(key) {
-  const aliases = {
-    ControlLeft: "Ctrl",
-    ControlRight: "Ctrl",
-    AltLeft: "Alt",
-    AltRight: "Alt",
-    ShiftLeft: "Shift",
-    ShiftRight: "Shift",
-    MetaLeft: "Meta",
-    MetaRight: "Meta",
-    " ": "Space",
-  };
-
-  if (aliases[key]) return aliases[key];
-  if (/^Key[A-Z]$/.test(key)) return key.slice(3);
-  if (/^Digit[0-9]$/.test(key)) return key.slice(5);
-  return key;
-}
+export { formatShortcutKey } from "../../libs/shortcutLabel";
 
 /**
  * 快捷键录入输入框组件 (ShortcutInput)

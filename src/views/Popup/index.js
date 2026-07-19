@@ -191,13 +191,18 @@ export default function Popup() {
               <M3Button
                 variant="text"
                 onClick={() =>
-                  window.open(
-                    "https://chromewebstore.google.com/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof/reviews",
-                    "_blank"
-                  )
+                  window.open(process.env.REACT_APP_REVIEW_URL, "_blank")
                 }
               >
                 {i18n("comment_support")}
+              </M3Button>
+              <M3Button
+                variant="text"
+                onClick={() =>
+                  window.open(process.env.REACT_APP_SUPPORT_URL, "_blank")
+                }
+              >
+                {i18n("appreciate_support")}
               </M3Button>
               <M3Button variant="text" onClick={handleOpenSetting}>
                 {i18n("setting")}

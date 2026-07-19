@@ -164,15 +164,23 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
 .kt-popup-advanced { display: flex; flex-direction: column; gap: 12px; animation: kt-m3-rise .35s var(--kt-spring); }
 .kt-popup-style-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.kt-popup-style-chips--open { max-height: 188px; padding: 2px; overflow-y: auto; overscroll-behavior: contain; }
 .kt-popup-style-chip { min-height: 44px; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 1px; padding: 5px 13px; border: 1px solid var(--kt-linev); border-radius: 16px; background: var(--kt-sf0); color: var(--kt-onv); cursor: pointer; font-size: 11.5px; }
 .kt-popup-style-chip[aria-pressed="true"] { border-color: var(--kt-pri); background: var(--kt-pric); color: var(--kt-onpric); font-weight: 650; }
 .kt-popup-style-chip > span { color: var(--kt-on); font-size: 11.5px; }
 .kt-popup-style-chip > small { color: var(--kt-onv); font-size: 9px; }
 .kt-popup-style-chip[aria-pressed="true"] > span,
 .kt-popup-style-chip[aria-pressed="true"] > small { color: inherit; }
+.kt-popup-style-more { min-height: 34px; display: flex; align-items: center; gap: 5px; margin: 7px 0 0 auto; padding: 0 8px; border: 0; background: transparent; color: var(--kt-pri); cursor: pointer; font-size: 11px; font-weight: 700; }
+.kt-popup-style-more svg { width: 17px; height: 17px; transition: transform .3s var(--kt-spring); }
+.kt-popup-style-more[aria-expanded="true"] svg { transform: rotate(180deg); }
 .kt-popup-advanced-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .kt-popup-advanced-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px 10px 9px 12px; border-radius: 15px; background: var(--kt-sf2); font-size: 11.5px; font-weight: 550; }
 .kt-popup-advanced-row .kt-m3-switch { transform: scale(.76); transform-origin: right center; }
+
+.kt-popup-support { display: flex; justify-content: flex-end; gap: 6px; margin-top: -4px; padding: 8px; border-radius: 16px; background: var(--kt-sf1); animation: kt-m3-rise .3s var(--kt-spring); }
+.kt-popup-support a { min-height: 34px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 999px; color: var(--kt-pri); font-size: 11px; font-weight: 700; text-decoration: none; }
+.kt-popup-support a:hover { background: var(--kt-sf2); }
 
 .kt-popup-footer { display: flex; align-items: center; gap: 8px; padding-top: 2px; color: var(--kt-onv); font-size: 10.5px; }
 .kt-popup-footer__keys { display: flex; align-items: center; gap: 4px; }

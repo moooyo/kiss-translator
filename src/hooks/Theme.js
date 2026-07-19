@@ -5,10 +5,10 @@ import { useDarkMode } from "./ColorMode";
 import { useSetting } from "./Setting";
 import { THEME_DARK, THEME_LIGHT } from "../config";
 import {
-  M3_BRAND_COLORS,
-  M3_COLORS,
+  createM3CssVariables,
   M3_FONT_FAMILY,
   M3_GLOBAL_CSS,
+  resolveM3Colors,
 } from "../styles/m3";
 
 export default function Theme({ children, options = {}, styles = {} }) {
@@ -43,12 +43,13 @@ export default function Theme({ children, options = {}, styles = {} }) {
             (darkMode === "auto" && systemMode === THEME_DARK)
           ? THEME_DARK
           : THEME_LIGHT;
+  const colors = useMemo(
+    () => resolveM3Colors(resolvedMode, brandColor),
+    [brandColor, resolvedMode]
+  );
 
   const theme = useMemo(() => {
-    const color = {
-      ...M3_COLORS[resolvedMode],
-      ...M3_BRAND_COLORS[brandColor][resolvedMode],
-    };
+    const color = colors;
     let htmlFontSize = 16;
     try {
       htmlFontSize = Number.parseInt(
@@ -228,7 +229,7 @@ export default function Theme({ children, options = {}, styles = {} }) {
         Object.entries(options).filter(([key]) => key !== "components")
       ),
     });
-  }, [brandColor, options, resolvedMode]);
+  }, [colors, options, resolvedMode]);
 
   return (
     <ThemeProvider theme={theme}>
@@ -238,6 +239,10 @@ export default function Theme({ children, options = {}, styles = {} }) {
         className="kt-m3-root"
         data-theme={resolvedMode}
         data-brand={brandColor}
+        style={{
+          ...createM3CssVariables(colors),
+          colorScheme: resolvedMode,
+        }}
       >
         <style>{M3_GLOBAL_CSS}</style>
         {children}

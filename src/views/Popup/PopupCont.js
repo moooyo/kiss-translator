@@ -19,6 +19,7 @@ import {
   MSG_TRANSBOX_TOGGLE,
   MSG_MOUSEHOVER_TOGGLE,
   MSG_TRANSINPUT_TOGGLE,
+  MSG_RUNTIME_SETTING_PATCH,
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
   OPT_LANGS_TO_REVERSED as OPT_LANGS_TO,
 } from "../../config";
@@ -26,6 +27,7 @@ import { saveRule } from "../../libs/rules";
 import { tryClearCaches } from "../../libs/cache";
 import { kissLog } from "../../libs/log";
 import { getDomainOptions, truncateMiddle } from "../../libs/url";
+import { normalizeShortcutKeys } from "../../libs/shortcutLabel";
 import { useAllTextStyles } from "../../hooks/CustomStyles";
 import { isInBlacklist } from "../../libs/blacklist";
 import { useSetting } from "../../hooks/Setting";
@@ -73,6 +75,27 @@ function getApiIconSrc(apiType) {
   return fileName ? `${process.env.PUBLIC_URL || "."}/api/${fileName}` : "";
 }
 
+export function resolvePopupTextStyles(
+  allTextStyles,
+  activeStyleSlug,
+  expanded
+) {
+  if (expanded) return allTextStyles;
+
+  const activeStyle = allTextStyles.find(
+    (style) => style.styleSlug === activeStyleSlug
+  );
+  const seen = new Set();
+  return [activeStyle, ...allTextStyles]
+    .filter(Boolean)
+    .filter((style) => {
+      if (seen.has(style.styleSlug)) return false;
+      seen.add(style.styleSlug);
+      return true;
+    })
+    .slice(0, 5);
+}
+
 export default function PopupCont({
   rule,
   setting,
@@ -91,18 +114,22 @@ export default function PopupCont({
   const [snackbar, setSnackbar] = useState({ open: false, message: "" });
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
+  const [showAllStyles, setShowAllStyles] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const [translationBusy, setTranslationBusy] = useState(false);
   const busyTimerRef = useRef(null);
   const { allTextStyles } = useAllTextStyles();
   const popupTextStyles = useMemo(
     () =>
-      allTextStyles.slice(0, 5).map((style) => ({
-        ...style,
-        previewClass: css`
-          ${style.styleCode || ""}
-        `,
-      })),
-    [allTextStyles]
+      resolvePopupTextStyles(allTextStyles, rule?.textStyle, showAllStyles).map(
+        (style) => ({
+          ...style,
+          previewClass: css`
+            ${style.styleCode || ""}
+          `,
+        })
+      ),
+    [allTextStyles, rule?.textStyle, showAllStyles]
   );
 
   const showMessage = useCallback((message) => {
@@ -276,6 +303,10 @@ export default function PopupCont({
         ...previous,
         subtitleSetting: { ...previous.subtitleSetting, enabled },
       }));
+      void sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
+        scope: "current",
+        patch: { subtitleSetting: { enabled } },
+      }).catch((error) => kissLog("apply runtime subtitle setting", error));
     },
     [setSetting, updateSetting]
   );
@@ -326,11 +357,11 @@ export default function PopupCont({
         if (isExt) {
           const response = await sendBgMsg(MSG_COMMAND_SHORTCUTS);
           (response || []).forEach(({ name, shortcut }) => {
-            nextCommands[name] = shortcut;
+            nextCommands[name] = normalizeShortcutKeys(shortcut).join("+");
           });
         } else {
           Object.entries(setting?.shortcuts || {}).forEach(([key, value]) => {
-            nextCommands[key] = value.join("+");
+            nextCommands[key] = normalizeShortcutKeys(value).join("+");
           });
         }
         if (active) setCommands(nextCommands);
@@ -642,7 +673,11 @@ export default function PopupCont({
             <div className="kt-popup-section-label">
               {i18n("text_style_alt")}
             </div>
-            <div className="kt-popup-style-chips">
+            <div
+              className={`kt-popup-style-chips ${
+                showAllStyles ? "kt-popup-style-chips--open" : ""
+              }`}
+            >
               {popupTextStyles.map((style) => (
                 <button
                   type="button"
@@ -658,6 +693,17 @@ export default function PopupCont({
                 </button>
               ))}
             </div>
+            {allTextStyles.length > 5 && (
+              <button
+                type="button"
+                className="kt-popup-style-more"
+                aria-expanded={showAllStyles}
+                onClick={() => setShowAllStyles((current) => !current)}
+              >
+                {i18n(showAllStyles ? "popup_collapse" : "popup_all_styles")}
+                <ExpandMoreRoundedIcon />
+              </button>
+            )}
           </div>
           <div className="kt-popup-advanced-grid">
             {advancedRows.map(([name, label, checked]) => (
@@ -696,6 +742,27 @@ export default function PopupCont({
         </div>
       )}
 
+      {showSupport && (
+        <div className="kt-popup-support" role="menu">
+          <a
+            role="menuitem"
+            href={process.env.REACT_APP_REVIEW_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {i18n("comment_support")}
+          </a>
+          <a
+            role="menuitem"
+            href={process.env.REACT_APP_SUPPORT_URL}
+            target="_blank"
+            rel="noreferrer"
+          >
+            {i18n("appreciate_support")}
+          </a>
+        </div>
+      )}
+
       <footer className="kt-popup-footer">
         <span className="kt-popup-footer__keys">
           <kbd>Alt</kbd>
@@ -706,6 +773,13 @@ export default function PopupCont({
           <kbd>S</kbd>
         </span>
         <span className="kt-popup-footer__spacer" />
+        <M3Button
+          variant="text"
+          aria-expanded={showSupport}
+          onClick={() => setShowSupport((current) => !current)}
+        >
+          {i18n("popup_support")}
+        </M3Button>
         <M3Button variant="text" onClick={handleOpenSetting}>
           {i18n("popup_all_settings")}
         </M3Button>

@@ -30,6 +30,7 @@ import {
   MSG_POPUP_TOGGLE,
   MSG_MOUSEHOVER_TOGGLE,
   MSG_TRANSINPUT_TOGGLE,
+  MSG_RUNTIME_SETTING_PATCH,
 } from "../config";
 import { logger } from "./log";
 
@@ -702,6 +703,8 @@ export default class TranslatorManager {
         break;
       case MSG_INPUT_TRANSLATE:
         this._inputTranslator?.handleTranslate();
+        break;
+      case MSG_RUNTIME_SETTING_PATCH:
         break;
       default:
         logger.info(`Message action is unavailable: ${action}`);

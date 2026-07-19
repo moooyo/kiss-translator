@@ -2,7 +2,14 @@ import { STOKEY_RULES, DEFAULT_RULES, KV_RULES_KEY } from "../config";
 import { useStorage } from "./Storage";
 import { checkRules } from "../libs/rules";
 import { useCallback } from "react";
-import { debounceSyncMeta } from "../libs/storage";
+import {
+  debounceSyncMeta,
+  getRulesWithDefault,
+  setRules,
+} from "../libs/storage";
+
+export const patchRuleList = (list, pattern, patch) =>
+  list.map((item) => (item.pattern === pattern ? { ...item, ...patch } : item));
 
 /**
  * 翻译规则列表增删改查管理的自定义 Hook
@@ -61,14 +68,16 @@ export function useRules() {
   // 修改/替换特定 pattern 规则的内部属性数据
   const put = useCallback(
     (pattern, obj) => {
-      save((prev) => {
-        return prev.map((item) =>
-          item.pattern === pattern ? { ...item, ...obj } : item
-        );
-      });
+      save((prev) => patchRuleList(prev, pattern, obj));
     },
     [save]
   );
+
+  const putLatest = useCallback(async (pattern, obj) => {
+    const latestRules = await getRulesWithDefault();
+    await setRules(patchRuleList(latestRules, pattern, obj));
+    debounceSyncMeta(KV_RULES_KEY);
+  }, []);
 
   // 批量合并新规则数组
   const merge = useCallback(
@@ -100,5 +109,5 @@ export function useRules() {
     [save]
   );
 
-  return { list, add, del, clear, put, merge };
+  return { list, add, del, clear, put, putLatest, merge };
 }

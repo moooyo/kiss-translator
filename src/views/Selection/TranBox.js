@@ -226,7 +226,6 @@ function TranBoxContent({
  * 划词翻译框的主容器入口组件 (控制拖拽外壳及规则分发)
  */
 export default function TranBox(props) {
-  const [mouseHover, setMouseHover] = useState(false);
   const [activeView, setActiveView] = useState("translation");
 
   const simpleStyle = props.simpleStyle;
@@ -266,14 +265,11 @@ export default function TranBox(props) {
                 setHideClickAway={setHideClickAway}
                 followSelection={followSelection}
                 setFollowSelection={setFollowSelection}
-                mouseHover={mouseHover}
                 activeView={activeView}
                 setActiveView={setActiveView}
               />
             }
             onClick={(e) => e.stopPropagation()}
-            onMouseEnter={() => setMouseHover(true)}
-            onMouseLeave={() => setMouseHover(false)}
           >
             <TranBoxContent
               simpleStyle={simpleStyle}

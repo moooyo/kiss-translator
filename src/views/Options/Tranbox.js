@@ -129,6 +129,7 @@ export default function Tranbox() {
             </SettingsRow>
             <SettingsRow label={i18n("trigger_mode")}>
               <SettingsSegmented
+                className="kt-settings-segmented--trigger"
                 value={triggerMode}
                 label={i18n("trigger_mode")}
                 onChange={(value) => updateTranbox({ triggerMode: value })}

@@ -44,24 +44,61 @@ export function M3Segmented({
   onChange,
   ariaLabel,
   className = "",
+  mode = "tabs",
 }) {
+  const selectedIndex = items.findIndex(
+    (item) => (typeof item === "string" ? item : item.value) === value
+  );
+
+  const handleKeyDown = (event, index) => {
+    const keys = [
+      "ArrowRight",
+      "ArrowDown",
+      "ArrowLeft",
+      "ArrowUp",
+      "Home",
+      "End",
+    ];
+    if (!keys.includes(event.key)) return;
+    event.preventDefault();
+    let nextIndex = index;
+    if (event.key === "ArrowRight" || event.key === "ArrowDown") {
+      nextIndex = (index + 1) % items.length;
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowUp") {
+      nextIndex = (index - 1 + items.length) % items.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = items.length - 1;
+    }
+    const item = items[nextIndex];
+    onChange(typeof item === "string" ? item : item.value);
+    event.currentTarget.parentElement?.children[nextIndex]?.focus();
+  };
+
+  const isTabs = mode === "tabs";
   return (
     <div
       className={`kt-m3-segmented ${className}`.trim()}
-      role="tablist"
+      role={isTabs ? "tablist" : "radiogroup"}
       aria-label={ariaLabel}
     >
-      {items.map((item) => {
+      {items.map((item, index) => {
         const itemValue = typeof item === "string" ? item : item.value;
         const label = typeof item === "string" ? item : item.label;
         const selected = itemValue === value;
         return (
           <button
             type="button"
-            role="tab"
-            aria-selected={selected}
+            role={isTabs ? "tab" : "radio"}
+            aria-selected={isTabs ? selected : undefined}
+            aria-checked={isTabs ? undefined : selected}
+            tabIndex={
+              selected || (selectedIndex === -1 && index === 0) ? 0 : -1
+            }
             key={itemValue}
             onClick={() => onChange(itemValue)}
+            onKeyDown={(event) => handleKeyDown(event, index)}
           >
             {selected && <CheckRoundedIcon fontSize="inherit" />}
             {label}

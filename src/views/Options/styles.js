@@ -146,7 +146,7 @@ export const OPTIONS_STYLES = String.raw`
 .kt-overview-settings .MuiFilledInput-input { padding-block: 9px; }
 .kt-overview-settings .MuiFormHelperText-root { grid-column: 1 / -1; margin-inline: 0; }
 
-.kt-api-grid { max-height: 340px; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; overflow-y: auto; padding: 0 4px 0 0 !important; }
+.kt-api-grid { max-height: 340px; display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; overflow-x: hidden; overflow-y: auto; padding: 0 4px 0 0 !important; }
 .kt-api-grid .MuiListItem-root { min-height: 72px; padding: 8px !important; border: 1px solid var(--kt-linev); border-radius: 20px; background: var(--kt-sf0); }
 .kt-api-grid .MuiListItemButton-root { min-height: 54px; border-radius: 15px; }
 .kt-api-grid .MuiListItemButton-root.Mui-selected { background: var(--kt-pric); color: var(--kt-onpric); }
@@ -185,6 +185,7 @@ export const OPTIONS_STYLES = String.raw`
 .kt-about-hero small { margin-top: 5px; color: var(--kt-onv); font-size: 11px; }
 .kt-about-hero__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 19px; }
 .kt-about-details { margin-top: 0; }
+.kt-about-details .kt-settings-advanced__content { padding: 0; }
 .kt-about-loading { min-height: 120px; display: grid; place-items: center; }
 .kt-about-markdown { padding: 20px; }
 
@@ -217,5 +218,6 @@ export const OPTIONS_STYLES = String.raw`
   .kt-settings-segmented,
   .kt-settings-range { width: 100%; max-width: none; }
   .kt-settings-segmented > button { padding-inline: 8px; font-size: 10.5px; }
+  .kt-settings-segmented--trigger { grid-template-columns: repeat(2, minmax(0, 1fr)); display: grid; border-radius: 18px; }
 }
 `;

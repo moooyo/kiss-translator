@@ -1,8 +1,13 @@
-import { OPT_HIGHLIGHT_WORDS_DISABLE } from "./config";
+import {
+  MSG_RUNTIME_SETTING_PATCH,
+  OPT_HIGHLIGHT_WORDS_DISABLE,
+  STOKEY_SETTING,
+} from "./config";
 import {
   getFabWithDefault,
   getSettingWithDefault,
   getWordsWithDefault,
+  storage,
 } from "./libs/storage";
 import { isIframe } from "./libs/iframe";
 import { genEventName } from "./libs/utils";
@@ -10,10 +15,83 @@ import { handlePing, injectScript } from "./libs/gm";
 import { matchRule } from "./libs/rules";
 import { trySyncAllSubRules } from "./libs/subRules";
 import { isInBlacklist } from "./libs/blacklist";
-import { runSubtitle } from "./subtitle/subtitle";
+import { runSubtitle, stopSubtitle } from "./subtitle/subtitle";
 import { logger } from "./libs/log";
 import { injectInlineJs } from "./libs/injector";
 import TranslatorManager from "./libs/translatorManager";
+import { browser } from "./libs/browser";
+
+let activeTranslatorManager = null;
+let runtimeStartPromise = null;
+let runtimeMessageListener = null;
+let runtimeStorageCleanup = null;
+let activeRuntimeIsUserscript = false;
+let runtimeLifecycleVersion = 0;
+
+function stopActiveRuntime() {
+  runtimeLifecycleVersion += 1;
+  activeTranslatorManager?.stop();
+  activeTranslatorManager = null;
+  stopSubtitle();
+}
+
+export async function applyRuntimeSettingPatch() {
+  const setting = await getSettingWithDefault();
+  if (setting.extensionEnabled === false) {
+    stopActiveRuntime();
+    return { enabled: false };
+  }
+
+  if (!activeTranslatorManager) {
+    const pendingStart = runtimeStartPromise;
+    await run(activeRuntimeIsUserscript);
+    if (pendingStart && !activeTranslatorManager) {
+      await run(activeRuntimeIsUserscript);
+    }
+  }
+
+  if (setting.subtitleSetting?.enabled === false) {
+    stopSubtitle();
+  } else if (!isIframe) {
+    runSubtitle({ href: document?.location?.href || "", setting });
+  }
+
+  return { enabled: true };
+}
+
+function ensureRuntimeControlListener(isUserscript) {
+  activeRuntimeIsUserscript = isUserscript;
+
+  if (isUserscript && !runtimeStorageCleanup) {
+    runtimeStorageCleanup = storage.subscribeObj(STOKEY_SETTING, () => {
+      void applyRuntimeSettingPatch().catch((error) =>
+        logger.error("apply userscript runtime setting", error)
+      );
+    });
+  }
+
+  if (isUserscript || runtimeMessageListener || !browser?.runtime?.onMessage) {
+    return;
+  }
+
+  runtimeMessageListener = ({ action }) => {
+    if (action !== MSG_RUNTIME_SETTING_PATCH) return undefined;
+    return applyRuntimeSettingPatch();
+  };
+  browser.runtime.onMessage.addListener(runtimeMessageListener);
+}
+
+export function resetRuntimeStateForTests() {
+  stopActiveRuntime();
+  runtimeStartPromise = null;
+  if (runtimeMessageListener && browser?.runtime?.onMessage) {
+    browser.runtime.onMessage.removeListener(runtimeMessageListener);
+  }
+  runtimeMessageListener = null;
+  runtimeStorageCleanup?.();
+  runtimeStorageCleanup = null;
+  activeRuntimeIsUserscript = false;
+}
 
 /**
  * 油猴脚本特权桥接设置。
@@ -77,6 +155,12 @@ function ensureUserscriptGM() {
   globalThis.GM.getValue = globalThis.GM.getValue || globalThis.GM_getValue;
   globalThis.GM.deleteValue =
     globalThis.GM.deleteValue || globalThis.GM_deleteValue;
+  globalThis.GM.addValueChangeListener =
+    globalThis.GM.addValueChangeListener ||
+    globalThis.GM_addValueChangeListener;
+  globalThis.GM.removeValueChangeListener =
+    globalThis.GM.removeValueChangeListener ||
+    globalThis.GM_removeValueChangeListener;
   globalThis.GM.info = globalThis.GM.info || globalThis.GM_info;
 }
 
@@ -231,7 +315,20 @@ async function waitForIframeTranslatableText() {
  * 前端翻译器的核心运行总入口。
  * @param {boolean} isUserscript 是否作为油猴 Userscript 脚本模式运行 (false 代表作为浏览器 Extension 运行)
  */
-export async function run(isUserscript = false) {
+export function run(isUserscript = false) {
+  if (isUserscript) ensureUserscriptGM();
+  ensureRuntimeControlListener(isUserscript);
+  if (runtimeStartPromise) return runtimeStartPromise;
+  const lifecycleVersion = runtimeLifecycleVersion;
+  runtimeStartPromise = runInternal(isUserscript, lifecycleVersion).finally(
+    () => {
+      runtimeStartPromise = null;
+    }
+  );
+  return runtimeStartPromise;
+}
+
+async function runInternal(isUserscript = false, lifecycleVersion) {
   try {
     const href = document?.location?.href || "";
 
@@ -256,9 +353,12 @@ export async function run(isUserscript = false) {
     logger.setLevel(setting.logLevel);
 
     if (setting.extensionEnabled === false) {
+      stopActiveRuntime();
       logger.info("KISS Translator is disabled by the global setting.");
       return;
     }
+
+    if (activeTranslatorManager) return;
 
     // 3. 页面类型拦截：若是 PDF / 图片 / 音视频等非 HTML 或纯文本媒体页面，则终止执行，避免注入多余 DOM
     const contentType = document?.contentType?.toLowerCase() || "";
@@ -308,8 +408,10 @@ export async function run(isUserscript = false) {
       fabConfig.isHide = !fabConfig.isHide;
     }
 
+    if (lifecycleVersion !== runtimeLifecycleVersion) return;
+
     // 8. 创建翻译调度器管理器并启动
-    const translatorManager = new TranslatorManager({
+    activeTranslatorManager = new TranslatorManager({
       setting,
       rule,
       fabConfig,
@@ -318,7 +420,7 @@ export async function run(isUserscript = false) {
       isUserscript,
       transboxOnly: isPdfDocument,
     });
-    translatorManager.start();
+    activeTranslatorManager.start();
 
     // 9. 若当前页面是嵌套的 iframe，不进行视频字幕翻译，避免多个 iframe 里重复跑字幕服务造成冲突
     if (isIframe || isPdfDocument) {
@@ -333,6 +435,7 @@ export async function run(isUserscript = false) {
       trySyncAllSubRules(setting);
     }
   } catch (err) {
+    stopActiveRuntime();
     console.error("[KISS-Translator]", err);
     showErr(err.message); // 向前台页面绘制报错 Banner，便于用户感知与排查问题
   }

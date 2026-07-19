@@ -26,6 +26,29 @@ import { kissLog } from "./log";
 import { debounce } from "./utils";
 import { getGmMethod } from "./gm";
 
+const localStorageListeners = new Map();
+
+function emitStorageChange(key, value) {
+  const listeners = localStorageListeners.get(key);
+  listeners?.forEach((listener) => {
+    try {
+      listener(value);
+    } catch (error) {
+      kissLog("storage listener error: ", key, error);
+    }
+  });
+}
+
+function addLocalStorageListener(key, listener) {
+  const listeners = localStorageListeners.get(key) || new Set();
+  listeners.add(listener);
+  localStorageListeners.set(key, listeners);
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) localStorageListeners.delete(key);
+  };
+}
+
 /**
  * 获取适用于当前环境的 GM (Greasemonkey) 存储引擎方法集合。
  * 返回的对象包含跨环境安全调用的 setValue, getValue, deleteValue 方法。
@@ -66,6 +89,7 @@ async function set(key, val) {
   } else {
     window.localStorage.setItem(key, val);
   }
+  emitStorageChange(key, val);
 }
 
 /**
@@ -100,6 +124,71 @@ async function del(key) {
   } else {
     window.localStorage.removeItem(key);
   }
+  emitStorageChange(key, null);
+}
+
+function subscribe(key, listener) {
+  const removeLocalListener = addLocalStorageListener(key, listener);
+  let removeExternalListener = () => {};
+
+  if (isExt && browser?.storage?.onChanged) {
+    const handleChanged = (changes, areaName) => {
+      if (areaName !== "local" || !changes[key]) return;
+      listener(changes[key].newValue ?? null);
+    };
+    browser.storage.onChanged.addListener(handleChanged);
+    removeExternalListener = () =>
+      browser.storage.onChanged.removeListener(handleChanged);
+  } else if (isGm) {
+    const addValueChangeListener =
+      globalThis.GM?.addValueChangeListener ||
+      globalThis.GM_addValueChangeListener;
+    const removeValueChangeListener =
+      globalThis.GM?.removeValueChangeListener ||
+      globalThis.GM_removeValueChangeListener;
+    if (typeof addValueChangeListener === "function") {
+      const listenerId = Promise.resolve(
+        addValueChangeListener(key, (_name, _oldValue, newValue) =>
+          listener(newValue ?? null)
+        )
+      );
+      removeExternalListener = () => {
+        void listenerId
+          .then((id) => removeValueChangeListener?.(id))
+          .catch((error) =>
+            kissLog("remove GM storage listener error: ", key, error)
+          );
+      };
+    }
+  } else if (typeof window !== "undefined") {
+    const handleStorage = (event) => {
+      if (event.storageArea !== window.localStorage || event.key !== key)
+        return;
+      listener(event.newValue);
+    };
+    window.addEventListener("storage", handleStorage);
+    removeExternalListener = () =>
+      window.removeEventListener("storage", handleStorage);
+  }
+
+  return () => {
+    removeLocalListener();
+    removeExternalListener();
+  };
+}
+
+function subscribeObj(key, listener) {
+  return subscribe(key, (rawValue) => {
+    if (rawValue === null || rawValue === undefined) {
+      listener(null);
+      return;
+    }
+    try {
+      listener(JSON.parse(rawValue));
+    } catch (error) {
+      kissLog("parse subscribed storage json error: ", key, error);
+    }
+  });
 }
 
 /**
@@ -161,6 +250,8 @@ export const storage = {
   trySetObj,
   getObj,
   putObj,
+  subscribe,
+  subscribeObj,
 };
 
 // --- 应用设置 (Settings) 数据存取 ---

@@ -31,12 +31,14 @@ import {
   STOKEY_SEPARATE_WINDOW,
   PORT_STREAM_FETCH,
   MSG_UPDATE_ICON,
+  MSG_RUNTIME_SETTING_PATCH,
   MSG_SHA256,
 } from "./config";
 import {
   getSettingWithDefault,
   tryInitDefaultData,
   runDataMigration,
+  setSetting,
 } from "./libs/storage";
 import { trySyncSettingAndRules } from "./libs/sync";
 import { fetchHandle, fetchStreamNative } from "./libs/fetch";
@@ -49,6 +51,7 @@ import { injectInlineJsBg, injectInternalCss } from "./libs/injector";
 import { kissLog, logger } from "./libs/log";
 import { chromeDetect, chromeTranslate } from "./libs/builtinAI";
 import { sha256 } from "./libs/utils";
+import { mergeSettingPatch } from "./libs/settingPatch";
 
 globalThis.__KISS_CONTEXT__ = "background";
 
@@ -525,6 +528,36 @@ const injectToCurrentTab = async (func, args) => {
   });
 };
 
+async function applyRuntimeSettingPatch(
+  { patch = {}, scope = "all" } = {},
+  sender
+) {
+  const currentSetting = await getSettingWithDefault();
+  const nextSetting = mergeSettingPatch(currentSetting, patch);
+  await setSetting(nextSetting);
+
+  let tabs;
+  if (scope === "current") {
+    const tabId = sender?.tab?.id ?? (await getCurTabId());
+    tabs = tabId ? [{ id: tabId }] : [];
+  } else {
+    tabs = await browser.tabs.query({});
+  }
+
+  const message = {
+    action: MSG_RUNTIME_SETTING_PATCH,
+    args: { patch },
+  };
+  const results = await Promise.allSettled(
+    tabs
+      .filter((tab) => Number.isInteger(tab.id))
+      .map((tab) => browser.tabs.sendMessage(tab.id, message))
+  );
+  return {
+    delivered: results.filter((result) => result.status === "fulfilled").length,
+  };
+}
+
 // 后台消息指令与对应处理器映射表
 const messageHandlers = {
   [MSG_FETCH]: (args) => fetchHandle(args), // 跨域请求代理
@@ -544,6 +577,8 @@ const messageHandlers = {
   [MSG_CLEAR_CACHES]: () => tryClearCaches(), // 清空翻译缓存
   [MSG_OPEN_SEPARATE_WINDOW]: () => openSeparateWindowWithSavedBounds(), // 打开独立翻译小窗口
   [MSG_UPDATE_ICON]: (args, sender) => updateIcon(args, sender?.tab?.id), // 变更页面的插件高亮图标
+  [MSG_RUNTIME_SETTING_PATCH]: (args, sender) =>
+    applyRuntimeSettingPatch(args, sender),
 };
 
 /**

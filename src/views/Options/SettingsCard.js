@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { M3Segmented, M3Switch } from "../../components/M3";
 
 export function SettingsSection({ title, children, className = "" }) {
@@ -60,6 +61,7 @@ export function SettingsSegmented({
       onChange={onChange}
       items={items}
       ariaLabel={label}
+      mode="radio"
     />
   );
 }
@@ -135,11 +137,28 @@ export function ShortcutKeys({ keys }) {
   );
 }
 
-export function SettingsAdvanced({ label, children, open = false }) {
+export function SettingsAdvanced({
+  label,
+  children,
+  open = false,
+  className = "",
+}) {
+  const [expanded, setExpanded] = useState(open);
+
+  useEffect(() => {
+    setExpanded(open);
+  }, [open]);
+
   return (
-    <details className="kt-settings-advanced" open={open}>
+    <details
+      className={`kt-settings-advanced ${className}`.trim()}
+      open={expanded}
+      onToggle={(event) => setExpanded(event.currentTarget.open)}
+    >
       <summary>{label}</summary>
-      <div className="kt-settings-advanced__content">{children}</div>
+      {expanded && (
+        <div className="kt-settings-advanced__content">{children}</div>
+      )}
     </details>
   );
 }

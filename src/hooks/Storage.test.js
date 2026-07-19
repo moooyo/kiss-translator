@@ -12,6 +12,7 @@ jest.mock("../libs/storage", () => ({
     getObj: jest.fn(),
     setObj: jest.fn(() => Promise.resolve()),
     del: jest.fn(() => Promise.resolve()),
+    subscribeObj: jest.fn(),
   },
 }));
 
@@ -35,6 +36,8 @@ jest.mock("../libs/log", () => ({
   kissLog: jest.fn(),
 }));
 
+const DEFAULT_LOCAL_SETTING = { local: true };
+
 function createHookHost() {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -44,7 +47,7 @@ function createHookHost() {
   function TestComponent() {
     Object.assign(
       hookResult,
-      useStorage("local-setting", { local: true }, "kiss-setting_v2.json")
+      useStorage("local-setting", DEFAULT_LOCAL_SETTING, "kiss-setting_v2.json")
     );
     return null;
   }
@@ -80,6 +83,8 @@ async function waitForLoaded(hookResult) {
 }
 
 describe("useStorage remote sync", () => {
+  let storageListeners;
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
@@ -87,6 +92,11 @@ describe("useStorage remote sync", () => {
     storage.getObj.mockResolvedValue({ local: true });
     storage.setObj.mockResolvedValue(undefined);
     storage.del.mockResolvedValue(undefined);
+    storageListeners = new Set();
+    storage.subscribeObj.mockImplementation((_key, listener) => {
+      storageListeners.add(listener);
+      return () => storageListeners.delete(listener);
+    });
     syncData.mockResolvedValue(undefined);
     isOptions.mockReturnValue(true);
   });
@@ -169,6 +179,36 @@ describe("useStorage remote sync", () => {
     await flushEffects();
 
     expect(storage.setObj).not.toHaveBeenCalled();
+
+    host.unmount();
+  });
+
+  test("applies external storage changes without writing stale data back", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    jest.clearAllTimers();
+
+    act(() => {
+      storageListeners.forEach((listener) => listener({ remote: true }));
+    });
+    await flushEffects();
+    act(() => {
+      jest.advanceTimersByTime(3000);
+    });
+    await flushEffects();
+
+    expect(host.hookResult.data).toEqual({ remote: true });
+    expect(storage.setObj).not.toHaveBeenCalledWith("local-setting", {
+      remote: true,
+    });
+    expect(syncData).not.toHaveBeenCalledWith("kiss-setting_v2.json", {
+      remote: true,
+    });
 
     host.unmount();
   });

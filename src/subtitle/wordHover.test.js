@@ -107,6 +107,54 @@ describe("WordTooltipController pinned state", () => {
     expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
   });
 
+  test("keeps listeners for detached batches until pruning is requested", () => {
+    const controller = new WordTooltipController({});
+    const firstRoot = document.createElement("div");
+    const secondRoot = document.createElement("div");
+    firstRoot.innerHTML =
+      '<span class="kiss-subtitle-word" data-word="first">first</span>';
+    secondRoot.innerHTML =
+      '<span class="kiss-subtitle-word" data-word="second">second</span>';
+    const first = firstRoot.firstElementChild;
+    const second = secondRoot.firstElementChild;
+
+    controller.attachSpanListeners(firstRoot);
+    controller.attachSpanListeners(secondRoot);
+    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(2);
+
+    document.body.appendChild(secondRoot);
+    controller.pruneDetachedSpanListeners();
+    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(3);
+    controller.destroy();
+  });
+
+  test("clears pending hover state when the active word is pruned", () => {
+    jest.useFakeTimers();
+    const controller = new WordTooltipController({});
+    const root = document.getElementById("captions");
+    const first = root.querySelector(".kiss-subtitle-word");
+    controller.attachSpanListeners(root);
+
+    first.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    expect(controller.activeWordEl).toBe(first);
+
+    root.remove();
+    controller.pruneDetachedSpanListeners();
+    jest.advanceTimersByTime(300);
+
+    expect(controller.activeWordEl).toBeNull();
+    expect(controller.tooltipEl).toBeNull();
+    expect(apiMicrosoftDict).not.toHaveBeenCalled();
+    controller.destroy();
+    jest.useRealTimers();
+  });
+
   test("ignores a stale dictionary response after another lookup starts", async () => {
     const pending = [];
     apiMicrosoftDict.mockImplementation(

@@ -178,12 +178,6 @@ export class WordTooltipController {
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
     if (!root) return;
 
-    this.spanListeners.forEach((record, span) => {
-      if (!span.isConnected || !record.root.contains(span)) {
-        this.#detachSpanListeners(span, record);
-      }
-    });
-
     const spans = Array.from(root.querySelectorAll(".kiss-subtitle-word"));
     spans.forEach((span) => {
       const existingRecord = this.spanListeners.get(span);
@@ -229,6 +223,14 @@ export class WordTooltipController {
       spans.find((span) => span.getAttribute("tabindex") === "0") || spans[0];
     spans.forEach((span) => {
       span.tabIndex = span === tabStop ? 0 : -1;
+    });
+  }
+
+  pruneDetachedSpanListeners() {
+    this.spanListeners.forEach((record, span) => {
+      if (!span.isConnected || !record.root.contains(span)) {
+        this.#detachSpanListeners(span, record);
+      }
     });
   }
 
@@ -309,6 +311,9 @@ export class WordTooltipController {
   }
 
   #detachSpanListeners(span, record) {
+    if (span === this.activeWordEl) {
+      this.clearHoverState();
+    }
     const { enterHandler, leaveHandler, clickHandler, keydownHandler } =
       record.handlers;
     span.removeEventListener("pointerenter", enterHandler);

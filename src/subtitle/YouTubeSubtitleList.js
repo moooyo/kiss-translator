@@ -479,6 +479,19 @@ export class YouTubeSubtitleList {
     }
 
     this.subtitleListUl.replaceChildren(fragment);
+    this._wordTooltipController?.pruneDetachedSpanListeners();
+    if (this.enableHoverLookup) {
+      for (let i = start; i < end; i++) {
+        const item = this._cachedSubtitleItems[i];
+        const originalText = item?.querySelector(".kiss-youtube-original");
+        if (originalText) {
+          this._wordTooltipController?.attachSpanListeners(
+            originalText,
+            () => this.bilingualSubtitles[i]?.start ?? 0
+          );
+        }
+      }
+    }
     this._measureVisibleSubtitleItems();
   }
 
@@ -1028,10 +1041,6 @@ export class YouTubeSubtitleList {
     if (this.enableHoverLookup) {
       textSpan.innerHTML = trustedTypesHelper.createHTML(
         wrapWordsWithSpans(sub.text || "")
-      );
-      this._wordTooltipController?.attachSpanListeners(
-        textSpan,
-        () => sub.start
       );
     } else {
       textSpan.textContent = sub.text || "";

@@ -1,0 +1,122 @@
+import { act } from "react";
+import { createRoot } from "react-dom/client";
+import { css as mockCss } from "@emotion/css";
+import { genTextClass } from "../../libs/style";
+import { StyleAccordion } from "./StylesSetting";
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+const DANGEROUS_STYLE_CODE = "position: fixed; inset: 0; z-index: 2147483647;";
+const CUSTOM_STYLE = {
+  styleSlug: "custom-dangerous",
+  styleName: "Custom Dangerous",
+  styleCode: DANGEROUS_STYLE_CODE,
+  source: "custom",
+  isBuiltin: false,
+};
+const BUILTIN_STYLE = {
+  styleSlug: "under_line",
+  styleName: "Underline",
+  styleCode: "text-decoration: underline;",
+  source: "builtin",
+  isBuiltin: true,
+};
+
+jest.mock("@emotion/css", () => ({
+  css: jest.fn(() => "mock-preview-class"),
+}));
+
+jest.mock("../../hooks/I18n", () => ({
+  useI18n: () => (key) => key,
+}));
+
+jest.mock("../../hooks/Setting", () => ({
+  useSetting: () => ({
+    setting: { uiLang: "en" },
+    updateSetting: jest.fn(),
+  }),
+}));
+
+jest.mock("../../hooks/Confirm", () => ({
+  useConfirm: () => jest.fn(async () => true),
+}));
+
+jest.mock("../../hooks/Rules", () => ({
+  useRules: () => ({ list: [], put: jest.fn() }),
+}));
+
+function renderStyleAccordion(customStyle) {
+  const container = document.createElement("div");
+  document.body.appendChild(container);
+  const root = createRoot(container);
+
+  act(() => {
+    root.render(
+      <StyleAccordion
+        customStyle={customStyle}
+        deleteStyle={jest.fn()}
+        updateStyle={jest.fn()}
+      />
+    );
+  });
+
+  return {
+    container,
+    cleanup() {
+      act(() => root.unmount());
+      container.remove();
+    },
+  };
+}
+
+function getCompiledStyleCode() {
+  return mockCss.mock.calls.flatMap((call) => call.slice(1)).join("\n");
+}
+
+function getSummaryTranslation(container) {
+  return Array.from(
+    container.querySelectorAll(".kt-style-card__summary span")
+  ).find((span) => span.textContent === "style_preview_translation");
+}
+
+describe("StylesSetting style previews", () => {
+  beforeEach(() => {
+    mockCss.mockClear();
+  });
+
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("keeps custom CSS out of compact summaries while previewing built-ins", () => {
+    const customView = renderStyleAccordion(CUSTOM_STYLE);
+
+    expect(getCompiledStyleCode()).not.toContain(DANGEROUS_STYLE_CODE);
+    expect(getSummaryTranslation(customView.container).className).toBe("");
+    customView.cleanup();
+
+    mockCss.mockClear();
+    const builtinView = renderStyleAccordion(BUILTIN_STYLE);
+
+    expect(getCompiledStyleCode()).toContain(BUILTIN_STYLE.styleCode);
+    expect(mockCss).toHaveBeenCalledTimes(1);
+    builtinView.cleanup();
+  });
+
+  test("retains full custom CSS in the expanded editor and runtime output", () => {
+    const view = renderStyleAccordion(CUSTOM_STYLE);
+
+    expect(getCompiledStyleCode()).not.toContain(DANGEROUS_STYLE_CODE);
+    act(() => {
+      view.container.querySelector(".MuiAccordionSummary-root").click();
+    });
+    expect(getCompiledStyleCode()).toContain(DANGEROUS_STYLE_CODE);
+
+    const [classMap, runtimeCss] = genTextClass([CUSTOM_STYLE]);
+    expect(classMap[CUSTOM_STYLE.styleSlug]).toBeDefined();
+    expect(runtimeCss).toContain("position:fixed");
+    expect(runtimeCss).toContain("inset:0");
+    expect(runtimeCss).toContain("z-index:2147483647");
+    view.cleanup();
+  });
+});

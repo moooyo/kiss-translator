@@ -3,14 +3,22 @@ import { createRoot } from "react-dom/client";
 import PopupCont from "./PopupCont";
 import { getVisibleServices } from "./services";
 import { MSG_RUNTIME_SETTING_PATCH } from "../../config";
+import { css as mockCss } from "@emotion/css";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-const mockStyles = Array.from({ length: 7 }, (_, index) => ({
-  styleSlug: `style_${index}`,
-  styleName: `Style ${index}`,
-  styleCode: `color: rgb(${index}, 0, 0);`,
-}));
+const DANGEROUS_STYLE_CODE = "position: fixed; inset: 0; z-index: 2147483647;";
+const mockStyles = Array.from({ length: 7 }, (_, index) => {
+  const isBuiltin = index < 5;
+  return {
+    styleSlug: `style_${index}`,
+    styleName: `Style ${index}`,
+    styleCode:
+      index === 6 ? DANGEROUS_STYLE_CODE : `color: rgb(${index}, 0, 0);`,
+    source: isBuiltin ? "builtin" : "custom",
+    isBuiltin,
+  };
+});
 const mockUpdateSetting = jest.fn();
 const mockSendBgMsg = jest.fn(async () => []);
 let mockIsExt = false;
@@ -27,7 +35,12 @@ jest.mock("../../hooks/Setting", () => ({
 }));
 
 jest.mock("../../hooks/CustomStyles", () => ({
+  ...jest.requireActual("../../hooks/CustomStyles"),
   useAllTextStyles: () => ({ allTextStyles: mockStyles }),
+}));
+
+jest.mock("@emotion/css", () => ({
+  css: jest.fn(() => "mock-preview-class"),
 }));
 
 jest.mock("../../libs/msg", () => ({
@@ -110,6 +123,7 @@ describe("PopupCont capability parity", () => {
     mockSendBgMsg.mockReset();
     mockSendBgMsg.mockResolvedValue([]);
     mockUpdateSetting.mockClear();
+    mockCss.mockClear();
   });
 
   afterEach(() => {
@@ -141,6 +155,27 @@ describe("PopupCont capability parity", () => {
 
     styleButtons = view.container.querySelectorAll(".kt-popup-style-chip");
     expect(styleButtons).toHaveLength(7);
+    view.cleanup();
+  });
+
+  test("previews built-in styles without compiling custom style code", async () => {
+    const view = renderPopupCont();
+    await flushEffects();
+
+    const compiledStyleCode = mockCss.mock.calls
+      .flatMap((call) => call.slice(1))
+      .join("\n");
+    expect(compiledStyleCode).toContain(mockStyles[0].styleCode);
+    expect(compiledStyleCode).not.toContain(DANGEROUS_STYLE_CODE);
+
+    const advancedButton = Array.from(
+      view.container.querySelectorAll("button")
+    ).find((button) => button.textContent.includes("popup_advanced_options"));
+    act(() => advancedButton.click());
+    const customStyleButton = Array.from(
+      view.container.querySelectorAll(".kt-popup-style-chip")
+    ).find((button) => button.textContent.includes("Style 6"));
+    expect(customStyleButton.querySelector("span").className).toBe("");
     view.cleanup();
   });
 

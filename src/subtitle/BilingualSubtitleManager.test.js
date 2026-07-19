@@ -234,6 +234,42 @@ describe("BilingualSubtitleManager", () => {
     manager.destroy();
   });
 
+  test("reconciles word listeners after replacing the caption rows", () => {
+    apiMicrosoftDict.mockResolvedValue({ trs: [{ def: "definition" }] });
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [
+        {
+          ...subtitle,
+          text: "first row",
+          translation: "translated first row",
+        },
+        {
+          ...subtitle,
+          start: 1500,
+          end: 3000,
+          text: "second row",
+          translation: "translated second row",
+        },
+      ],
+      setting: { ...setting, hoverLookupMode: "on" },
+    });
+
+    manager.start();
+    const detachedWord = document.querySelector(".kiss-subtitle-word");
+    videoEl.currentTime = 2;
+    videoEl.dispatchEvent(new Event("timeupdate"));
+    const currentWord = document.querySelector(".kiss-subtitle-word");
+
+    detachedWord.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    currentWord.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
+    expect(apiMicrosoftDict).toHaveBeenCalledWith("second");
+    manager.destroy();
+  });
+
   test("renders translation before original when display order is translation first", () => {
     const videoEl = createVideoElement();
     const manager = new BilingualSubtitleManager({

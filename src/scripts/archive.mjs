@@ -1,13 +1,13 @@
 #!/usr/bin/env zx
 
 import bestzip from "bestzip";
+import { releaseTargets } from "./release-archives.mjs";
 
 const buildDirectory = path.resolve("build");
 if (!(await fs.pathExists(buildDirectory))) {
   throw new Error("Build directory is missing. Run the release build first.");
 }
 
-const targets = ["chrome", "edge", "firefox", "thunderbird", "userscript"];
 const packageJson = await fs.readJSON(path.resolve("package.json"));
 const releasePrefix = `kiss-translator_v${packageJson.version}`;
 
@@ -16,7 +16,7 @@ const oldArchives = (await fs.readdir(buildDirectory))
   .map((fileName) => fs.remove(path.join(buildDirectory, fileName)));
 await Promise.all(oldArchives);
 
-for (const target of targets) {
+for (const target of releaseTargets) {
   const sourceDirectory = path.join(buildDirectory, target);
   const destination = path.join(
     buildDirectory,

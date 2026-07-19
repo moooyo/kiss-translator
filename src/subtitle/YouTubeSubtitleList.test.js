@@ -49,12 +49,14 @@ const subtitle = {
 };
 
 function renderVisibleSubtitleItems(manager) {
+  manager._cancelVirtualRender();
   manager.subtitleListEl.getClientRects = () => [{ width: 320, height: 300 }];
   Object.defineProperty(manager.subtitleScrollContainer, "clientHeight", {
     value: 300,
     configurable: true,
   });
   manager._renderVirtualSubtitles(true);
+  manager._cancelVirtualRender();
 }
 
 describe("YouTubeSubtitleList", () => {
@@ -140,6 +142,45 @@ describe("YouTubeSubtitleList", () => {
 
     await Promise.resolve();
     await Promise.resolve();
+    manager.destroy();
+  });
+
+  test("attaches lookup listeners to every row in a virtual range", async () => {
+    apiMicrosoftDict.mockResolvedValue({ trs: [{ def: "definition" }] });
+    const videoEl = createVideoElement();
+    const manager = new YouTubeSubtitleList(videoEl, () => "", {
+      enableHoverLookup: true,
+    });
+    manager.initialize(
+      [
+        { ...subtitle, start: 1000, text: "first row" },
+        { ...subtitle, start: 2000, text: "second row" },
+        { ...subtitle, start: 3000, text: "third row" },
+      ],
+      [],
+      100
+    );
+    renderVisibleSubtitleItems(manager);
+
+    const words = document.querySelectorAll(
+      ".kiss-youtube-original .kiss-subtitle-word:first-child"
+    );
+    words.forEach((word) =>
+      word.dispatchEvent(new MouseEvent("click", { bubbles: true }))
+    );
+
+    expect(apiMicrosoftDict.mock.calls.map(([word]) => word)).toEqual([
+      "first",
+      "second",
+      "third",
+    ]);
+
+    manager.setBilingualSubtitles([], 100);
+    manager._renderVirtualSubtitles(true);
+    words[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(3);
+    expect(words[0].hasAttribute("role")).toBe(false);
     manager.destroy();
   });
 

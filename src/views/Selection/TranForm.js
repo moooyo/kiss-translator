@@ -20,10 +20,7 @@ import {
   OPT_DICT_ALL,
   OPT_SUG_ALL,
   OPT_LANGS_MAP,
-  OPT_DICT_MAP,
-  OPT_SUG_MAP,
   PROMPT_MODE_FOLLOW_API,
-  findPromptBySlug,
 } from "../../config";
 import { useState, useMemo, useEffect, useRef } from "react";
 import TranCont from "./TranCont";
@@ -32,9 +29,13 @@ import AiDictCont from "./AiDictCont";
 import SugCont from "./SugCont";
 import CopyBtn from "./CopyBtn";
 import Zdic from "./Zdic";
-import { isValidWord, isSingleChineseChar } from "../../libs/utils";
+import { isValidWord } from "../../libs/utils";
 import { kissLog } from "../../libs/log";
 import { tryDetectLang } from "../../libs/detect";
+import {
+  normalizeDictionaryTab,
+  resolveDictionaryCapabilities,
+} from "./dictionaryCapabilities";
 
 /**
  * 翻译交互核心表单组件 (集成源/目标语言选择、多引擎翻译、词典展示、汉典展示、语言检测与文本输入)
@@ -58,6 +59,7 @@ export default function TranForm({
   isPlaygound = false,
   popupStyle = false,
   viewMode = "all",
+  dictionaryCapabilities: providedDictionaryCapabilities,
 }) {
   const i18n = useI18n();
 
@@ -174,7 +176,6 @@ export default function TranForm({
     [transApis]
   );
 
-  const isWord = useMemo(() => isValidWord(text), [text]);
   const xs = useMemo(() => (isPlaygound ? 6 : 4), [isPlaygound]);
   const md = useMemo(() => (isPlaygound ? 3 : 4), [isPlaygound]);
 
@@ -183,38 +184,37 @@ export default function TranForm({
     return apiSlugs.filter((slug) => validSlugs.has(slug));
   }, [apiSlugs, optApis]);
 
-  // 默认词典覆盖英文单词和单个汉字：英文走 Bing/有道，单字走汉典。
-  const defaultDictAvailable =
-    (isWord && OPT_DICT_MAP.has(enDict)) || isSingleChineseChar(text);
-  const aiDictApiSetting = useMemo(() => {
-    if (!aiDictApiSlug || aiDictApiSlug === "-") {
-      return null;
-    }
-
-    const apiSetting = transApis.find((api) => api.apiSlug === aiDictApiSlug);
-    if (!apiSetting) {
-      return null;
-    }
-
-    // 跟随接口时必须确保 API 配置已经解析出了 dictPrompt，否则 AI 词典不可用。
-    if (aiDictPromptSlug === PROMPT_MODE_FOLLOW_API) {
-      return apiSetting.dictPrompt ? apiSetting : null;
-    }
-
-    // 指定全局词典提示词时，用该提示词覆盖接口内置词典提示词。
-    const prompt = findPromptBySlug(prompts, aiDictPromptSlug);
-    if (!prompt) {
-      return null;
-    }
-
-    return {
-      ...apiSetting,
-      dictPromptSlug: prompt.slug,
-      dictPrompt: prompt.systemPrompt,
-      dictUserPrompt: prompt.userPrompt,
-    };
-  }, [aiDictApiSlug, aiDictPromptSlug, prompts, transApis]);
-  const aiDictAvailable = Boolean(text?.trim() && aiDictApiSetting);
+  const dictionaryCapabilities = useMemo(
+    () =>
+      providedDictionaryCapabilities ||
+      resolveDictionaryCapabilities({
+        text,
+        enDict,
+        enSug,
+        aiDictApiSlug,
+        aiDictPromptSlug,
+        prompts,
+        transApis,
+      }),
+    [
+      providedDictionaryCapabilities,
+      text,
+      enDict,
+      enSug,
+      aiDictApiSlug,
+      aiDictPromptSlug,
+      prompts,
+      transApis,
+    ]
+  );
+  const {
+    isWord,
+    isChineseChar,
+    defaultDictionaryAvailable,
+    aiDictionaryAvailable,
+    suggestionAvailable,
+    aiDictionaryApiSetting,
+  } = dictionaryCapabilities;
   const showTranslation = viewMode !== "dictionary";
   const showDictionary = viewMode !== "translation";
 
@@ -233,30 +233,29 @@ export default function TranForm({
     });
   };
 
+  const preferredDictTab = defaultDictionaryAvailable
+    ? "default"
+    : aiDictionaryAvailable
+      ? "ai"
+      : null;
+  const effectiveDictTab = hasUserChangedDictTabRef.current
+    ? normalizeDictionaryTab(dictTab, dictionaryCapabilities)
+    : preferredDictTab;
+
   useEffect(() => {
-    if (hasUserChangedDictTabRef.current) {
-      return;
+    if (effectiveDictTab && effectiveDictTab !== dictTab) {
+      setDictTab(effectiveDictTab);
     }
-
-    // 默认词典可用时优先展示更快、更稳定的本地/在线词典；否则自动切到 AI 词典。
-    if (defaultDictAvailable) {
-      setDictTab("default");
-      return;
-    }
-
-    if (aiDictAvailable) {
-      setDictTab("ai");
-    }
-  }, [text, defaultDictAvailable, aiDictAvailable]);
+  }, [dictTab, effectiveDictTab]);
 
   const dictionaryPanels = (
     <>
-      {(defaultDictAvailable || aiDictAvailable) && (
+      {(defaultDictionaryAvailable || aiDictionaryAvailable) && (
         <Box className={popupStyle ? "kt-popup-dictionary" : undefined}>
-          {aiDictAvailable ? (
+          {aiDictionaryAvailable ? (
             <>
               <Tabs
-                value={defaultDictAvailable ? dictTab : "ai"}
+                value={effectiveDictTab}
                 onChange={(_, value) => {
                   hasUserChangedDictTabRef.current = true;
                   setDictTab(value);
@@ -265,7 +264,7 @@ export default function TranForm({
                 allowScrollButtonsMobile
                 sx={{ minHeight: 36, mb: 1 }}
               >
-                {defaultDictAvailable && (
+                {defaultDictionaryAvailable && (
                   <Tab
                     value="default"
                     label={i18n("default_dict", "Default dictionary")}
@@ -278,21 +277,19 @@ export default function TranForm({
                   sx={{ minHeight: 36, py: 0.5 }}
                 />
               </Tabs>
-              {defaultDictAvailable && dictTab === "default" && (
+              {defaultDictionaryAvailable && effectiveDictTab === "default" && (
                 <>
-                  {isWord && OPT_DICT_MAP.has(enDict) && (
-                    <DictCont text={text} enDict={enDict} />
-                  )}
-                  {isSingleChineseChar(text) && <Zdic text={text} />}
+                  {isWord && <DictCont text={text} enDict={enDict} />}
+                  {isChineseChar && <Zdic text={text} />}
                 </>
               )}
-              {(!defaultDictAvailable || dictTab === "ai") && (
+              {effectiveDictTab === "ai" && (
                 <AiDictCont
                   text={text}
                   fromLang={fromLang}
                   speechLang={fromLang === "auto" ? deLang : fromLang}
                   toLang={realToLang}
-                  apiSetting={aiDictApiSetting}
+                  apiSetting={aiDictionaryApiSetting}
                   context={
                     selectionContext && selectionContext.includes(text)
                       ? selectionContext
@@ -303,16 +300,14 @@ export default function TranForm({
             </>
           ) : (
             <>
-              {isWord && OPT_DICT_MAP.has(enDict) && (
-                <DictCont text={text} enDict={enDict} />
-              )}
-              {isSingleChineseChar(text) && <Zdic text={text} />}
+              {isWord && <DictCont text={text} enDict={enDict} />}
+              {isChineseChar && <Zdic text={text} />}
             </>
           )}
         </Box>
       )}
 
-      {isWord && OPT_SUG_MAP.has(enSug) && (
+      {suggestionAvailable && (
         <Box className={popupStyle ? "kt-popup-dictionary" : undefined}>
           <SugCont text={text} enSug={enSug} />
         </Box>

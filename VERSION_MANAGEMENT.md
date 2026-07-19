@@ -99,12 +99,24 @@ The release workflow rejects the tag unless all three values match exactly:
 - `package.json`: `2.1.0`
 - First changelog heading: `## v2.1.0`
 
+The tagged source must also contain the current `releaseContract` marker from
+`package.json`. This fail-closed check prevents the current workflow from
+running against legacy tags whose build and archive behavior does not satisfy
+the current release contract.
+
 After validation, the workflow reruns quality checks and tests, builds and
 verifies every release target, publishes or updates the GitHub release assets,
-and deploys `build/web` through the official GitHub Pages workflow.
+and publishes `build/web` by committing it to the `gh-pages` branch. Repository
+Pages settings serve that branch; this repository does not use the official
+GitHub Pages Actions deployment flow.
 
-The workflow can also be dispatched manually for an existing tag. Reruns are
-idempotent: existing release assets are replaced rather than duplicated.
+The workflow can also be dispatched manually for an existing compatible tag.
+Reruns are idempotent: existing release assets are replaced rather than
+duplicated. Manual dispatch publishes only the GitHub release and never updates
+`gh-pages`, so rerunning an older compatible release cannot roll back the live
+website. Legacy releases without the current contract marker are intentionally
+rejected; arbitrary historical reconciliation belongs in a separate future
+workflow.
 
 ## Relevant files
 

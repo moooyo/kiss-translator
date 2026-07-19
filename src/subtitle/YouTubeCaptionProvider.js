@@ -38,6 +38,58 @@ import {
   waitForElement,
 } from "./youtubePlayerUi.js";
 
+const PROCESSING_SETTING_NAMES = new Set([
+  "toLang",
+  "segSlug",
+  "segPromptMode",
+  "segPromptSlug",
+  "apiSlug",
+  "apiSetting",
+  "transApis",
+  "forceSubtitleRetranslate",
+  "aiContextSlug",
+  "chunkLength",
+  "longSentenceThreshold",
+  "useAlgorithmBreaker",
+  "prompts",
+]);
+
+const PRESENTATION_SETTING_NAMES = new Set([
+  "isBilingual",
+  "blurTranslation",
+  "displayOrder",
+  "fontScale",
+  "windowStyle",
+  "originStyle",
+  "translationStyle",
+  "showList",
+  "enhanceMode",
+  "hoverLookupMode",
+  "brandColor",
+  "darkMode",
+  "uiLang",
+  "preTrans",
+  "throttleTrans",
+]);
+
+function areSettingValuesEqual(first, second) {
+  if (Object.is(first, second)) return true;
+  if (
+    !first ||
+    !second ||
+    typeof first !== "object" ||
+    typeof second !== "object"
+  ) {
+    return false;
+  }
+
+  try {
+    return JSON.stringify(first) === JSON.stringify(second);
+  } catch (_error) {
+    return false;
+  }
+}
+
 /**
  * YouTube 字幕翻译与双语渲染入口。
  * 负责页面生命周期、字幕轨处理调度、异步竞态保护，并把结果交给播放器渲染器。
@@ -159,8 +211,14 @@ export class YouTubeCaptionProvider {
    * @public
    * @returns {void}
    */
-  initialize() {
-    if (this.#initialized) return;
+  initialize(setting) {
+    const changedNames = this.#applySettingPatch(setting, {
+      updateExternalDefaults: true,
+    });
+    if (this.#initialized) {
+      this.#reconcileSettingChanges(changedNames);
+      return;
+    }
     this.#initialized = true;
 
     this.#messageEventHandler = (event) => {
@@ -217,7 +275,10 @@ export class YouTubeCaptionProvider {
       })
     );
 
-    this.#resumeCurrentTrack();
+    const resumedBySettingChange = this.#reconcileSettingChanges(changedNames);
+    if (!resumedBySettingChange) {
+      this.#resumeCurrentTrack();
+    }
   }
 
   destroy() {
@@ -411,8 +472,6 @@ export class YouTubeCaptionProvider {
    * @returns {void}
    */
   updateSetting({ name, value }) {
-    if (this.#setting[name] === value) return;
-
     logger.debug("Youtube Provider: update setting", name, value);
     const patch = { [name]: value };
     if (name === "apiSlug") {
@@ -420,38 +479,118 @@ export class YouTubeCaptionProvider {
         this.#setting.transApis?.find((api) => api.apiSlug === value) ||
         DEFAULT_API_SETTING;
     }
-    this.#setting = { ...this.#setting, ...patch };
+    const changedNames = this.#applySettingPatch(patch);
+    this.#reconcileSettingChanges(changedNames);
+  }
+
+  #applySettingPatch(setting, { updateExternalDefaults = false } = {}) {
+    if (!setting || typeof setting !== "object") return new Set();
+
+    const patch = { ...setting };
+    if (
+      Object.prototype.hasOwnProperty.call(patch, "apiSlug") &&
+      !Object.prototype.hasOwnProperty.call(patch, "apiSetting")
+    ) {
+      patch.apiSetting =
+        (patch.transApis || this.#setting.transApis)?.find(
+          (api) => api.apiSlug === patch.apiSlug
+        ) || DEFAULT_API_SETTING;
+    }
+
+    const changedNames = new Set(
+      Object.keys(patch).filter(
+        (name) => !areSettingValuesEqual(this.#setting[name], patch[name])
+      )
+    );
+
+    if (updateExternalDefaults) {
+      if (Object.prototype.hasOwnProperty.call(patch, "autoTranslate")) {
+        this.#defaultAutoTranslate = patch.autoTranslate;
+      }
+      if (
+        Object.prototype.hasOwnProperty.call(patch, "uiLang") &&
+        changedNames.has("uiLang")
+      ) {
+        this.#i18n = newI18n(patch.uiLang || "zh");
+      }
+    }
+
+    if (changedNames.size) {
+      this.#setting = { ...this.#setting, ...patch };
+    }
+    return changedNames;
+  }
+
+  #reconcileSettingChanges(changedNames) {
+    if (!changedNames?.size) return false;
 
     this.#playerUi.updateMenuProps();
 
     if (
-      name === "isBilingual" ||
-      name === "blurTranslation" ||
-      name === "displayOrder" ||
-      name === "fontScale" ||
-      name === "windowStyle"
+      changedNames.has("showLoadNotification") &&
+      !this.#setting.showLoadNotification
     ) {
-      this.#managerInstance?.updateSetting({ [name]: value });
-    } else if (
-      name === "segSlug" ||
-      name === "apiSlug" ||
-      name === "forceSubtitleRetranslate"
-    ) {
-      this.#reProcessEvents();
-    } else if (name === "autoTranslate") {
-      this.#toggleTranslation();
-    } else if (name === "aiContextSlug") {
-      this.#reProcessEventsWithContext();
-    } else if (name === "showLoadNotification" && value === false) {
       this.#playerUi.hideNotification();
-    } else if (name === "hideSubtitleButton") {
-      if (value === true) {
+    }
+    if (changedNames.has("hideSubtitleButton")) {
+      if (this.#setting.hideSubtitleButton) {
         this.#playerUi.removeToggleButton();
       } else {
         this.#playerUi.injectToggleButton(
           document.querySelector(CONTROLS_SELECTOR)
         );
       }
+    }
+
+    const hasProcessingChange = Array.from(changedNames).some((name) =>
+      PROCESSING_SETTING_NAMES.has(name)
+    );
+    const hasPresentationChange = Array.from(changedNames).some((name) =>
+      PRESENTATION_SETTING_NAMES.has(name)
+    );
+
+    if (hasProcessingChange) {
+      this.#restartAfterProcessingSettingChange();
+      return true;
+    }
+    if (changedNames.has("autoTranslate")) {
+      this.#toggleTranslation();
+      return true;
+    }
+    if (hasPresentationChange && this.#subtitles.length) {
+      this.#destroyManager();
+      this.#startManager();
+    }
+    return false;
+  }
+
+  #invalidateDerivedOutput() {
+    this.#processingVersion += 1;
+    this.#processingId = null;
+    this.#subtitleAbortController?.abort();
+    this.#subtitleAbortController = null;
+    this.#aiChunkScheduler = null;
+    this.#subtitles = [];
+    this.#progressed = 0;
+    this.#destroyManager();
+    clearMsgHistory(this.#setting.apiSlug);
+  }
+
+  #restartAfterProcessingSettingChange() {
+    if (!this.#setting.autoTranslate) {
+      this.#invalidateDerivedOutput();
+      return;
+    }
+
+    if (this.#flatEvents.length) {
+      void this.#translateCachedEvents();
+      return;
+    }
+
+    this.#invalidateDerivedOutput();
+    if (this.#lastInterceptedRequest?.videoId === this.#videoId) {
+      const { url, responseText } = this.#lastInterceptedRequest;
+      void this.#handleInterceptedRequest(url, responseText);
     }
   }
 
@@ -475,7 +614,7 @@ export class YouTubeCaptionProvider {
       }
       this.#destroyManager();
     } else {
-      this.#translateCachedEvents();
+      this.#resumeCurrentTrack();
     }
   }
 
@@ -488,6 +627,12 @@ export class YouTubeCaptionProvider {
   async #translateCachedEvents() {
     const videoId = this.#videoId;
     if (!this.#setting.autoTranslate || !videoId || !this.#flatEvents.length) {
+      return;
+    }
+
+    if (isSameLang(this.#fromLang, this.#setting.toLang)) {
+      this.#invalidateDerivedOutput();
+      this.#playerUi.showNotification(this.#i18n("subtitle_same_lang"));
       return;
     }
 
@@ -895,43 +1040,6 @@ export class YouTubeCaptionProvider {
   }
 
   /**
-   * 当用户更改了断句设置时，触发对现有字幕的重新处理与渲染。
-   *
-   * @private
-   * @returns {void}
-   */
-  #reProcessEvents() {
-    if (!this.#setting.autoTranslate) return;
-
-    this.#progressed = 0;
-    this.#subtitles = [];
-
-    const videoId = this.#videoId;
-    const flatEvents = this.#flatEvents;
-    const fromLang = this.#fromLang;
-    if (!videoId || !flatEvents.length) {
-      return;
-    }
-
-    this.#playerUi.showNotification(this.#i18n("starting_reprocess_events"));
-
-    const processingVersion = (this.#processingVersion += 1);
-    this.#subtitleAbortController?.abort();
-    this.#subtitleAbortController = new AbortController();
-    this.#aiChunkScheduler = null;
-    this.#destroyManager();
-    clearMsgHistory(this.#setting.apiSlug);
-
-    this.#processEvents({
-      videoId,
-      flatEvents,
-      fromLang,
-      processingVersion,
-      signal: this.#subtitleAbortController.signal,
-    });
-  }
-
-  /**
    * 异步调用 AI 总结 API，提取视频的专有名词、主要大意及语境背景。
    * 提取的信息会保存在 docInfo.summary 中，为之后的翻译步骤提供上下文提示。
    *
@@ -984,40 +1092,6 @@ export class YouTubeCaptionProvider {
     } catch (err) {
       logger.info("Youtube Provider: AI context enrichment failed", err);
     }
-  }
-
-  /**
-   * 当用户更改了 AI 上下文引擎配置时，清空当前大纲记忆，并带上新上下文重新处理字幕事件。
-   *
-   * @private
-   * @returns {Promise<void>}
-   */
-  async #reProcessEventsWithContext() {
-    if (!this.#setting.autoTranslate) return;
-
-    this.#progressed = 0;
-    this.#subtitles = [];
-
-    const videoId = this.#videoId;
-    const flatEvents = this.#flatEvents;
-    if (!videoId || !flatEvents.length) return;
-
-    const processingVersion = (this.#processingVersion += 1);
-    this.#subtitleAbortController?.abort();
-    this.#subtitleAbortController = new AbortController();
-    this.#aiChunkScheduler = null;
-    this.#destroyManager();
-    clearMsgHistory(this.#setting.apiSlug);
-    this.#docInfo = getDocInfo();
-    await this.#enrichDocInfoWithAI(flatEvents, processingVersion);
-    if (this.#isStaleProcessing(processingVersion)) return;
-    this.#processEvents({
-      videoId,
-      flatEvents,
-      fromLang: this.#fromLang,
-      processingVersion,
-      signal: this.#subtitleAbortController.signal,
-    });
   }
 
   /**
@@ -1153,7 +1227,7 @@ export const YouTubeInitializer = (() => {
       logger.info("Bilingual Subtitle Extension: Initializing...");
       provider = new YouTubeCaptionProvider(setting);
     }
-    provider.initialize();
+    provider.initialize(setting);
     return provider;
   };
 

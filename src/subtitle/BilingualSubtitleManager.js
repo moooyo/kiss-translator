@@ -299,6 +299,7 @@ export class BilingualSubtitleManager {
    * 为翻译分词后产生的每一个单词标签绑 hover 移入/移出事件
    */
   #attachSpanListeners() {
+    this.#wordTooltipController?.pruneDetachedSpanListeners();
     this.#wordTooltipController?.attachSpanListeners(this.#captionWindowEl);
   }
 

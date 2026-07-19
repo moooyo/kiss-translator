@@ -12,7 +12,12 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import AddIcon from "@mui/icons-material/Add";
 import { useConfirm } from "../../hooks/Confirm";
 import Box from "@mui/material/Box";
-import { useAllTextStyles, useStyleList } from "../../hooks/CustomStyles";
+import {
+  getCompactStylePreviewCode,
+  toPersistedCustomStyle,
+  useAllTextStyles,
+  useStyleList,
+} from "../../hooks/CustomStyles";
 import { css } from "@emotion/css";
 import { getRandomQuote } from "../../config/quotes";
 import { useSetting } from "../../hooks/Setting";
@@ -72,7 +77,7 @@ function StyleFields({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
 
   // 触发样式规则更新
   const handleSave = () => {
-    updateStyle(customStyle.styleSlug, formData);
+    updateStyle(customStyle.styleSlug, toPersistedCustomStyle(formData));
   };
 
   // 二次确认删除自定义样式
@@ -169,14 +174,19 @@ function StyleFields({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
 /**
  * 样式的折叠手风琴壳组件
  */
-function StyleAccordion({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
+export function StyleAccordion({ customStyle, deleteStyle, updateStyle }) {
   const [expanded, setExpanded] = useState(false);
   const i18n = useI18n();
+  const { isBuiltin } = customStyle;
+  const previewCode = getCompactStylePreviewCode(customStyle);
   const previewClass = useMemo(
-    () => css`
-      ${customStyle.styleCode || ""}
-    `,
-    [customStyle.styleCode]
+    () =>
+      previewCode
+        ? css`
+            ${previewCode}
+          `
+        : undefined,
+    [previewCode]
   );
 
   const handleChange = (e) => {
@@ -221,9 +231,9 @@ export default function StylesSetting() {
   const { list: rules, put: updateRule } = useRules();
   const [showStyleManager, setShowStyleManager] = useState(false);
   // 自定义 CSS 列表 Hook
-  const { customStyles, addStyle, deleteStyle, updateStyle } = useStyleList();
+  const { addStyle, deleteStyle, updateStyle } = useStyleList();
   // 系统内置的只读样式配置列表
-  const { builtinStyles } = useAllTextStyles();
+  const { builtinStyles, customStyles } = useAllTextStyles();
 
   // 添加新 CSS 样式
   const handleClick = (e) => {
@@ -358,7 +368,6 @@ export default function StylesSetting() {
                   customStyle={customStyle}
                   deleteStyle={deleteStyle}
                   updateStyle={updateStyle}
-                  isBuiltin={true}
                 />
               ))}
             </Box>

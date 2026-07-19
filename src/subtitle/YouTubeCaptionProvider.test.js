@@ -13,6 +13,7 @@ import {
 
 const mockManagerInstances = [];
 const mockPlayerUiInstances = [];
+const mockIsSameLang = jest.fn(() => false);
 
 jest.mock("../config", () => ({
   MSG_XHR_DATA_YOUTUBE: "xhr-youtube",
@@ -20,7 +21,7 @@ jest.mock("../config", () => ({
   OPT_ENHANCE_ON: "on",
   OPT_ENHANCE_OFF: "off",
   OPT_ENHANCE_MOBILE_OFF: "mobile_off",
-  newI18n: () => (key) => key,
+  newI18n: (lang) => (key) => `${lang}:${key}`,
 }));
 
 jest.mock("../apis/index.js", () => ({
@@ -58,7 +59,7 @@ jest.mock("./youtubeCaptionTracks.js", () => ({
   findCaptionTrack: (tracks) => tracks[0],
   getCaptionTracks: jest.fn(),
   getSubtitleEvents: jest.fn(),
-  isSameLang: () => false,
+  isSameLang: (...args) => mockIsSameLang(...args),
 }));
 
 jest.mock("./youtubeSubtitleProcessing.js", () => ({
@@ -75,7 +76,8 @@ jest.mock("./youtubeAiSegmentation.js", () => ({
 
 jest.mock("./BilingualSubtitleManager.js", () => ({
   BilingualSubtitleManager: class {
-    constructor() {
+    constructor(options) {
+      this.options = options;
       mockManagerInstances.push(this);
     }
 
@@ -113,6 +115,7 @@ describe("YouTubeCaptionProvider manual translation", () => {
       null,
     ]);
     apiSummarizeContext.mockResolvedValue("");
+    mockIsSameLang.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -214,6 +217,237 @@ describe("YouTubeCaptionProvider manual translation", () => {
 
     await YouTubeInitializer({ autoTranslate: true });
     expect(mockManagerInstances).toHaveLength(2);
+  });
+
+  test("reprocesses cached events with semantic settings received while suspended", async () => {
+    const initialApi = { apiSlug: "initial-api", apiType: "Microsoft" };
+    const nextApi = { apiSlug: "next-api", apiType: "Google" };
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      apiSlug: "initial-api",
+      apiSetting: initialApi,
+      transApis: [initialApi, nextApi],
+      showList: "off",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    YouTubeInitializer.suspend();
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      apiSlug: "next-api",
+      apiSetting: nextApi,
+      transApis: [initialApi, nextApi],
+      showList: "off",
+    });
+    await act(async () => flushPromises());
+
+    expect(getCaptionTracks).toHaveBeenCalledTimes(1);
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(2);
+    expect(eventsToSubtitles.mock.calls[1][0].setting).toEqual(
+      expect.objectContaining({ apiSlug: "next-api", apiSetting: nextApi })
+    );
+  });
+
+  test("reprocesses cached events when the segmentation prompt changes", async () => {
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      segPromptMode: "global",
+      segPromptSlug: "subtitle-prompt-a",
+      showList: "off",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      segPromptMode: "global",
+      segPromptSlug: "subtitle-prompt-b",
+      showList: "off",
+    });
+    await act(async () => flushPromises());
+
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(2);
+    expect(eventsToSubtitles.mock.calls[1][0].setting).toEqual(
+      expect.objectContaining({ segPromptSlug: "subtitle-prompt-b" })
+    );
+  });
+
+  test("replays an interrupted request after automatic translation is re-enabled", async () => {
+    let resolveInterruptedRequest;
+    getCaptionTracks
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveInterruptedRequest = resolve;
+          })
+      )
+      .mockResolvedValue({
+        captionTracks: [{ baseUrl: "https://www.youtube.com/timedtext" }],
+        fullDescription: "",
+      });
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      apiSlug: "initial-api",
+      showList: "off",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    await YouTubeInitializer({
+      autoTranslate: false,
+      aiContextSlug: "-",
+      apiSlug: "next-api",
+      showList: "off",
+    });
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      apiSlug: "next-api",
+      showList: "off",
+    });
+    await act(async () => flushPromises());
+
+    expect(getCaptionTracks).toHaveBeenCalledTimes(2);
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
+
+    resolveInterruptedRequest({
+      captionTracks: [{ baseUrl: "https://www.youtube.com/timedtext" }],
+      fullDescription: "",
+    });
+    await act(async () => flushPromises());
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not translate cached subtitles when target and source languages match", async () => {
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      toLang: "zh-CN",
+      showList: "off",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
+
+    mockIsSameLang.mockReturnValue(true);
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      toLang: "en",
+      showList: "off",
+    });
+    await act(async () => flushPromises());
+
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
+    expect(mockPlayerUiInstances[0].showNotification).toHaveBeenCalledWith(
+      "zh:subtitle_same_lang"
+    );
+  });
+
+  test("rebuilds presentation managers without reprocessing subtitles", async () => {
+    const provider = await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      fontScale: 100,
+      showList: "off",
+      uiLang: "zh",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    const sameProvider = await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      fontScale: 125,
+      showList: "off",
+      uiLang: "en",
+    });
+
+    expect(sameProvider).toBe(provider);
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
+    expect(mockManagerInstances).toHaveLength(2);
+    expect(mockManagerInstances[1].options.setting.fontScale).toBe(125);
+    expect(mockPlayerUiInstances[0].showNotification).toHaveBeenLastCalledWith(
+      "en:subtitle_load_succeed"
+    );
+  });
+
+  test("uses the latest external auto-translate value after navigation", async () => {
+    const provider = await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      showList: "off",
+    });
+    await YouTubeInitializer({
+      autoTranslate: false,
+      aiContextSlug: "-",
+      showList: "off",
+    });
+    provider.updateSetting({ name: "autoTranslate", value: true });
+    window.dispatchEvent(new Event("yt-navigate-finish"));
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(eventsToSubtitles).not.toHaveBeenCalled();
   });
 
   test("replays the intercepted track when suspension interrupts loading", async () => {

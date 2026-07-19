@@ -34,7 +34,10 @@ import { saveRule } from "../../libs/rules";
 import { tryClearCaches } from "../../libs/cache";
 import { kissLog } from "../../libs/log";
 import { getDomainOptions, truncateMiddle } from "../../libs/url";
-import { useAllTextStyles } from "../../hooks/CustomStyles";
+import {
+  getCompactStylePreviewCode,
+  useAllTextStyles,
+} from "../../hooks/CustomStyles";
 import { useOverviewShortcuts } from "../../hooks/Commands";
 import { isInBlacklist } from "../../libs/blacklist";
 import { useSetting } from "../../hooks/Setting";
@@ -96,12 +99,17 @@ export default function PopupCont({
   const popupTextStyles = useMemo(
     () =>
       resolvePopupTextStyles(allTextStyles, rule?.textStyle, showAllStyles).map(
-        (style) => ({
-          ...style,
-          previewClass: css`
-            ${style.styleCode || ""}
-          `,
-        })
+        (style) => {
+          const previewCode = getCompactStylePreviewCode(style);
+          return {
+            ...style,
+            previewClass: previewCode
+              ? css`
+                  ${previewCode}
+                `
+              : undefined,
+          };
+        }
       ),
     [allTextStyles, rule?.textStyle, showAllStyles]
   );

@@ -26,6 +26,7 @@ import { useTheme, alpha } from "@mui/material/styles";
 import { isValidWord } from "../../libs/utils";
 import { useDarkMode } from "../../hooks/ColorMode";
 import { SELECTION_STYLES } from "./styles";
+import { resolveDictionaryCapabilities } from "./dictionaryCapabilities";
 
 /**
  * 划词翻译框的顶部导航栏组件
@@ -49,6 +50,7 @@ function TranBoxHeader({
   setFollowSelection,
   activeView,
   setActiveView,
+  dictionaryAvailable,
 }) {
   const i18n = useI18n();
   const { darkMode, toggleDarkMode } = useDarkMode();
@@ -82,12 +84,14 @@ function TranBoxHeader({
           id="kt-tranbox-translation-tab"
           aria-controls="kt-tranbox-active-panel"
         />
-        <Tab
-          value="dictionary"
-          label={i18n("dictionary")}
-          id="kt-tranbox-dictionary-tab"
-          aria-controls="kt-tranbox-active-panel"
-        />
+        {dictionaryAvailable && (
+          <Tab
+            value="dictionary"
+            label={i18n("dictionary")}
+            id="kt-tranbox-dictionary-tab"
+            aria-controls="kt-tranbox-active-panel"
+          />
+        )}
       </Tabs>
       <span className="kt-tranbox-header__actions">
         <IconButton
@@ -168,6 +172,7 @@ function TranBoxContent({
   prompts,
   selectionContext,
   activeView,
+  dictionaryCapabilities,
 }) {
   const theme = useTheme();
   const isDark = theme.palette.mode === "dark";
@@ -232,6 +237,7 @@ function TranBoxContent({
         aiDictPromptSlug={aiDictPromptSlug}
         selectionContext={selectionContext}
         viewMode={activeView}
+        dictionaryCapabilities={dictionaryCapabilities}
       />
     </Box>
   );
@@ -241,17 +247,58 @@ function TranBoxContent({
  * 划词翻译框的主容器入口组件 (控制拖拽外壳及规则分发)
  */
 export default function TranBox(props) {
+  const dictionaryCapabilities = resolveDictionaryCapabilities({
+    text: props.text,
+    enDict: props.tranboxSetting.enDict,
+    enSug: props.tranboxSetting.enSug,
+    aiDictApiSlug: props.tranboxSetting.aiDictApiSlug,
+    aiDictPromptSlug: props.tranboxSetting.aiDictPromptSlug,
+    prompts: props.prompts,
+    transApis: props.transApis,
+  });
   const defaultView = getDefaultTranBoxView(
     props.text,
-    props.tranboxSetting.singleWordNoTrans
+    props.tranboxSetting.singleWordNoTrans,
+    dictionaryCapabilities.dictionaryAvailable
   );
-  const [activeView, setActiveView] = useState(defaultView);
+  const viewContext = [
+    props.text,
+    Boolean(props.tranboxSetting.singleWordNoTrans),
+    dictionaryCapabilities.defaultDictionaryAvailable,
+    dictionaryCapabilities.aiDictionaryAvailable,
+    dictionaryCapabilities.suggestionAvailable,
+  ].join("\u0000");
+  const [viewSelection, setViewSelection] = useState(() => ({
+    context: viewContext,
+    view: defaultView,
+  }));
+  const activeView = resolveTranBoxView({
+    requestedView:
+      viewSelection.context === viewContext ? viewSelection.view : defaultView,
+    dictionaryAvailable: dictionaryCapabilities.dictionaryAvailable,
+  });
+
+  const setActiveView = useCallback(
+    (view) => {
+      setViewSelection({
+        context: viewContext,
+        view: resolveTranBoxView({
+          requestedView: view,
+          dictionaryAvailable: dictionaryCapabilities.dictionaryAvailable,
+        }),
+      });
+    },
+    [viewContext, dictionaryCapabilities.dictionaryAvailable]
+  );
 
   useEffect(() => {
-    setActiveView(
-      getDefaultTranBoxView(props.text, props.tranboxSetting.singleWordNoTrans)
-    );
-  }, [props.text, props.tranboxSetting.singleWordNoTrans]);
+    setViewSelection((current) => {
+      if (current.context === viewContext && current.view === activeView) {
+        return current;
+      }
+      return { context: viewContext, view: activeView };
+    });
+  }, [activeView, viewContext]);
 
   const simpleStyle = props.simpleStyle;
   const setSimpleStyle = props.setSimpleStyle;
@@ -292,6 +339,7 @@ export default function TranBox(props) {
                 setFollowSelection={setFollowSelection}
                 activeView={activeView}
                 setActiveView={setActiveView}
+                dictionaryAvailable={dictionaryCapabilities.dictionaryAvailable}
               />
             }
             onClick={(e) => e.stopPropagation()}
@@ -313,6 +361,7 @@ export default function TranBox(props) {
               aiDictPromptSlug={props.tranboxSetting.aiDictPromptSlug}
               selectionContext={props.selectionContext}
               activeView={activeView}
+              dictionaryCapabilities={dictionaryCapabilities}
             />
           </DraggableResizable>
         )}
@@ -321,8 +370,20 @@ export default function TranBox(props) {
   );
 }
 
-export function getDefaultTranBoxView(text, singleWordNoTrans) {
-  return singleWordNoTrans && isValidWord(text) ? "dictionary" : "translation";
+export function getDefaultTranBoxView(
+  text,
+  singleWordNoTrans,
+  dictionaryAvailable = true
+) {
+  return singleWordNoTrans && isValidWord(text) && dictionaryAvailable
+    ? "dictionary"
+    : "translation";
+}
+
+export function resolveTranBoxView({ requestedView, dictionaryAvailable }) {
+  return requestedView === "dictionary" && dictionaryAvailable
+    ? "dictionary"
+    : "translation";
 }
 
 export function resolveTranBoxApiSlugs({

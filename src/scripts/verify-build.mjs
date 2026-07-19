@@ -4,6 +4,10 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { findMissingManifestArtifacts } from "./manifest-artifacts.mjs";
+import {
+  findReleaseArchiveSetFailures,
+  getExpectedReleaseArchives,
+} from "./release-archives.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "../..");
@@ -38,14 +42,6 @@ const requiredFiles = [
   "userscript/kiss-translator.user.js",
   "userscript/kiss-translator-ios-safari.user.js",
 ];
-
-if (releaseMode) {
-  requiredFiles.push(
-    ...["chrome", "edge", "firefox", "thunderbird", "userscript"].map(
-      (target) => `kiss-translator_v${packageJson.version}_${target}.zip`
-    )
-  );
-}
 
 const failures = [];
 const manifestArtifacts = new Map();
@@ -160,13 +156,22 @@ for (const relativePath of forbiddenFiles) {
 }
 
 if (releaseMode) {
-  const archiveExpectations = {
-    [`kiss-translator_v${packageJson.version}_chrome.zip`]: "chrome",
-    [`kiss-translator_v${packageJson.version}_edge.zip`]: "edge",
-    [`kiss-translator_v${packageJson.version}_firefox.zip`]: "firefox",
-    [`kiss-translator_v${packageJson.version}_thunderbird.zip`]: "thunderbird",
-    [`kiss-translator_v${packageJson.version}_userscript.zip`]: "userscript",
-  };
+  const buildEntries = await fs.readdir(buildDirectory, {
+    withFileTypes: true,
+  });
+  const buildFileNames = buildEntries
+    .filter((entry) => entry.isFile())
+    .map((entry) => entry.name);
+  failures.push(
+    ...findReleaseArchiveSetFailures(packageJson.version, buildFileNames)
+  );
+
+  const archiveExpectations = Object.fromEntries(
+    getExpectedReleaseArchives(packageJson.version).map((archiveName) => [
+      archiveName,
+      archiveName.slice(archiveName.lastIndexOf("_") + 1, -4),
+    ])
+  );
 
   for (const [archiveName, target] of Object.entries(archiveExpectations)) {
     try {
@@ -205,6 +210,10 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
+const verifiedArtifactCount =
+  requiredFiles.length +
+  (releaseMode ? getExpectedReleaseArchives(packageJson.version).length : 0);
+
 console.log(
-  `Verified ${requiredFiles.length} ${releaseMode ? "release" : "build"} artifacts for version ${packageJson.version}.`
+  `Verified ${verifiedArtifactCount} ${releaseMode ? "release" : "build"} artifacts for version ${packageJson.version}.`
 );

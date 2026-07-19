@@ -40,7 +40,11 @@ jest.mock("./DictCont", () => {
 });
 
 jest.mock("./Zdic", () => () => null);
-jest.mock("./SugCont", () => () => null);
+jest.mock("./SugCont", () => {
+  const React = require("react");
+
+  return () => React.createElement("div", { "data-testid": "suggestions" });
+});
 
 jest.mock("./AudioBtn", () => {
   const React = require("react");
@@ -324,6 +328,73 @@ describe("TranForm panel views", () => {
       dictionary.container.querySelector('[data-testid="default-dict"]')
     ).not.toBeNull();
     act(() => dictionary.root.unmount());
+  });
+
+  test("renders suggestions as the only dictionary capability", async () => {
+    const { container, root } = renderTranForm({
+      enDict: "-",
+      enSug: "Youdao",
+      aiDictApiSlug: "-",
+      viewMode: "dictionary",
+    });
+    await flushEffects();
+
+    expect(container.querySelector('[data-testid="default-dict"]')).toBeNull();
+    expect(
+      container.querySelector('[data-testid="suggestions"]')
+    ).not.toBeNull();
+    act(() => root.unmount());
+  });
+
+  test("falls back to the default dictionary when AI capability is lost", async () => {
+    const { container, root } = renderTranForm({ viewMode: "dictionary" });
+    await flushEffects();
+
+    let tabs = container.querySelectorAll('[role="tab"]');
+    await act(async () => {
+      tabs[1].dispatchEvent(
+        new MouseEvent("click", { bubbles: true, button: 0 })
+      );
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(apiDict).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      root.render(
+        <TranForm
+          text="library"
+          setText={jest.fn()}
+          apiSlugs={[]}
+          fromLang="en"
+          toLang="zh-CN"
+          toLang2="-"
+          transApis={[
+            {
+              apiSlug: "openai",
+              apiName: "OpenAI",
+              apiType: "OpenAI",
+              dictPrompt: "Dictionary prompt",
+              isDisabled: true,
+            },
+          ]}
+          simpleStyle
+          langDetector="-"
+          enDict="Bing"
+          enSug="-"
+          aiDictApiSlug="openai"
+          selectionContext="The library is open."
+          viewMode="dictionary"
+        />
+      );
+    });
+    await flushEffects();
+
+    expect(container.querySelectorAll('[role="tab"]')).toHaveLength(0);
+    expect(
+      container.querySelector('[data-testid="default-dict"]')
+    ).not.toBeNull();
+    act(() => root.unmount());
   });
 });
 

@@ -204,6 +204,11 @@ export const M3_GLOBAL_CSS = String.raw`
   }
 }
 
+.kt-m3-root .MuiInputBase-input:focus,
+.kt-m3-root .MuiInputBase-input:focus-visible {
+  outline: none;
+}
+
 .kt-m3-root ::-webkit-scrollbar {
   width: 10px;
   height: 10px;

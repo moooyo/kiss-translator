@@ -2,7 +2,7 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Simulate } from "react-dom/test-utils";
 import Apis from "./Apis";
-import { OPT_TRANS_OPENAI } from "../../config";
+import { OPT_TRANS_BUILTINAI, OPT_TRANS_OPENAI } from "../../config";
 import { fetchModelList } from "../../libs/modelList";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -160,6 +160,38 @@ function getListToggle(container, apiName) {
   }
   return input;
 }
+
+describe("Apis conditional option groups", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("omits the runtime option shell when the API has no matching controls", async () => {
+    const view = await renderApis(
+      createApi({ apiSlug: "BuiltinAI", apiType: OPT_TRANS_BUILTINAI })
+    );
+
+    expect(view.container.querySelector(".kt-api-runtime-options")).toBeNull();
+    expect(
+      Array.from(view.container.querySelectorAll(".MuiGrid-item")).filter(
+        (item) => !item.firstElementChild && !item.textContent.trim()
+      )
+    ).toHaveLength(0);
+
+    view.unmount();
+  });
+
+  test("keeps runtime options for APIs that support them", async () => {
+    const view = await renderApis();
+
+    expect(
+      view.container.querySelector(".kt-api-runtime-options")
+    ).not.toBeNull();
+
+    view.unmount();
+  });
+});
 
 describe("Apis model list", () => {
   afterEach(() => {

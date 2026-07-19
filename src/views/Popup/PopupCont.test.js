@@ -179,46 +179,15 @@ describe("PopupCont capability parity", () => {
     view.cleanup();
   });
 
-  test("exposes support actions as a keyboard-accessible disclosure", async () => {
+  test("leaves browser popup support actions to the header menu", async () => {
     const view = renderPopupCont();
     await flushEffects();
 
     const supportButton = Array.from(
       view.container.querySelectorAll("button")
     ).find((button) => button.textContent.includes("popup_support"));
-    expect(supportButton.getAttribute("aria-expanded")).toBe("false");
-    act(() => supportButton.click());
-
-    const supportDisclosure = view.container.querySelector(".kt-popup-support");
-    const supportLinks = supportDisclosure.querySelectorAll("a");
-    expect(supportButton.getAttribute("aria-controls")).toBe(
-      supportDisclosure.id
-    );
-    expect(supportDisclosure.getAttribute("aria-labelledby")).toBe(
-      supportButton.id
-    );
-    expect(supportButton.compareDocumentPosition(supportDisclosure)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(
-      supportButton.closest(".kt-popup-disclosure-row").nextElementSibling
-    ).toBe(supportDisclosure);
-    expect(supportLinks).toHaveLength(2);
-    expect(supportLinks[0].textContent).toBe("comment_support");
-    expect(supportLinks[1].textContent).toBe("appreciate_support");
-    expect(supportDisclosure.getAttribute("role")).toBe("region");
-    expect(supportLinks[0].hasAttribute("role")).toBe(false);
-    expect(document.activeElement).toBe(supportLinks[0]);
-
-    act(() => {
-      supportLinks[0].dispatchEvent(
-        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
-      );
-    });
-
+    expect(supportButton).toBeUndefined();
     expect(view.container.querySelector(".kt-popup-support")).toBeNull();
-    expect(supportButton.getAttribute("aria-expanded")).toBe("false");
-    expect(document.activeElement).toBe(supportButton);
     view.cleanup();
   });
 

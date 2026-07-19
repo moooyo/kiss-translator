@@ -1,3 +1,10 @@
+## v2.0.29
+
+- Refined the Material 3 popup with adaptive sizing, sticky navigation, a Sponsor menu, and reliable single-axis scrolling.
+- Fixed Playground source and result fields to use one accessible focus treatment and consistent Material 3 spacing.
+- Removed empty translation-service option containers and unused grid placeholders.
+- Added regression coverage for popup navigation, support actions, Playground fields, and conditional API option groups.
+
 ## v2.0.28
 
 - PDF 页面支持使用选中文本打开划词翻译弹窗。

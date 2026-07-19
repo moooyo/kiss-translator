@@ -112,6 +112,22 @@ describe("TranCont", () => {
     document.body.innerHTML = "";
   });
 
+  test("renders a read-only M3 result field in Playground", async () => {
+    apiTranslate.mockResolvedValueOnce({ trText: "译文" });
+    const { container, root } = renderTranCont({ playgroundStyle: true });
+    await flushEffects();
+
+    const field = container.querySelector(".kt-translation-text-field--result");
+    const textarea = field.querySelector("textarea");
+
+    expect(textarea.readOnly).toBe(true);
+    expect(
+      field.querySelector(".kt-translation-text-field__actions")
+    ).not.toBeNull();
+
+    act(() => root.unmount());
+  });
+
   test("renders streaming chunks before the final translation", async () => {
     const deferred = createDeferred();
     apiTranslate.mockReturnValueOnce(deferred.promise);

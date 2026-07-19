@@ -377,6 +377,8 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse, onDirtyChange }) {
   }, [modelListUrl, key]);
 
   const thinkingParam = THINKING_PARAM_MAP[apiType];
+  const hasRuntimeOptions =
+    API_SPE_TYPES.stream.has(apiType) || API_SPE_TYPES.context.has(apiType);
   const selectedBatchPromptSlug = Object.prototype.hasOwnProperty.call(
     activeFormData,
     "batchPromptSlug"
@@ -755,82 +757,84 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse, onDirtyChange }) {
         </Box>
       )}
 
-      <Box>
-        <Grid container spacing={2} columns={12}>
-          {API_SPE_TYPES.stream.has(apiType) && (
-            <Grid item xs={12} sm={12} md={6} lg={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                name="useStream"
-                value={useStream}
-                label={i18n("use_stream")}
-                onChange={handleChange}
-              >
-                <MenuItem value={false}>{i18n("disable")}</MenuItem>
-                <MenuItem value={true}>{i18n("enable")}</MenuItem>
-              </TextField>
-            </Grid>
-          )}
-
-          {API_SPE_TYPES.stream.has(apiType) && useStream && (
-            <Grid item xs={12} sm={12} md={6} lg={3}>
-              <TextField
-                select
-                fullWidth
-                size="small"
-                name="streamRenderMode"
-                value={streamRenderMode}
-                label={i18n("stream_render_mode")}
-                onChange={handleChange}
-              >
-                <MenuItem value="disabled">{i18n("disable")}</MenuItem>
-                <MenuItem value="realtime">
-                  {i18n("stream_render_realtime")}
-                </MenuItem>
-                <MenuItem value="segment">
-                  {i18n("stream_render_segment")}
-                </MenuItem>
-              </TextField>
-            </Grid>
-          )}
-
-          {API_SPE_TYPES.context.has(apiType) && (
-            <>
+      {hasRuntimeOptions && (
+        <Box className="kt-api-runtime-options">
+          <Grid container spacing={2} columns={12}>
+            {API_SPE_TYPES.stream.has(apiType) && (
               <Grid item xs={12} sm={12} md={6} lg={3}>
-                {" "}
                 <TextField
                   select
-                  size="small"
                   fullWidth
-                  name="useContext"
-                  value={useContext}
-                  label={i18n("use_context")}
+                  size="small"
+                  name="useStream"
+                  value={useStream}
+                  label={i18n("use_stream")}
                   onChange={handleChange}
                 >
                   <MenuItem value={false}>{i18n("disable")}</MenuItem>
                   <MenuItem value={true}>{i18n("enable")}</MenuItem>
                 </TextField>
               </Grid>
+            )}
+
+            {API_SPE_TYPES.stream.has(apiType) && useStream && (
               <Grid item xs={12} sm={12} md={6} lg={3}>
-                {" "}
                 <TextField
-                  size="small"
+                  select
                   fullWidth
-                  label={i18n("context_size")}
-                  type="number"
-                  name="contextSize"
-                  value={contextSize}
+                  size="small"
+                  name="streamRenderMode"
+                  value={streamRenderMode}
+                  label={i18n("stream_render_mode")}
                   onChange={handleChange}
-                  min={1}
-                  max={20}
-                />
+                >
+                  <MenuItem value="disabled">{i18n("disable")}</MenuItem>
+                  <MenuItem value="realtime">
+                    {i18n("stream_render_realtime")}
+                  </MenuItem>
+                  <MenuItem value="segment">
+                    {i18n("stream_render_segment")}
+                  </MenuItem>
+                </TextField>
               </Grid>
-            </>
-          )}
-        </Grid>
-      </Box>
+            )}
+
+            {API_SPE_TYPES.context.has(apiType) && (
+              <>
+                <Grid item xs={12} sm={12} md={6} lg={3}>
+                  {" "}
+                  <TextField
+                    select
+                    size="small"
+                    fullWidth
+                    name="useContext"
+                    value={useContext}
+                    label={i18n("use_context")}
+                    onChange={handleChange}
+                  >
+                    <MenuItem value={false}>{i18n("disable")}</MenuItem>
+                    <MenuItem value={true}>{i18n("enable")}</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={12} md={6} lg={3}>
+                  {" "}
+                  <TextField
+                    size="small"
+                    fullWidth
+                    label={i18n("context_size")}
+                    type="number"
+                    name="contextSize"
+                    value={contextSize}
+                    onChange={handleChange}
+                    min={1}
+                    max={20}
+                  />
+                </Grid>
+              </>
+            )}
+          </Grid>
+        </Box>
+      )}
 
       <Box>
         <Grid container spacing={2} columns={12}>
@@ -873,7 +877,6 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse, onDirtyChange }) {
               max={600}
             />
           </Grid>
-          <Grid item xs={12} sm={12} md={6} lg={3}></Grid>
         </Grid>
       </Box>
 

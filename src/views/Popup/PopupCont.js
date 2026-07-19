@@ -75,7 +75,6 @@ export default function PopupCont({
   handleOpenSetting,
   processActions,
   isContent = false,
-  onExpandedChange,
 }) {
   const i18n = useI18n();
   const { setting: contextSetting, updateSetting } = useSetting();
@@ -126,19 +125,8 @@ export default function PopupCont({
   );
 
   useEffect(() => {
-    onExpandedChange?.(showAdvanced || showAllServices || showSupport);
-  }, [onExpandedChange, showAdvanced, showAllServices, showSupport]);
-
-  useEffect(() => {
     if (showSupport) supportFirstLinkRef.current?.focus();
   }, [showSupport]);
-
-  useEffect(
-    () => () => {
-      onExpandedChange?.(false);
-    },
-    [onExpandedChange]
-  );
 
   const blacklistValue = contextSetting?.blacklist || "";
   const isInCurrentBlacklist = useMemo(() => {
@@ -481,7 +469,7 @@ export default function PopupCont({
         </label>
       </div>
 
-      <div>
+      <div className="kt-popup-services-block">
         <div className="kt-popup-section-label">
           {i18n("translate_service")}
         </div>
@@ -613,22 +601,7 @@ export default function PopupCont({
           {i18n("popup_advanced_options")}
           <ExpandMoreRoundedIcon />
         </button>
-        {!isContent && (
-          <Button
-            ref={supportTriggerRef}
-            id={supportTriggerId}
-            className="kt-popup-disclosure-support"
-            variant="text"
-            aria-controls={supportDisclosureId}
-            aria-expanded={showSupport}
-            onClick={() => setShowSupport((current) => !current)}
-          >
-            {i18n("popup_support")}
-          </Button>
-        )}
       </div>
-
-      {!isContent && supportDisclosure}
 
       {showAdvanced && (
         <div className="kt-popup-advanced">

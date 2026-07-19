@@ -48,6 +48,7 @@ const normalizeChunkText = (text) => {
  * @param {string} props.apiSlug 选用的翻译 API 唯一标识。
  * @param {Array<Object>} props.transApis 可用翻译 API 配置列表。
  * @param {boolean} [props.simpleStyle=false] 是否使用极简文本样式渲染。
+ * @param {boolean} [props.playgroundStyle=false] Whether to use the Playground field presentation.
  * @returns {JSX.Element|null} 单个翻译服务商的结果视图。
  */
 export default function TranCont({
@@ -58,6 +59,7 @@ export default function TranCont({
   transApis,
   simpleStyle = false,
   popupStyle = false,
+  playgroundStyle = false,
 }) {
   const i18n = useI18n();
   const [trText, setTrText] = useState("");
@@ -208,28 +210,44 @@ export default function TranCont({
   return (
     <Box>
       <TextField
+        className={
+          playgroundStyle
+            ? "kt-translation-text-field kt-translation-text-field--result"
+            : undefined
+        }
         size="small"
         label={`${i18n("translated_text")} - ${apiSetting.apiName}`}
         fullWidth
         multiline
+        minRows={playgroundStyle ? 2 : undefined}
         maxRows={10}
         sx={{
           "& textarea": {
-            resize: "vertical",
+            resize: playgroundStyle ? "none" : "vertical",
           },
         }}
         value={trText}
         helperText={error}
         InputProps={{
+          readOnly: true,
           startAdornment: loading ? <CircularProgress size={16} /> : null,
           endAdornment: (
             <Stack
+              className={
+                playgroundStyle
+                  ? "kt-translation-text-field__actions"
+                  : undefined
+              }
               direction="row"
-              sx={{
-                position: "absolute",
-                right: 0,
-                top: 0,
-              }}
+              sx={
+                playgroundStyle
+                  ? undefined
+                  : {
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                    }
+              }
             >
               {/* 复制当前译文；流式渲染期间复制到的是已经到达的部分文本。 */}
               <CopyBtn text={trText} title={i18n("copy")} />

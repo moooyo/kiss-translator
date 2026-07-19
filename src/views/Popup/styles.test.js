@@ -10,19 +10,18 @@ describe("Safari popup sizing", () => {
     expect(shellRule).toContain("width: 396px");
     expect(shellRule).toContain("min-width: 396px");
     expect(shellRule).not.toMatch(/max-(?:width|height):\s*100v[wh]/);
-    const expandedRule = POPUP_STYLES.match(
-      /\.kt-popup-scroll--expanded\s*\{([^}]*)\}/
-    )?.[1];
-
     expect(scrollRule).toContain("height: auto");
     expect(scrollRule).toContain("overflow: visible");
     expect(scrollRule).not.toContain("100vh");
-    expect(expandedRule).toContain("max-height: 492px");
-    expect(expandedRule).toContain("overflow-y: auto");
-    expect(expandedRule).toContain("scrollbar-width: none");
-    expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-scroll--expanded::-webkit-scrollbar[\s\S]*?display:\s*none;/
+    expect(POPUP_STYLES).not.toContain("kt-popup-scroll--expanded");
+    expect(POPUP_STYLES).not.toContain("kt-popup-scroll--text");
+    expect(POPUP_STYLES).not.toMatch(
+      /\.kt-popup-style-chips--open\s*\{[^}]*overflow-y:\s*auto;/
     );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-chrome\s*\{[^}]*position:\s*sticky;[^}]*top:\s*0;/
+    );
+    expect(POPUP_STYLES).toMatch(/@media\s*\(max-height:\s*520px\)/);
     expect(POPUP_STYLES).toMatch(
       /\.kt-popup-main-switch\.MuiSwitch-root\s*\{[^}]*width:\s*46px;[^}]*height:\s*28px;/
     );

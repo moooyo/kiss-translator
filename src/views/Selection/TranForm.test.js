@@ -26,10 +26,11 @@ jest.mock("react-markdown", () => {
 jest.mock("./TranCont", () => {
   const React = require("react");
 
-  return ({ apiSlug }) =>
+  return ({ apiSlug, playgroundStyle }) =>
     React.createElement("div", {
       "data-testid": "tran-cont",
       "data-api-slug": apiSlug,
+      "data-playground-style": String(Boolean(playgroundStyle)),
     });
 });
 
@@ -103,6 +104,34 @@ function renderTranForm(props = {}) {
 
   return { container, root };
 }
+
+describe("TranForm Playground presentation", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  test("marks the editable source and result fields for M3 styling", () => {
+    const { container, root } = renderTranForm({
+      apiSlugs: ["openai"],
+      isPlaygound: true,
+      simpleStyle: false,
+    });
+
+    const sourceField = container.querySelector(
+      ".kt-translation-text-field--source"
+    );
+    const actions = sourceField.querySelector(
+      ".kt-translation-text-field__actions"
+    );
+    const result = container.querySelector('[data-testid="tran-cont"]');
+
+    expect(sourceField.querySelector("textarea")).not.toBeNull();
+    expect(actions).not.toBeNull();
+    expect(result.getAttribute("data-playground-style")).toBe("true");
+
+    act(() => root.unmount());
+  });
+});
 
 describe("TranForm AI dictionary tab", () => {
   beforeEach(() => {

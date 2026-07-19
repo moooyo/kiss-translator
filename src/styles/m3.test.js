@@ -58,4 +58,10 @@ describe("M3 keyboard focus", () => {
     expect(M3_GLOBAL_CSS).toContain("@supports selector(:focus-visible)");
     expect(M3_GLOBAL_CSS).toContain("@supports (outline-color: color-mix");
   });
+
+  test("delegates MUI input focus rendering to the field container", () => {
+    expect(M3_GLOBAL_CSS).toMatch(
+      /\.kt-m3-root \.MuiInputBase-input:focus,[\s\S]*?\.MuiInputBase-input:focus-visible\s*\{[^}]*outline:\s*none;/
+    );
+  });
 });

@@ -625,6 +625,11 @@ export default function TranForm({
           {/* 原始文本输入区域 */}
           <Box>
             <TextField
+              className={
+                isPlaygound
+                  ? "kt-translation-text-field kt-translation-text-field--source"
+                  : undefined
+              }
               size="small"
               label={i18n("original_text")}
               fullWidth
@@ -634,7 +639,7 @@ export default function TranForm({
               maxRows={10}
               sx={{
                 "& textarea": {
-                  resize: "vertical",
+                  resize: isPlaygound ? "none" : "vertical",
                 },
               }}
               value={editText}
@@ -648,12 +653,21 @@ export default function TranForm({
               InputProps={{
                 endAdornment: (
                   <Stack
+                    className={
+                      isPlaygound
+                        ? "kt-translation-text-field__actions"
+                        : undefined
+                    }
                     direction="row"
-                    sx={{
-                      position: "absolute",
-                      right: 0,
-                      top: 0,
-                    }}
+                    sx={
+                      isPlaygound
+                        ? undefined
+                        : {
+                            position: "absolute",
+                            right: 0,
+                            top: 0,
+                          }
+                    }
                   >
                     {editMode ? (
                       /* 编辑模式：显示提交勾选图标 */
@@ -698,6 +712,7 @@ export default function TranForm({
             simpleStyle={simpleStyle}
             apiSlug={slug}
             transApis={transApis}
+            playgroundStyle={isPlaygound}
           />
         ))}
 

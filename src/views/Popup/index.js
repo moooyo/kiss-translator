@@ -92,7 +92,6 @@ export default function Popup() {
   const [activeTab, setActiveTab] = useState("page");
   const [isSeparate, setIsSeparate] = useState(false);
   const [globallyDisabled, setGloballyDisabled] = useState(false);
-  const [pageContentExpanded, setPageContentExpanded] = useState(false);
   const popupShellRef = useRef(null);
   const initialFocusGuardRef = useRef(true);
 
@@ -238,38 +237,34 @@ export default function Popup() {
       }}
     >
       <style>{POPUP_STYLES}</style>
-      <Header
-        openSeparateWindow={openSeparateWindow}
-        openSettings={handleOpenSetting}
-      />
-      <Tabs
-        className="kt-popup-tabs"
-        value={activeTab}
-        onChange={(_event, value) => setActiveTab(value)}
-        aria-label={i18n("translate")}
-        variant="fullWidth"
-      >
-        {tabs.map((tab) => (
-          <Tab
-            value={tab.value}
-            label={tab.label}
-            id={tab.tabId}
-            aria-controls={tab.panelId}
-            key={tab.value}
-          />
-        ))}
-      </Tabs>
+      <div className="kt-popup-chrome">
+        <Header
+          openSeparateWindow={openSeparateWindow}
+          openSettings={handleOpenSetting}
+        />
+        <Tabs
+          className="kt-popup-tabs"
+          value={activeTab}
+          onChange={(_event, value) => setActiveTab(value)}
+          aria-label={i18n("translate")}
+          variant="fullWidth"
+        >
+          {tabs.map((tab) => (
+            <Tab
+              value={tab.value}
+              label={tab.label}
+              id={tab.tabId}
+              aria-controls={tab.panelId}
+              key={tab.value}
+            />
+          ))}
+        </Tabs>
+      </div>
       <div
         id="kt-popup-active-panel"
         role="tabpanel"
         aria-labelledby={`kt-popup-${activeTab}-tab`}
-        className={`kt-popup-scroll ${
-          activeTab === "text"
-            ? "kt-popup-scroll--text"
-            : pageContentExpanded
-              ? "kt-popup-scroll--expanded"
-              : ""
-        }`}
+        className="kt-popup-scroll"
       >
         {activeTab === "text" ? (
           <TranslationTab />
@@ -292,7 +287,6 @@ export default function Popup() {
             setRule={setRule}
             setSetting={setSetting}
             handleOpenSetting={handleOpenSetting}
-            onExpandedChange={setPageContentExpanded}
           />
         ) : isLoading ? (
           <div className="kt-popup-loading" role="status">

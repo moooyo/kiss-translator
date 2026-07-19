@@ -36,7 +36,7 @@ export default function OverviewHero() {
     "—";
   const shortcuts = [
     [i18n("popup_translate_page"), shortcutMap.page],
-    [i18n("popup_text_translation"), shortcutMap.popup],
+    [i18n("open_menu"), shortcutMap.popup],
     [i18n("text_style_alt"), shortcutMap.style],
     [i18n("selection_translate"), shortcutMap.selection],
     [i18n("input_translate"), shortcutMap.input],

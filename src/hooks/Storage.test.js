@@ -212,4 +212,62 @@ describe("useStorage remote sync", () => {
 
     host.unmount();
   });
+
+  test("does not let a late initial read overwrite a newer storage event", async () => {
+    let resolveInitialRead;
+    storage.getObj.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInitialRead = resolve;
+        })
+    );
+    const host = createHookHost();
+    host.render();
+    await flushEffects();
+
+    act(() => {
+      storageListeners.forEach((listener) => listener({ remote: "new" }));
+    });
+    await act(async () => {
+      resolveInitialRead({ local: "stale" });
+      await Promise.resolve();
+    });
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    expect(host.hookResult.data).toEqual({ remote: "new" });
+    expect(storage.setObj).not.toHaveBeenCalledWith("local-setting", {
+      local: "stale",
+    });
+
+    host.unmount();
+  });
+
+  test("syncs a local edit made after an external update", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    act(() => {
+      storageListeners.forEach((listener) => listener({ remote: true }));
+    });
+    await flushEffects();
+
+    await act(async () => {
+      host.hookResult.save((current) => ({
+        ...current,
+        localEdit: true,
+      }));
+    });
+    await flushEffects();
+
+    const expected = { remote: true, localEdit: true };
+    expect(storage.setObj).toHaveBeenCalledWith("local-setting", expected);
+    expect(syncData).toHaveBeenCalledWith("kiss-setting_v2.json", expected);
+
+    host.unmount();
+  });
 });

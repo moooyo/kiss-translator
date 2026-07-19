@@ -93,7 +93,7 @@ export default function InputSetting() {
               value={Number(triggerCount)}
               label={i18n("shortcut_press_count")}
               onChange={(value) => updateInputRule({ triggerCount: value })}
-              items={[1, 2, 3].map((value) => ({
+              items={[1, 2, 3, 4, 5].map((value) => ({
                 value,
                 label: `${value}×`,
               }))}
@@ -179,19 +179,6 @@ export default function InputSetting() {
                 unit=" ms"
                 label={i18n("combo_timeout")}
                 onChange={(value) => updateInputRule({ triggerTime: value })}
-              />
-            </SettingsRow>
-            <SettingsRow label={i18n("shortcut_press_count")}>
-              <SettingsSelect
-                value={triggerCount}
-                label={i18n("shortcut_press_count")}
-                onChange={(value) =>
-                  updateInputRule({ triggerCount: Number(value) })
-                }
-                options={[1, 2, 3, 4, 5].map((value) => ({
-                  value,
-                  label: String(value),
-                }))}
               />
             </SettingsRow>
           </SettingsCard>

@@ -25,7 +25,7 @@ export class YouTubeSubtitleList {
   constructor(
     videoElement,
     i18n = () => "",
-    { enableHoverLookup = false } = {}
+    { enableHoverLookup = false, theme = {} } = {}
   ) {
     this.videoEl = videoElement;
     this.i18n = i18n;
@@ -88,7 +88,7 @@ export class YouTubeSubtitleList {
     window.addEventListener("message", this.handleJumpMessage);
 
     if (this.enableHoverLookup) {
-      addWordHoverStyles();
+      addWordHoverStyles(theme);
       this._wordTooltipController = new WordTooltipController({
         getVideoContainer: () => this._getPlayerElement(),
         getTimestamp: () => this.videoEl.currentTime * 1000,

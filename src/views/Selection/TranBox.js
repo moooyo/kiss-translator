@@ -14,7 +14,7 @@ import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useI18n } from "../../hooks/I18n";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import TranForm from "./TranForm.js";
 import { MSG_OPEN_SEPARATE_WINDOW } from "../../config/msg.js";
 import { sendBgMsg } from "../../libs/msg.js";
@@ -73,8 +73,18 @@ function TranBoxHeader({
         value={activeView}
         onChange={setActiveView}
         items={[
-          { value: "translation", label: i18n("translate") },
-          { value: "dictionary", label: i18n("dictionary") },
+          {
+            value: "translation",
+            label: i18n("translate"),
+            tabId: "kt-tranbox-translation-tab",
+            panelId: "kt-tranbox-active-panel",
+          },
+          {
+            value: "dictionary",
+            label: i18n("dictionary"),
+            tabId: "kt-tranbox-dictionary-tab",
+            panelId: "kt-tranbox-active-panel",
+          },
         ]}
       />
       <span className="kt-tranbox-header__actions">
@@ -168,6 +178,9 @@ function TranBoxContent({
 
   return (
     <Box
+      id="kt-tranbox-active-panel"
+      role="tabpanel"
+      aria-labelledby={`kt-tranbox-${activeView}-tab`}
       className="kt-tranbox-content"
       sx={{
         p: simpleStyle ? 1 : 2,
@@ -226,7 +239,17 @@ function TranBoxContent({
  * 划词翻译框的主容器入口组件 (控制拖拽外壳及规则分发)
  */
 export default function TranBox(props) {
-  const [activeView, setActiveView] = useState("translation");
+  const defaultView = getDefaultTranBoxView(
+    props.text,
+    props.tranboxSetting.singleWordNoTrans
+  );
+  const [activeView, setActiveView] = useState(defaultView);
+
+  useEffect(() => {
+    setActiveView(
+      getDefaultTranBoxView(props.text, props.tranboxSetting.singleWordNoTrans)
+    );
+  }, [props.text, props.tranboxSetting.singleWordNoTrans]);
 
   const simpleStyle = props.simpleStyle;
   const setSimpleStyle = props.setSimpleStyle;
@@ -294,4 +317,8 @@ export default function TranBox(props) {
       </ThemeProvider>
     </SettingProvider>
   );
+}
+
+export function getDefaultTranBoxView(text, singleWordNoTrans) {
+  return singleWordNoTrans && isValidWord(text) ? "dictionary" : "translation";
 }

@@ -10,7 +10,7 @@ export default function Header({ onDrawerToggle, navigationOpen }) {
     <header className="kt-options-mobile-header">
       <M3IconButton
         onClick={onDrawerToggle}
-        aria-label="Open navigation"
+        aria-label={i18n("options_open_navigation")}
         aria-controls="kt-options-navigation"
         aria-expanded={navigationOpen}
       >

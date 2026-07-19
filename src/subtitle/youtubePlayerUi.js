@@ -2,6 +2,7 @@ import { APP_NAME } from "../config";
 import DomManager from "../libs/domManager.js";
 import { createLogoSVG } from "../libs/svg.js";
 import { Menus } from "./Menus.js";
+import { resolveM3Colors, resolveM3ThemeMode } from "../styles/m3.js";
 
 /**
  * YouTube 播放器 UI 层。
@@ -14,7 +15,12 @@ export const YT_CAPTION_SELECTOR = "#ytp-caption-window-container";
 export const YT_AD_SELECTOR = ".video-ads";
 export const YT_SUBTITLE_BUTTON_SELECTOR = "button.ytp-subtitles-button";
 
-function renderToggleButton(button, selected = false) {
+function renderToggleButton(button, selected = false, setting = {}) {
+  const prefersDark =
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const mode = resolveM3ThemeMode(setting.darkMode, prefersDark);
+  const colors = resolveM3Colors(mode, setting.brandColor);
   const label = document.createElement("span");
   label.textContent = APP_NAME;
   label.style.cssText =
@@ -24,9 +30,9 @@ function renderToggleButton(button, selected = false) {
   icon.style.height = "20px";
   button.replaceChildren(icon, label);
   button.style.background = selected
-    ? "rgba(211,227,253,.95)"
+    ? colors.primaryContainer
     : "rgba(255,255,255,.16)";
-  button.style.color = selected ? "#041E49" : "#FFFFFF";
+  button.style.color = selected ? colors.onPrimaryContainer : "#FFFFFF";
 }
 
 /**
@@ -133,7 +139,7 @@ export class YouTubePlayerUi {
       backdropFilter: "blur(8px)",
       transition: "background .3s, transform .2s",
     });
-    renderToggleButton(toggleButton);
+    renderToggleButton(toggleButton, false, this.#getSetting());
     kissControls.appendChild(toggleButton);
 
     // 使用 DomManager 挂载 React 菜单，避免直接把菜单结构散落到 provider 编排层。
@@ -148,12 +154,16 @@ export class YouTubePlayerUi {
     toggleButton.onclick = () => {
       if (!this.#isMenuShow) {
         this.#isMenuShow = true;
-        if (this.#toggleButton) renderToggleButton(this.#toggleButton, true);
+        if (this.#toggleButton) {
+          renderToggleButton(this.#toggleButton, true, this.#getSetting());
+        }
         this.#menuManager.show();
         this.updateMenuProps();
       } else {
         this.#isMenuShow = false;
-        if (this.#toggleButton) renderToggleButton(this.#toggleButton);
+        if (this.#toggleButton) {
+          renderToggleButton(this.#toggleButton, false, this.#getSetting());
+        }
         this.#menuManager.hide();
       }
     };

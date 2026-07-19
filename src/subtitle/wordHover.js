@@ -1,30 +1,50 @@
 import { apiMicrosoftDict } from "../apis/index.js";
 import { logger } from "../libs/log.js";
 import { trustedTypesHelper } from "../libs/trustedTypes.js";
+import {
+  createM3CssVariableDeclarations,
+  resolveM3Colors,
+} from "../styles/m3.js";
 
 /**
  * 动态向网页 document.head 中注入生词 hover 及详情气泡弹窗所需的 CSS 样式
  */
-export const addWordHoverStyles = () => {
-  // 如果已经注入过该样式表，直接返回，避免重复创建
-  if (document.getElementById("kiss-word-hover-styles")) return;
+export const addWordHoverStyles = ({
+  brandColor = "blue",
+  darkMode = "auto",
+} = {}) => {
+  const lightColors = resolveM3Colors("light", brandColor);
+  const darkColors = resolveM3Colors("dark", brandColor);
+  const baseColors = darkMode === "dark" ? darkColors : lightColors;
+  const baseVariables = createM3CssVariableDeclarations(baseColors);
+  const autoDarkStyles =
+    darkMode === "auto"
+      ? `
+    @media (prefers-color-scheme: dark) {
+      .kiss-word-tooltip { ${createM3CssVariableDeclarations(darkColors)} }
+      .kiss-word-hover { background: ${darkColors.primaryContainer}; }
+    }`
+      : "";
 
-  const style = document.createElement("style");
+  const style =
+    document.getElementById("kiss-word-hover-styles") ||
+    document.createElement("style");
   style.id = "kiss-word-hover-styles";
   style.textContent = `
     /* 鼠标 hover 的单词样式：呈现下划线，指示可点击查词 */
     .kiss-word-hover {
       cursor: pointer;
       border-radius: 5px;
-      background: rgba(168, 199, 250, .32);
+      background: ${baseColors.primaryContainer};
       text-decoration: none;
     }
 
     /* 查词气泡弹窗主体样式 */
     .kiss-word-tooltip {
+      ${baseVariables}
       position: fixed;
-      background: #FFFFFF;
-      color: #1F1F1F;
+      background: var(--kt-sf0);
+      color: var(--kt-on);
       border-radius: 16px;
       padding: 12px 14px;
       font-size: 13px;
@@ -32,7 +52,7 @@ export const addWordHoverStyles = () => {
       max-width: 240px;
       word-wrap: break-word;
       box-shadow: 0 4px 8px 3px rgba(0,0,0,.1), 0 1px 3px rgba(0,0,0,.18);
-      border: 1px solid #C9CDD3;
+      border: 1px solid var(--kt-linev);
       font-family: "Google Sans Flex", "Noto Sans SC", system-ui, sans-serif;
     }
 
@@ -44,14 +64,14 @@ export const addWordHoverStyles = () => {
       margin-bottom: 8px;
       font-weight: bold;
       font-size: 16px;
-      color: #1F1F1F;
+      color: var(--kt-on);
     }
 
     /* 关闭气泡弹窗的 X 按钮 */
     .kiss-word-tooltip-close {
       background: none;
       border: none;
-      color: #444746;
+      color: var(--kt-onv);
       cursor: pointer;
       font-size: 18px;
       padding: 0;
@@ -64,14 +84,14 @@ export const addWordHoverStyles = () => {
     }
 
     .kiss-word-tooltip-close:hover {
-      color: #1F1F1F;
-      background: #F0F4F9;
+      color: var(--kt-on);
+      background: var(--kt-sf2);
       border-radius: 50%;
     }
 
     /* 释义加载中状态文案 */
     .kiss-word-loading {
-      color: #444746;
+      color: var(--kt-onv);
       font-style: italic;
     }
 
@@ -85,14 +105,14 @@ export const addWordHoverStyles = () => {
       display: inline-block;
       padding: 2px 6px;
       border-radius: 999px;
-      background: #C4EED0;
-      color: #072711;
+      background: var(--kt-terc);
+      color: var(--kt-onterc);
       font-weight: 700;
     }
 
     /* 音标字符样式 */
     .kiss-word-phonetic {
-      color: #444746;
+      color: var(--kt-onv);
       font-style: italic;
       margin-right: 10px;
     }
@@ -101,7 +121,7 @@ export const addWordHoverStyles = () => {
     .kiss-word-example {
       margin-top: 10px;
       padding-top: 8px;
-      border-top: 1px solid #C9CDD3;
+      border-top: 1px solid var(--kt-linev);
     }
 
     .kiss-word-example-title {
@@ -116,28 +136,13 @@ export const addWordHoverStyles = () => {
 
     /* 例句中文翻译 */
     .kiss-word-example-translation {
-      color: #444746;
+      color: var(--kt-onv);
       font-style: italic;
     }
 
-    @media (prefers-color-scheme: dark) {
-      .kiss-word-tooltip {
-        background: #1E1F20;
-        color: #E3E3E3;
-        border-color: #3F4245;
-        box-shadow: 0 4px 10px 3px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.5);
-      }
-      .kiss-word-tooltip-header { color: #E3E3E3; }
-      .kiss-word-tooltip-close,
-      .kiss-word-loading,
-      .kiss-word-phonetic,
-      .kiss-word-example-translation { color: #C4C7C5; }
-      .kiss-word-tooltip-close:hover { color: #E3E3E3; background: #282A2C; }
-      .kiss-word-pos { background: #0F5223; color: #C4EED0; }
-      .kiss-word-example { border-color: #3F4245; }
-    }
+    ${autoDarkStyles}
   `;
-  document.head.appendChild(style);
+  if (!style.isConnected) document.head.appendChild(style);
 };
 
 /**
@@ -219,6 +224,7 @@ export class WordTooltipController {
   #handleWordHover(event, getTimestamp) {
     const target = event.target;
     if (!target.classList.contains("kiss-subtitle-word")) return;
+    if (this.isPinned) return;
 
     if (this.hoverTimeout) {
       clearTimeout(this.hoverTimeout);

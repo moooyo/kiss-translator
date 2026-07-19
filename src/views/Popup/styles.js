@@ -173,10 +173,12 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-site__actions .kt-m3-button:first-child { flex: 1; }
 .kt-popup-site__actions .kt-m3-icon-button { width: 36px; height: 36px; }
 
-.kt-popup-disclosure { width: 100%; min-height: 38px; display: flex; align-items: center; gap: 8px; padding: 0 4px; border: 0; background: transparent; color: var(--kt-onv); cursor: pointer; font-size: 12.5px; font-weight: 650; }
+.kt-popup-disclosure-row { display: flex; align-items: center; gap: 4px; }
+.kt-popup-disclosure { width: auto; min-height: 38px; display: flex; flex: 1; align-items: center; gap: 8px; padding: 0 4px; border: 0; background: transparent; color: var(--kt-onv); cursor: pointer; font-size: 12.5px; font-weight: 650; }
 .kt-popup-disclosure::after { content: ""; height: 1px; flex: 1; order: -1; background: var(--kt-linev); }
 .kt-popup-disclosure svg { transition: transform .35s var(--kt-spring); }
 .kt-popup-disclosure[aria-expanded="true"] svg { transform: rotate(180deg); }
+.kt-popup-disclosure-support { min-height: 34px; padding-inline: 9px; font-size: 11px; }
 .kt-popup-advanced { display: flex; flex-direction: column; gap: 12px; animation: kt-m3-rise .35s var(--kt-spring); }
 .kt-popup-style-chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .kt-popup-style-chips--open { max-height: 188px; padding: 2px; overflow-y: auto; overscroll-behavior: contain; }
@@ -235,6 +237,10 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-dictionary .MuiTab-root { min-height: 36px; font-size: 11.5px; }
 .kt-popup-empty { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--kt-onv); text-align: center; }
 .kt-popup-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.kt-popup-disabled { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin: 14px 18px 18px; padding: 28px 24px; border: 1px solid var(--kt-linev); border-radius: 24px; background: var(--kt-sf1); color: var(--kt-onv); text-align: center; }
+.kt-popup-disabled strong { color: var(--kt-on); font-size: 16px; }
+.kt-popup-disabled span { max-width: 280px; font-size: 12px; line-height: 1.55; }
+.kt-popup-disabled .kt-m3-button { margin-top: 6px; }
 
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-content { gap: 9px; padding: 10px 16px 12px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero { padding: 12px 14px; border-radius: 20px; }

@@ -45,8 +45,18 @@ describe("M3Segmented", () => {
           onChange={jest.fn()}
           ariaLabel="Theme"
           items={[
-            { value: "blue", label: "Google blue" },
-            { value: "cyan", label: "Cyan" },
+            {
+              value: "blue",
+              label: "Google blue",
+              tabId: "blue-tab",
+              panelId: "blue-panel",
+            },
+            {
+              value: "cyan",
+              label: "Cyan",
+              tabId: "cyan-tab",
+              panelId: "cyan-panel",
+            },
           ]}
         />
       );
@@ -57,6 +67,8 @@ describe("M3Segmented", () => {
     );
     expect(selectedButton.querySelector("svg")).toBeNull();
     expect(selectedButton.title).toBe("Google blue");
+    expect(selectedButton.id).toBe("blue-tab");
+    expect(selectedButton.getAttribute("aria-controls")).toBe("blue-panel");
     expect(
       selectedButton.querySelector(".kt-m3-segmented__label").textContent
     ).toBe("Google blue");

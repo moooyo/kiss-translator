@@ -507,12 +507,16 @@ export class YouTubeCaptionProvider {
       displayOrder,
       apiSlug,
       windowStyle,
+      brandColor,
+      darkMode,
     } = this.#setting;
     return {
       i18n: this.#i18n,
       updateSetting: this.updateSetting.bind(this),
       downloadSubtitle: this.downloadSubtitle.bind(this),
       openSettings: this.openSubtitleSettings.bind(this),
+      brandColor,
+      darkMode,
       transApis,
       progressed: this.#progressedNum,
       formData: {
@@ -1032,6 +1036,10 @@ export class YouTubeCaptionProvider {
           this.#setting.hoverLookupMode,
           this.#setting.enhanceMode
         ),
+        theme: {
+          brandColor: this.#setting.brandColor,
+          darkMode: this.#setting.darkMode,
+        },
       });
       this.#subtitleListManager.initialize(
         this.#subtitles,

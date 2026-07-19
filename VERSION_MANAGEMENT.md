@@ -27,15 +27,16 @@ push to `dev`, and manual dispatches. It provides these independent gates:
 1. GitHub Actions workflow validation with `actionlint`.
 2. Version and formatting checks on Ubuntu.
 3. The complete unit-test suite on Ubuntu and Windows.
-4. A full multi-target build after all earlier gates pass.
+4. A native Safari Web Extension conversion on macOS.
+5. A full multi-target build after all earlier gates pass.
 
 Superseded runs on the same branch or pull request are cancelled automatically.
 Successful non-PR builds are retained as short-lived smoke-build artifacts.
 
 Repository administrators should protect `dev` and require the
 `Build all distribution targets` check before merging. That job depends on the
-workflow lint, quality, and complete Ubuntu/Windows test matrix, so requiring it
-also enforces every earlier gate.
+workflow lint, quality, complete Ubuntu/Windows test matrix, and the macOS
+Safari conversion, so requiring it also enforces every earlier gate.
 
 ## Version source of truth
 
@@ -75,9 +76,11 @@ that branch through a reviewed pull request:
 5. Merge the pull request into `dev` after CI passes.
 
 `pnpm build+zip` is the local end-to-end release rehearsal. It builds Chrome,
-Edge, Firefox, Thunderbird, web, and userscript outputs; creates the iOS
-userscript variant and static rule files; generates release ZIP files; and
-verifies their contents and versions.
+Edge, Safari Web Extension output, Firefox, Thunderbird, web, and userscript
+outputs; creates the iOS userscript variant and static rule files; generates
+release ZIP files named `kiss-translator_vX.Y.Z_<target>.zip`; and verifies
+their contents and versions. The native Safari Xcode conversion is verified by
+the macOS CI job.
 
 ## Publishing a release
 

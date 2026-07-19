@@ -53,17 +53,32 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const skipRemoteSyncValueRef = useRef();
   const externalStorageValueRef = useRef();
 
-  // 首次挂载时从本地存储异步加载初始数据
+  // Load and subscribe in one lifecycle so a late initial read cannot
+  // overwrite a newer value delivered by the storage change channel.
   useEffect(() => {
     let isMounted = true;
+    let storageRevision = 0;
+
+    const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
+      if (!isMounted) return;
+      storageRevision += 1;
+      const nextValue = storedValue ?? defaultVal;
+      setData((currentValue) => {
+        if (isSameStorageValue(currentValue, nextValue)) return currentValue;
+        externalStorageValueRef.current = nextValue;
+        skipRemoteSyncValueRef.current = { value: nextValue };
+        return nextValue;
+      });
+    });
 
     const loadInitialData = async () => {
+      const revisionAtStart = storageRevision;
       try {
         const storedVal = await storage.getObj(key);
+        if (!isMounted || storageRevision !== revisionAtStart) return;
         if (storedVal === undefined || storedVal === null) {
-          // 如果存储中没有该值，写入初始默认值
           await storage.setObj(key, defaultVal);
-        } else if (isMounted) {
+        } else {
           setData(storedVal);
         }
       } catch (err) {
@@ -79,21 +94,9 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
 
     return () => {
       isMounted = false;
+      unsubscribe?.();
     };
   }, [key, defaultVal]);
-
-  useEffect(() => {
-    if (!storage.subscribeObj) return undefined;
-    return storage.subscribeObj(key, (storedValue) => {
-      const nextValue = storedValue ?? defaultVal;
-      setData((currentValue) => {
-        if (isSameStorageValue(currentValue, nextValue)) return currentValue;
-        externalStorageValueRef.current = nextValue;
-        skipRemoteSyncValueRef.current = { value: nextValue };
-        return nextValue;
-      });
-    });
-  }, [defaultVal, key]);
 
   // 远端同步处理器
   const runSync = useCallback(async (keyToSync, valueToSync) => {

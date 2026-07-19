@@ -24,6 +24,8 @@ function renderMenus({
   downloadSubtitle = jest.fn(),
   openSettings,
   transApis = [],
+  brandColor,
+  darkMode,
 } = {}) {
   const container = document.createElement("div");
   document.body.appendChild(container);
@@ -47,6 +49,8 @@ function renderMenus({
         downloadSubtitle={downloadSubtitle}
         openSettings={openSettings}
         transApis={transApis}
+        brandColor={brandColor}
+        darkMode={darkMode}
       />
     );
   });
@@ -65,6 +69,18 @@ function renderMenus({
 describe("subtitle Menus", () => {
   test("keeps immediate translation enabled by default", () => {
     expect(DEFAULT_SUBTITLE_SETTING.autoTranslate).toBe(true);
+  });
+
+  test("uses the shared brand and dark-mode token set", () => {
+    const view = renderMenus({ brandColor: "violet", darkMode: "dark" });
+    const panel = view.container.querySelector(".kt-subtitle-panel");
+
+    expect(panel.dataset.theme).toBe("dark");
+    expect(panel.dataset.brand).toBe("violet");
+    expect(panel.style.getPropertyValue("--kt-pri")).toBe("#D0BCFF");
+    expect(panel.style.getPropertyValue("--kt-bg")).toBe("#131314");
+
+    view.cleanup();
   });
 
   test("renders translation first and updates the current video state", () => {

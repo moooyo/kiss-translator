@@ -38,7 +38,6 @@ import {
   getSettingWithDefault,
   tryInitDefaultData,
   runDataMigration,
-  setSetting,
 } from "./libs/storage";
 import { trySyncSettingAndRules } from "./libs/sync";
 import { fetchHandle, fetchStreamNative } from "./libs/fetch";
@@ -51,7 +50,7 @@ import { injectInlineJsBg, injectInternalCss } from "./libs/injector";
 import { kissLog, logger } from "./libs/log";
 import { chromeDetect, chromeTranslate } from "./libs/builtinAI";
 import { sha256 } from "./libs/utils";
-import { mergeSettingPatch } from "./libs/settingPatch";
+import { applyRuntimeSettingPatch } from "./libs/runtimeSettingPatch";
 
 globalThis.__KISS_CONTEXT__ = "background";
 
@@ -527,36 +526,6 @@ const injectToCurrentTab = async (func, args) => {
     world: "MAIN", // 运行在前台页面的真实主环境 (MAIN world)，而非隔离环境 (ISOLATED)
   });
 };
-
-async function applyRuntimeSettingPatch(
-  { patch = {}, scope = "all" } = {},
-  sender
-) {
-  const currentSetting = await getSettingWithDefault();
-  const nextSetting = mergeSettingPatch(currentSetting, patch);
-  await setSetting(nextSetting);
-
-  let tabs;
-  if (scope === "current") {
-    const tabId = sender?.tab?.id ?? (await getCurTabId());
-    tabs = tabId ? [{ id: tabId }] : [];
-  } else {
-    tabs = await browser.tabs.query({});
-  }
-
-  const message = {
-    action: MSG_RUNTIME_SETTING_PATCH,
-    args: { patch },
-  };
-  const results = await Promise.allSettled(
-    tabs
-      .filter((tab) => Number.isInteger(tab.id))
-      .map((tab) => browser.tabs.sendMessage(tab.id, message))
-  );
-  return {
-    delivered: results.filter((result) => result.status === "fulfilled").length,
-  };
-}
 
 // 后台消息指令与对应处理器映射表
 const messageHandlers = {

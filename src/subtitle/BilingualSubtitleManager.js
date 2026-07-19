@@ -99,7 +99,7 @@ export class BilingualSubtitleManager {
 
     // 如果启用了悬浮背词/查词翻译功能，将所需 CSS 样式表写入 head
     if (this.#isHoverLookupEnabled()) {
-      addWordHoverStyles();
+      addWordHoverStyles(this.#setting);
       this.#wordTooltipController = new WordTooltipController({
         getVideoContainer: () => this.#videoEl.parentElement?.parentElement,
         getTimestamp: () => this.#getCurrentSubtitleStartTime(),

@@ -100,8 +100,14 @@ describe("Popup focus", () => {
 
     const shell = container.querySelector(".kt-popup-shell");
     const select = container.querySelector("select");
+    const selectedTab = container.querySelector(
+      '[role="tab"][aria-selected="true"]'
+    );
+    const panel = container.querySelector('[role="tabpanel"]');
     expect(select).not.toBeNull();
     expect(document.activeElement).toBe(shell);
+    expect(selectedTab.getAttribute("aria-controls")).toBe(panel.id);
+    expect(panel.getAttribute("aria-labelledby")).toBe(selectedTab.id);
 
     await act(async () => {
       select.focus();
@@ -116,6 +122,30 @@ describe("Popup focus", () => {
       await new Promise((resolve) => window.setTimeout(resolve, 20));
     });
     expect(document.activeElement).toBe(select);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  test("renders a paused state when the global switch is disabled", async () => {
+    mockSendTabMsg.mockResolvedValue({
+      disabled: true,
+      rule: { pattern: "*", transOpen: "true" },
+      setting: { extensionEnabled: false, darkMode: "auto" },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Popup />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(container.querySelector(".kt-popup-disabled")).not.toBeNull();
+    expect(container.textContent).toContain("popup_extension_disabled");
+    expect(container.textContent).not.toContain("load_setting_err");
 
     act(() => root.unmount());
     container.remove();

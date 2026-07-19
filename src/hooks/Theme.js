@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { CssBaseline, GlobalStyles } from "@mui/material";
 import { useDarkMode } from "./ColorMode";
@@ -9,8 +9,10 @@ import {
   M3_FONT_FAMILY,
   M3_GLOBAL_CSS,
   resolveM3Colors,
+  resolveM3ThemeMode,
 } from "../styles/m3";
 import { getMuiSwitchStyleOverrides } from "./themeStyles";
+import { useSystemDarkPreference } from "./SystemColorScheme";
 
 export { getMuiSwitchStyleOverrides } from "./themeStyles";
 
@@ -20,32 +22,16 @@ export default function Theme({ children, options = {}, styles = {} }) {
   const brandColor = ["blue", "cyan", "violet"].includes(setting.brandColor)
     ? setting.brandColor
     : "blue";
-  const [systemMode, setSystemMode] = useState(THEME_LIGHT);
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return undefined;
-    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-    const handleChange = () => {
-      setSystemMode(mediaQuery.matches ? THEME_DARK : THEME_LIGHT);
-    };
-    handleChange();
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
+  const systemPrefersDark = useSystemDarkPreference();
 
   const previewMode =
     process.env.NODE_ENV === "development"
       ? new URLSearchParams(window.location.search).get("theme")
       : null;
   const resolvedMode =
-    previewMode === THEME_DARK
-      ? THEME_DARK
-      : previewMode === THEME_LIGHT
-        ? THEME_LIGHT
-        : darkMode === THEME_DARK ||
-            (darkMode === "auto" && systemMode === THEME_DARK)
-          ? THEME_DARK
-          : THEME_LIGHT;
+    previewMode === THEME_DARK || previewMode === THEME_LIGHT
+      ? previewMode
+      : resolveM3ThemeMode(darkMode, systemPrefersDark);
   const colors = useMemo(
     () => resolveM3Colors(resolvedMode, brandColor),
     [brandColor, resolvedMode]

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Navigator from "./Navigator";
@@ -9,6 +9,7 @@ export default function Layout() {
   const location = useLocation();
   const i18n = useI18n();
   const [navigationOpen, setNavigationOpen] = useState(false);
+  const navigationTriggerRef = useRef(null);
   const [latestVersion, setLatestVersion] = useState("");
   const [isMobile, setIsMobile] = useState(
     () =>
@@ -61,6 +62,38 @@ export default function Layout() {
     document.body.scrollTop = 0;
   }, [location.pathname]);
 
+  useEffect(() => {
+    if (!isMobile || !navigationOpen) return undefined;
+    const navigation = document.getElementById("kt-options-navigation");
+    if (!navigation) return undefined;
+    getNavigationFocusTargets(navigation)[0]?.focus();
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setNavigationOpen(false);
+        return;
+      }
+      const focusTargets = getNavigationFocusTargets(navigation);
+      if (event.key !== "Tab" || focusTargets.length === 0) return;
+      const first = focusTargets[0];
+      const last = focusTargets[focusTargets.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      navigationTriggerRef.current?.focus();
+    };
+  }, [isMobile, navigationOpen]);
+
   const page = useMemo(() => {
     const pages = {
       "/": [i18n("options_overview"), i18n("options_overview_description")],
@@ -106,7 +139,10 @@ export default function Layout() {
       <style>{OPTIONS_STYLES}</style>
       <Header
         navigationOpen={navigationOpen}
-        onDrawerToggle={() => setNavigationOpen(true)}
+        onDrawerToggle={(event) => {
+          navigationTriggerRef.current = event.currentTarget;
+          setNavigationOpen(true);
+        }}
       />
       <div className="kt-options-layout">
         <Navigator open={navigationOpen} isMobile={isMobile} />
@@ -114,7 +150,7 @@ export default function Layout() {
           <button
             type="button"
             className="kt-options-overlay kt-options-overlay--open"
-            aria-label="Close navigation"
+            aria-label={i18n("options_close_navigation")}
             onClick={() => setNavigationOpen(false)}
           />
         )}
@@ -148,4 +184,12 @@ export default function Layout() {
       </div>
     </div>
   );
+}
+
+export function getNavigationFocusTargets(navigation) {
+  return Array.from(
+    navigation.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => !element.hasAttribute("hidden"));
 }

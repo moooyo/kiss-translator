@@ -29,8 +29,10 @@ export const getCurTabId = async () => {
  * @param {Object} args 指令参数数据
  * @returns {Promise<*>} 后台响应的数据
  */
-export const sendBgMsg = (action, args) =>
-  browser?.runtime.sendMessage({ action, args });
+export const sendBgMsg = async (action, args) => {
+  if (!browser?.runtime?.sendMessage) return undefined;
+  return browser.runtime.sendMessage({ action, args });
+};
 
 /**
  * 向当前活跃页面标签发送通信消息。

@@ -218,7 +218,7 @@ function StyleAccordion({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
 export default function StylesSetting() {
   const i18n = useI18n();
   const { setting, updateSetting } = useSetting();
-  const { list: rules, putLatest: updateLatestRule } = useRules();
+  const { list: rules, put: updateRule } = useRules();
   const [showStyleManager, setShowStyleManager] = useState(false);
   // 自定义 CSS 列表 Hook
   const { customStyles, addStyle, deleteStyle, updateStyle } = useStyleList();
@@ -295,7 +295,7 @@ export default function StylesSetting() {
               checked={richTextEnabled}
               label={i18n("richtext_alt")}
               onChange={(checked) =>
-                updateLatestRule("*", {
+                updateRule("*", {
                   hasRichText: checked ? "true" : "false",
                 })
               }

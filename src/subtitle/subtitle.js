@@ -55,6 +55,8 @@ export function runSubtitle({ href, setting }) {
       // 将整理好的字幕配置、翻译 API 配置、所有已启用的 API 列表以及 UI 界面语言传递给对应的 provider
       return provider.start({
         ...subtitleSetting,
+        brandColor: setting.brandColor,
+        darkMode: setting.darkMode,
         apiSetting,
         transApis,
         prompts: setting.prompts,

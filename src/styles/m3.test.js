@@ -1,8 +1,10 @@
 import {
+  createM3CssVariableDeclarations,
   createM3CssVariables,
   M3_BRAND_COLORS,
   M3_GLOBAL_CSS,
   resolveM3Colors,
+  resolveM3ThemeMode,
 } from "./m3";
 
 describe("M3 brand colors", () => {
@@ -31,6 +33,10 @@ describe("M3 brand colors", () => {
         "--kt-on": "#E3E3E3",
       })
     );
+    expect(createM3CssVariableDeclarations(colors)).toContain(
+      "--kt-pri: #4FD8EB;"
+    );
+    expect(resolveM3ThemeMode("auto", true)).toBe("dark");
   });
 });
 

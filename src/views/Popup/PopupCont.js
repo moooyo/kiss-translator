@@ -683,15 +683,27 @@ export default function PopupCont({
         </div>
       </div>
 
-      <button
-        type="button"
-        className="kt-popup-disclosure"
-        aria-expanded={showAdvanced}
-        onClick={() => setShowAdvanced((current) => !current)}
-      >
-        {i18n("popup_advanced_options")}
-        <ExpandMoreRoundedIcon />
-      </button>
+      <div className="kt-popup-disclosure-row">
+        <button
+          type="button"
+          className="kt-popup-disclosure"
+          aria-expanded={showAdvanced}
+          onClick={() => setShowAdvanced((current) => !current)}
+        >
+          {i18n("popup_advanced_options")}
+          <ExpandMoreRoundedIcon />
+        </button>
+        {!isContent && (
+          <M3Button
+            className="kt-popup-disclosure-support"
+            variant="text"
+            aria-expanded={showSupport}
+            onClick={() => setShowSupport((current) => !current)}
+          >
+            {i18n("popup_support")}
+          </M3Button>
+        )}
+      </div>
 
       {showAdvanced && (
         <div className="kt-popup-advanced">
@@ -789,8 +801,8 @@ export default function PopupCont({
         </div>
       )}
 
-      <footer className="kt-popup-footer">
-        {isContent && (
+      {isContent && (
+        <footer className="kt-popup-footer">
           <>
             <span className="kt-popup-footer__keys">
               <kbd>Alt</kbd>
@@ -801,21 +813,19 @@ export default function PopupCont({
               <kbd>S</kbd>
             </span>
           </>
-        )}
-        <span className="kt-popup-footer__spacer" />
-        <M3Button
-          variant="text"
-          aria-expanded={showSupport}
-          onClick={() => setShowSupport((current) => !current)}
-        >
-          {i18n("popup_support")}
-        </M3Button>
-        {isContent && (
+          <span className="kt-popup-footer__spacer" />
+          <M3Button
+            variant="text"
+            aria-expanded={showSupport}
+            onClick={() => setShowSupport((current) => !current)}
+          >
+            {i18n("popup_support")}
+          </M3Button>
           <M3Button variant="text" onClick={handleOpenSetting}>
             {i18n("popup_all_settings")}
           </M3Button>
-        )}
-      </footer>
+        </footer>
+      )}
 
       <M3Snackbar
         open={snackbar.open}

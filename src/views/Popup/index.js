@@ -89,6 +89,7 @@ export default function Popup() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("page");
   const [isSeparate, setIsSeparate] = useState(false);
+  const [globallyDisabled, setGloballyDisabled] = useState(false);
   const [pageContentExpanded, setPageContentExpanded] = useState(false);
   const popupShellRef = useRef(null);
   const initialFocusGuardRef = useRef(true);
@@ -166,6 +167,7 @@ export default function Popup() {
               useMouseHover: true,
             },
           });
+          setGloballyDisabled(false);
           return;
         }
         const cleanHash = window.location.hash.slice(1);
@@ -177,6 +179,7 @@ export default function Popup() {
         if (active && response && !response.error) {
           setRule(response.rule);
           setSetting(response.setting);
+          setGloballyDisabled(response.disabled === true);
         }
       } catch (error) {
         kissLog("query rule", error);
@@ -196,8 +199,18 @@ export default function Popup() {
 
   const tabs = useMemo(
     () => [
-      { value: "page", label: i18n("popup_page_translation") },
-      { value: "text", label: i18n("popup_text_translation") },
+      {
+        value: "page",
+        label: i18n("popup_page_translation"),
+        tabId: "kt-popup-page-tab",
+        panelId: "kt-popup-active-panel",
+      },
+      {
+        value: "text",
+        label: i18n("popup_text_translation"),
+        tabId: "kt-popup-text-tab",
+        panelId: "kt-popup-active-panel",
+      },
     ],
     [i18n]
   );
@@ -236,6 +249,9 @@ export default function Popup() {
         ariaLabel={i18n("translate")}
       />
       <div
+        id="kt-popup-active-panel"
+        role="tabpanel"
+        aria-labelledby={`kt-popup-${activeTab}-tab`}
         className={`kt-popup-scroll ${
           activeTab === "text"
             ? "kt-popup-scroll--text"
@@ -244,7 +260,15 @@ export default function Popup() {
               : ""
         }`}
       >
-        {activeTab === "text" ? (
+        {globallyDisabled ? (
+          <div className="kt-popup-disabled" role="status">
+            <strong>{i18n("popup_extension_disabled")}</strong>
+            <span>{i18n("popup_extension_disabled_description")}</span>
+            <M3Button variant="tonal" onClick={handleOpenSetting}>
+              {i18n("setting")}
+            </M3Button>
+          </div>
+        ) : activeTab === "text" ? (
           <TranslationTab />
         ) : rule && setting ? (
           <PopupCont

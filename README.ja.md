@@ -2,7 +2,7 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-[![CI](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml)
+[![CI](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml)
 
 シンプルでオープンソースの [バイリンガル対照翻訳拡張機能＆ユーザースクリプト](https://github.com/fishjar/kiss-translator)です。
 

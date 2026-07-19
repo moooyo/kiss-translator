@@ -8,6 +8,8 @@ if (!(await fs.pathExists(buildDirectory))) {
 }
 
 const targets = ["chrome", "edge", "firefox", "thunderbird", "userscript"];
+const packageJson = await fs.readJSON(path.resolve("package.json"));
+const releasePrefix = `kiss-translator_v${packageJson.version}`;
 
 const oldArchives = (await fs.readdir(buildDirectory))
   .filter((fileName) => fileName.endsWith(".zip"))
@@ -16,7 +18,10 @@ await Promise.all(oldArchives);
 
 for (const target of targets) {
   const sourceDirectory = path.join(buildDirectory, target);
-  const destination = path.join(buildDirectory, `${target}.zip`);
+  const destination = path.join(
+    buildDirectory,
+    `${releasePrefix}_${target}.zip`
+  );
   if (!(await fs.pathExists(sourceDirectory))) {
     throw new Error(`Archive source is missing: ${sourceDirectory}`);
   }

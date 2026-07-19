@@ -100,6 +100,10 @@ export function resolveM3Colors(mode = "light", brand = "blue") {
   };
 }
 
+export function resolveM3ThemeMode(mode = "auto", prefersDark = false) {
+  return mode === "dark" || (mode === "auto" && prefersDark) ? "dark" : "light";
+}
+
 export function createM3CssVariables(colors) {
   return {
     "--kt-pri": colors.primary,
@@ -127,6 +131,12 @@ export function createM3CssVariables(colors) {
     "--kt-inv": colors.inverseSurface,
     "--kt-oninv": colors.onInverseSurface,
   };
+}
+
+export function createM3CssVariableDeclarations(colors) {
+  return Object.entries(createM3CssVariables(colors))
+    .map(([name, value]) => `${name}: ${value};`)
+    .join("\n");
 }
 
 export const M3_FONT_FAMILY =

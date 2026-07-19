@@ -89,11 +89,15 @@ export function M3Segmented({
       {items.map((item, index) => {
         const itemValue = typeof item === "string" ? item : item.value;
         const label = typeof item === "string" ? item : item.label;
+        const tabId = typeof item === "string" ? undefined : item.tabId;
+        const panelId = typeof item === "string" ? undefined : item.panelId;
         const selected = itemValue === value;
         return (
           <button
             type="button"
             role={isTabs ? "tab" : "radio"}
+            id={isTabs ? tabId : undefined}
+            aria-controls={isTabs ? panelId : undefined}
             aria-selected={isTabs ? selected : undefined}
             aria-checked={isTabs ? undefined : selected}
             tabIndex={

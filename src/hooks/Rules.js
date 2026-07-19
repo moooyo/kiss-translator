@@ -2,11 +2,7 @@ import { STOKEY_RULES, DEFAULT_RULES, KV_RULES_KEY } from "../config";
 import { useStorage } from "./Storage";
 import { checkRules } from "../libs/rules";
 import { useCallback } from "react";
-import {
-  debounceSyncMeta,
-  getRulesWithDefault,
-  setRules,
-} from "../libs/storage";
+import { debounceSyncMeta } from "../libs/storage";
 
 export const patchRuleList = (list, pattern, patch) =>
   list.map((item) => (item.pattern === pattern ? { ...item, ...patch } : item));
@@ -73,12 +69,6 @@ export function useRules() {
     [save]
   );
 
-  const putLatest = useCallback(async (pattern, obj) => {
-    const latestRules = await getRulesWithDefault();
-    await setRules(patchRuleList(latestRules, pattern, obj));
-    debounceSyncMeta(KV_RULES_KEY);
-  }, []);
-
   // 批量合并新规则数组
   const merge = useCallback(
     (rules) => {
@@ -109,5 +99,5 @@ export function useRules() {
     [save]
   );
 
-  return { list, add, del, clear, put, putLatest, merge };
+  return { list, add, del, clear, put, merge };
 }

@@ -2,7 +2,7 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-[![CI](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml)
+[![CI](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml)
 
 심플하고 오픈 소스인 [이중 언어 대조 번역 확장 프로그램 & 유저 스크립트](https://github.com/fishjar/kiss-translator)입니다.
 

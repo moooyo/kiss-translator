@@ -20,6 +20,10 @@ const requiredFiles = [
   "chrome/background.js",
   "edge/manifest.json",
   "edge/popup.html",
+  "safari/manifest.json",
+  "safari/popup.html",
+  "safari/options.html",
+  "safari/background.js",
   "firefox/manifest.json",
   "firefox/background.js",
   "thunderbird/manifest.json",
@@ -36,11 +40,9 @@ const requiredFiles = [
 
 if (releaseMode) {
   requiredFiles.push(
-    "chrome.zip",
-    "edge.zip",
-    "firefox.zip",
-    "thunderbird.zip",
-    "userscript.zip"
+    ...["chrome", "edge", "firefox", "thunderbird", "userscript"].map(
+      (target) => `kiss-translator_v${packageJson.version}_${target}.zip`
+    )
   );
 }
 
@@ -82,6 +84,7 @@ for (const relativePath of requiredFiles) {
 const manifestPaths = [
   "chrome/manifest.json",
   "edge/manifest.json",
+  "safari/manifest.json",
   "firefox/manifest.json",
   "thunderbird/manifest.json",
 ];
@@ -133,11 +136,13 @@ for (const relativePath of forbiddenFiles) {
 
 if (releaseMode) {
   const archiveExpectations = {
-    "chrome.zip": "manifest.json",
-    "edge.zip": "manifest.json",
-    "firefox.zip": "manifest.json",
-    "thunderbird.zip": "manifest.json",
-    "userscript.zip": "kiss-translator.user.js",
+    [`kiss-translator_v${packageJson.version}_chrome.zip`]: "manifest.json",
+    [`kiss-translator_v${packageJson.version}_edge.zip`]: "manifest.json",
+    [`kiss-translator_v${packageJson.version}_firefox.zip`]: "manifest.json",
+    [`kiss-translator_v${packageJson.version}_thunderbird.zip`]:
+      "manifest.json",
+    [`kiss-translator_v${packageJson.version}_userscript.zip`]:
+      "kiss-translator.user.js",
   };
 
   for (const [archiveName, expectedEntry] of Object.entries(

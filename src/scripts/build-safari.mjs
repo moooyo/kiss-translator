@@ -1,5 +1,5 @@
 #!/usr/bin/env zx
-import { $, globby } from "zx";
+import { $, chalk, globby } from "zx";
 import path from "node:path";
 import fs from "node:fs/promises";
 import dotenv from "dotenv";
@@ -42,7 +42,7 @@ async function main() {
   await $`pnpm build:safari-output`;
 
   // 转换项目 (注意：--force 会覆盖已存在的项目)
-  await $`xcrun safari-web-extension-converter --bundle-identifier ${CONFIG.identifier} --force --project-location ${CONFIG.distPath} ${CONFIG.sourcePath}`;
+  await $`xcrun safari-web-extension-converter --app-name ${CONFIG.projectName} --bundle-identifier ${CONFIG.identifier} --force --no-open --no-prompt --project-location ${CONFIG.distPath} ${CONFIG.sourcePath}`;
 
   /**
    * 核心逻辑：修改 Xcode 工程配置 (project.pbxproj)

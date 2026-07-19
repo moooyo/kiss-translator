@@ -3,6 +3,7 @@ import GTranslateRoundedIcon from "@mui/icons-material/GTranslateRounded";
 import PaletteRoundedIcon from "@mui/icons-material/PaletteRounded";
 import SelectAllRoundedIcon from "@mui/icons-material/SelectAllRounded";
 import SettingsRoundedIcon from "@mui/icons-material/SettingsRounded";
+import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
 import { useCallback, useMemo, useState } from "react";
 import ThemeProvider from "../../hooks/Theme";
@@ -11,6 +12,7 @@ import { useI18n } from "../../hooks/I18n";
 import {
   MSG_OPEN_OPTIONS,
   MSG_OPEN_TRANBOX,
+  MSG_POPUP_TOGGLE,
   MSG_TRANS_TOGGLE,
   MSG_TRANS_TOGGLE_STYLE,
 } from "../../config";
@@ -20,7 +22,7 @@ import useWindowSize from "../../hooks/WindowSize";
 import Draggable from "./Draggable";
 import { ACTION_STYLES } from "./styles";
 
-function ContentFabContent({
+export function ContentFabContent({
   fabConfig: { x: fabX, y: fabY, fabClickAction = 0 } = {},
   processActions,
 }) {
@@ -81,6 +83,11 @@ function ContentFabContent({
       action: () => runAction(MSG_OPEN_TRANBOX),
     },
     {
+      label: i18n("open_menu"),
+      icon: TuneRoundedIcon,
+      action: () => runAction(MSG_POPUP_TOGGLE),
+    },
+    {
       label: i18n("open_setting"),
       icon: SettingsRoundedIcon,
       action: openSettings,
@@ -91,6 +98,7 @@ function ContentFabContent({
     <Draggable
       key="fab"
       {...fabProps}
+      snapEdge
       persistPosition
       onStart={() => setMoved(false)}
       onMove={() => setMoved(true)}

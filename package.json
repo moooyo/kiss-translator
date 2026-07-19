@@ -47,7 +47,7 @@
     "build:safari": "node src/scripts/build-safari.mjs",
     "build:userscript-ios": "zx src/scripts/build-ios.mjs",
     "build:rules": "babel-node src/rules.js",
-    "build:targets": "pnpm build:chrome && pnpm build:edge && pnpm build:thunderbird && pnpm build:firefox && pnpm build:web && pnpm build:userscript-ios",
+    "build:targets": "pnpm build:chrome && pnpm build:edge && pnpm build:safari-output && pnpm build:thunderbird && pnpm build:firefox && pnpm build:web && pnpm build:userscript-ios",
     "verify:build": "node src/scripts/verify-build.mjs",
     "verify:release": "node src/scripts/verify-build.mjs --release",
     "format": "prettier --write \"**/*.{js,mjs,json,html}\"",

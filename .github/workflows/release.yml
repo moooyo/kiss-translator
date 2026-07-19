@@ -121,7 +121,9 @@ jobs:
 
   deploy-pages:
     name: Deploy website to GitHub Pages
-    needs: build
+    needs:
+      - build
+      - release
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:

@@ -2,7 +2,7 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-[![CI](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/moooyo/kiss-translator/actions/workflows/ci.yml)
+[![CI](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml)
 
 一个简约、开源的 [双语对照翻译扩展 & 油猴脚本](https://github.com/fishjar/kiss-translator)。
 

@@ -35,6 +35,7 @@ describe("loadPopupData", () => {
           url: "https://example.com/article",
         }),
         executeScript,
+        getSetting: jest.fn().mockResolvedValue({ extensionEnabled: true }),
         wait,
       })
     ).resolves.toBe(popupData);
@@ -58,9 +59,31 @@ describe("loadPopupData", () => {
           url: "safari-web-extension://example/options.html",
         }),
         executeScript,
+        getSetting: jest.fn().mockResolvedValue({ extensionEnabled: true }),
         wait: jest.fn().mockResolvedValue(undefined),
       })
     ).resolves.toBeUndefined();
+
+    expect(executeScript).not.toHaveBeenCalled();
+  });
+
+  test("returns an explicit disabled state without reinjecting content.js", async () => {
+    const sendMessage = jest.fn().mockResolvedValue(undefined);
+    const executeScript = jest.fn();
+    const setting = { extensionEnabled: false, darkMode: "auto" };
+
+    await expect(
+      loadPopupData({
+        sendMessage,
+        getTab: jest.fn().mockResolvedValue({
+          id: 19,
+          url: "https://example.com/article",
+        }),
+        executeScript,
+        getSetting: jest.fn().mockResolvedValue(setting),
+        wait: jest.fn().mockResolvedValue(undefined),
+      })
+    ).resolves.toEqual({ rule: null, setting, disabled: true });
 
     expect(executeScript).not.toHaveBeenCalled();
   });

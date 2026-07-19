@@ -1,22 +1,14 @@
 import { useCallback, useMemo } from "react";
 import { API_SPE_TYPES } from "../config";
+import {
+  createM3CssVariables,
+  resolveM3Colors,
+  resolveM3ThemeMode,
+} from "../styles/m3";
+import { useSystemDarkPreference } from "../hooks/SystemColorScheme";
 
 export const MENU_STYLES = String.raw`
 .kt-subtitle-panel {
-  --kt-pri: #0b57d0;
-  --kt-onpri: #ffffff;
-  --kt-pric: #d3e3fd;
-  --kt-onpric: #041e49;
-  --kt-secc: #c2e7ff;
-  --kt-onsecc: #001d35;
-  --kt-sf0: #ffffff;
-  --kt-sf1: #f3f6fb;
-  --kt-sf2: #f0f4f9;
-  --kt-sf3: #e9eef6;
-  --kt-on: #1f1f1f;
-  --kt-onv: #444746;
-  --kt-line: #747775;
-  --kt-linev: #c9cdd3;
   --kt-spring: cubic-bezier(.3, 1.4, .4, 1);
   width: min(322px, calc(100vw - 24px));
   position: absolute;
@@ -71,25 +63,6 @@ export const MENU_STYLES = String.raw`
 .kt-subtitle-download:disabled { cursor: default; opacity: .45; }
 .kt-subtitle-all-settings { width: 100%; min-height: 42px; margin-top: 8px; border: 0; border-radius: 999px; background: transparent; color: var(--kt-pri); cursor: pointer; font: inherit; font-size: 12px; font-weight: 700; }
 .kt-subtitle-all-settings:hover { background: var(--kt-sf2); }
-@media (prefers-color-scheme: dark) {
-  .kt-subtitle-panel {
-    --kt-pri: #a8c7fa;
-    --kt-onpri: #062e6f;
-    --kt-pric: #0842a0;
-    --kt-onpric: #d3e3fd;
-    --kt-secc: #004a77;
-    --kt-onsecc: #c2e7ff;
-    --kt-sf0: #1e1f20;
-    --kt-sf1: #232426;
-    --kt-sf2: #282a2c;
-    --kt-sf3: #2d2f31;
-    --kt-on: #e3e3e3;
-    --kt-onv: #c4c7c5;
-    --kt-line: #8e918f;
-    --kt-linev: #3f4245;
-    box-shadow: 0 4px 10px 3px rgba(0,0,0,.45), 0 1px 3px rgba(0,0,0,.5);
-  }
-}
 @keyframes kt-subtitle-up { from { opacity: 0; transform: translateY(14px) scale(.97); } to { opacity: 1; transform: none; } }
 `;
 
@@ -189,7 +162,15 @@ export function Menus({
   downloadSubtitle,
   openSettings,
   transApis,
+  brandColor = "blue",
+  darkMode = "auto",
 }) {
+  const prefersDark = useSystemDarkPreference();
+  const resolvedMode = resolveM3ThemeMode(darkMode, prefersDark);
+  const themeVariables = useMemo(
+    () => createM3CssVariables(resolveM3Colors(resolvedMode, brandColor)),
+    [brandColor, resolvedMode]
+  );
   const handleChange = useCallback(
     ({ name, value }) => updateSetting({ name, value }),
     [updateSetting]
@@ -270,7 +251,12 @@ export function Menus({
   };
 
   return (
-    <div className="kt-subtitle-panel">
+    <div
+      className="kt-subtitle-panel"
+      data-theme={resolvedMode}
+      data-brand={brandColor}
+      style={{ ...themeVariables, colorScheme: resolvedMode }}
+    >
       <Switch
         name="autoTranslate"
         value={autoTranslate}

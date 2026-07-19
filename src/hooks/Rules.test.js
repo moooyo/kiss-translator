@@ -5,8 +5,6 @@ jest.mock("../libs/rules", () => ({ checkRules: jest.fn((rules) => rules) }));
 jest.mock("../libs/storage", () => ({
   storage: {},
   debounceSyncMeta: jest.fn(),
-  getRulesWithDefault: jest.fn(),
-  setRules: jest.fn(),
 }));
 jest.mock("../libs/sync", () => ({ syncData: jest.fn() }));
 

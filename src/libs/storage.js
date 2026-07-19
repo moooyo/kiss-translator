@@ -21,7 +21,7 @@ import {
   SETTINGS_VERSION_V2,
 } from "../config";
 import { isExt, isGm } from "./client";
-import { browser } from "./browser";
+import { browser, isExtensionContextInvalidatedError } from "./browser";
 import { kissLog } from "./log";
 import { debounce } from "./utils";
 import { getGmMethod } from "./gm";
@@ -137,8 +137,13 @@ function subscribe(key, listener) {
       listener(changes[key].newValue ?? null);
     };
     browser.storage.onChanged.addListener(handleChanged);
-    removeExternalListener = () =>
-      browser.storage.onChanged.removeListener(handleChanged);
+    removeExternalListener = () => {
+      try {
+        browser.storage.onChanged.removeListener(handleChanged);
+      } catch (error) {
+        if (!isExtensionContextInvalidatedError(error)) throw error;
+      }
+    };
   } else if (isGm) {
     const addValueChangeListener =
       globalThis.GM?.addValueChangeListener ||
@@ -399,7 +404,12 @@ export const putSyncMeta = async (key) => {
   await putSync({ syncMeta });
 };
 // 节流处理同步时间元数据的更新
-export const debounceSyncMeta = debounce(putSyncMeta, 300);
+export const debounceSyncMeta = debounce((key) => {
+  void putSyncMeta(key).catch((error) => {
+    if (isExtensionContextInvalidatedError(error)) return;
+    kissLog("update sync metadata error: ", key, error);
+  });
+}, 300);
 
 // --- 微软云服务授权 Token 存取 ---
 export const getMsauth = () => getObj(STOKEY_MSAUTH);

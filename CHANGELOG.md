@@ -1,3 +1,9 @@
+## v2.0.30
+
+- Restored natural popup sizing so browser zoom is preserved and scrolling begins only when Chrome reaches its popup bounds.
+- Fixed Playground multiline input caret alignment and action placement.
+- Handled invalidated extension contexts gracefully across messaging, storage synchronization, content startup, and subtitle startup.
+
 ## v2.0.29
 
 - Refined the Material 3 popup with adaptive sizing, sticky navigation, a Sponsor menu, and reliable single-axis scrolling.

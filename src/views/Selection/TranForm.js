@@ -673,11 +673,17 @@ export default function TranForm({
                       /* 编辑模式：显示提交勾选图标 */
                       <IconButton
                         size="small"
+                        disabled={isPlaygound && !editText.trim()}
                         onMouseDown={(event) => event.preventDefault()}
                         onClick={commitText}
-                        title={i18n("submit")}
+                        title={i18n(isPlaygound ? "translate" : "submit")}
+                        aria-label={i18n(isPlaygound ? "translate" : "submit")}
                       >
-                        <DoneIcon fontSize="inherit" />
+                        {isPlaygound ? (
+                          <TranslateRoundedIcon fontSize="inherit" />
+                        ) : (
+                          <DoneIcon fontSize="inherit" />
+                        )}
                       </IconButton>
                     ) : text ? (
                       /* 有内容时：显示一键复制按钮 */

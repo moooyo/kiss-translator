@@ -54,11 +54,15 @@ export const OPTIONS_STYLES = String.raw`
 .kt-options-page .MuiGrid-item { padding: 8px !important; }
 .kt-options-page .MuiTextField-root { min-width: 0; }
 .kt-options-page .MuiInputLabel-root.MuiInputLabel-shrink { max-width: calc(125% - 24px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.kt-options-page .kt-translation-text-field .MuiFilledInput-root { min-height: 112px; align-items: flex-start; padding: 0; border-radius: 20px; }
-.kt-options-page .kt-translation-text-field .MuiFilledInput-inputMultiline { min-height: 80px; padding: 28px 52px 14px 16px; border: 0; outline: 0; background: transparent; line-height: 1.55; }
+.kt-options-page .kt-translation-text-field .MuiFilledInput-root { min-height: 128px; align-items: flex-start; padding: 0; border-radius: 20px; }
+.kt-options-page .kt-translation-text-field .MuiInputBase-inputMultiline { box-sizing: border-box; padding: 30px 52px 48px 16px; border: 0; outline: 0; background: transparent; line-height: 1.55; }
+.kt-options-page .kt-translation-text-field .MuiInputBase-inputMultiline:not([aria-hidden="true"]) { min-height: 128px; }
 .kt-options-page .kt-translation-text-field .MuiInputLabel-root { transform: translate(16px, 16px) scale(1); }
 .kt-options-page .kt-translation-text-field .MuiInputLabel-root.MuiInputLabel-shrink { transform: translate(16px, 7px) scale(.75); }
-.kt-options-page .kt-translation-text-field__actions { position: absolute; top: 8px; right: 8px; z-index: 1; }
+.kt-options-page .kt-translation-text-field__actions { position: absolute; right: 10px; bottom: 10px; z-index: 1; }
+.kt-options-page .kt-translation-text-field__actions .MuiIconButton-root { width: 34px; height: 34px; background: var(--kt-secc); color: var(--kt-onsecc); }
+.kt-options-page .kt-translation-text-field__actions .MuiIconButton-root.Mui-disabled { background: var(--kt-sf2); color: var(--kt-line); }
+.kt-options-page .kt-translation-text-field--source textarea { caret-color: var(--kt-pri); }
 .kt-options-page .kt-translation-text-field--result textarea { cursor: default; }
 .kt-options-page .MuiFormControlLabel-root { min-height: 48px; gap: 8px; margin: 0; padding: 4px 8px 4px 14px; border-radius: 14px; background: var(--kt-sf1); }
 .kt-options-page .MuiFormControlLabel-label { font-size: 13px; font-weight: 550; }

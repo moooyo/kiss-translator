@@ -19,7 +19,7 @@ import { runSubtitle, stopSubtitle } from "./subtitle/subtitle";
 import { logger } from "./libs/log";
 import { injectInlineJs } from "./libs/injector";
 import TranslatorManager from "./libs/translatorManager";
-import { browser } from "./libs/browser";
+import { browser, isExtensionContextInvalidatedError } from "./libs/browser";
 
 let activeTranslatorManager = null;
 let runtimeStartPromise = null;
@@ -27,6 +27,11 @@ let runtimeMessageListener = null;
 let runtimeStorageCleanup = null;
 let activeRuntimeIsUserscript = false;
 let runtimeLifecycleVersion = 0;
+
+function abandonInvalidatedRuntime() {
+  runtimeLifecycleVersion += 1;
+  activeTranslatorManager = null;
+}
 
 function stopActiveRuntime() {
   runtimeLifecycleVersion += 1;
@@ -81,7 +86,11 @@ function ensureRuntimeControlListener(isUserscript) {
 
   runtimeMessageListener = ({ action }) => {
     if (action !== MSG_RUNTIME_SETTING_PATCH) return undefined;
-    return applyRuntimeSettingPatch();
+    return applyRuntimeSettingPatch().catch((error) => {
+      if (!isExtensionContextInvalidatedError(error)) throw error;
+      abandonInvalidatedRuntime();
+      return { enabled: false, invalidated: true };
+    });
   };
   browser.runtime.onMessage.addListener(runtimeMessageListener);
 }
@@ -440,6 +449,13 @@ async function runInternal(isUserscript = false, lifecycleVersion) {
       trySyncAllSubRules(setting);
     }
   } catch (err) {
+    if (isExtensionContextInvalidatedError(err)) {
+      abandonInvalidatedRuntime();
+      logger.info(
+        "Extension context invalidated; stale content runtime stopped."
+      );
+      return;
+    }
     stopActiveRuntime();
     console.error("[KISS-Translator]", err);
     showErr(err.message); // 向前台页面绘制报错 Banner，便于用户感知与排查问题

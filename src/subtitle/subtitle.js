@@ -3,6 +3,7 @@ import { isMatch } from "../libs/utils.js";
 import { DEFAULT_API_SETTING } from "../config/api.js";
 import { DEFAULT_SUBTITLE_SETTING } from "../config/setting.js";
 import { logger } from "../libs/log.js";
+import { isExtensionContextInvalidatedError } from "../libs/browser.js";
 import { injectJs, INJECTOR } from "../injectors/index.js";
 
 // 各视频平台对应的字幕初始化拦截器配置
@@ -35,7 +36,7 @@ export function stopSubtitle() {
  * @param {string} params.href - 当前浏览器网页的完整链接 (document.location.href)
  * @param {object} params.setting - 全局用户配置选项，包括 subtitleSetting 和 transApis
  */
-export function runSubtitle({ href, setting }) {
+export async function runSubtitle({ href, setting }) {
   try {
     // 获取字幕配置，若无则使用默认字幕配置
     const subtitleSetting = setting.subtitleSetting || DEFAULT_SUBTITLE_SETTING;
@@ -64,7 +65,7 @@ export function runSubtitle({ href, setting }) {
 
       // 3. 启动特定平台的字幕翻译与渲染引擎 (如 YouTubeCaptionProvider)
       // 将整理好的字幕配置、翻译 API 配置、所有已启用的 API 列表以及 UI 界面语言传递给对应的 provider
-      return provider.start({
+      return await provider.start({
         ...subtitleSetting,
         brandColor: setting.brandColor,
         darkMode: setting.darkMode,
@@ -75,6 +76,7 @@ export function runSubtitle({ href, setting }) {
       });
     }
   } catch (err) {
+    if (isExtensionContextInvalidatedError(err)) return undefined;
     logger.error("start subtitle provider failed", err);
   }
 }

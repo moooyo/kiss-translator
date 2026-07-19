@@ -123,10 +123,15 @@ describe("TranForm Playground presentation", () => {
     const actions = sourceField.querySelector(
       ".kt-translation-text-field__actions"
     );
+    const translateButton = sourceField.querySelector(
+      'button[aria-label="translate"]'
+    );
     const result = container.querySelector('[data-testid="tran-cont"]');
 
     expect(sourceField.querySelector("textarea")).not.toBeNull();
     expect(actions).not.toBeNull();
+    expect(translateButton).not.toBeNull();
+    expect(sourceField.querySelector('[aria-label="submit"]')).toBeNull();
     expect(result.getAttribute("data-playground-style")).toBe("true");
 
     act(() => root.unmount());

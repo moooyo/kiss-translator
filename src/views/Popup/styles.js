@@ -1,6 +1,4 @@
 export const POPUP_STYLES = String.raw`
-html { overflow-x: hidden; }
-
 .kt-popup-shell {
   width: 396px;
   min-width: 396px;
@@ -265,55 +263,6 @@ html { overflow-x: hidden; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions { margin: 7px -2px -2px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions .MuiButton-root { min-height: 34px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-disclosure { min-height: 34px; }
-
-@media (max-height: 520px) {
-  .kt-popup-header { min-height: 48px; gap: 6px; padding: 6px 12px 3px; }
-  .kt-popup-header__title { font-size: 13px; }
-  .kt-popup-header__version { display: none; }
-  .kt-popup-header__actions .MuiIconButton-root { width: 34px; height: 34px; padding: 6px; }
-
-  .kt-popup-tabs { min-height: 38px; margin-inline: 12px; }
-  .kt-popup-tabs .MuiTab-root { min-height: 38px; padding: 4px 8px; font-size: 11.5px; }
-
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-content { gap: 5px; padding: 6px 12px 8px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero { min-height: 40px; padding: 4px 9px; border-radius: 16px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero__icon { width: 32px; height: 32px; border-radius: 11px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero__icon svg { width: 20px; height: 20px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero__title { font-size: 13px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero__subtitle { display: none; }
-
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-language-row { grid-template-columns: 1fr 32px 1fr; gap: 5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-language { padding: 3px 9px; border-radius: 13px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-language > span { font-size: 9px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-language select { font-size: 11.5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-swap.MuiIconButton-root { width: 32px; height: 32px; padding: 6px; }
-
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-services-block { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 6px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-section-label { margin: 0; font-size: 9.5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-services { gap: 4px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-service { gap: 4px; padding: 2px 7px 2px 3px; font-size: 10px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-service-logo { width: 19px; height: 19px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-service-logo img { width: 12px; height: 12px; }
-
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scenes { grid-template-columns: 1fr 1fr; gap: 4px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene { min-height: 30px; justify-content: flex-start; gap: 5px; padding: 3px 7px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene > svg { width: 16px; height: 16px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene__copy { width: 100%; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene__label { font-size: 9.5px; text-align: left; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene__state { display: none; }
-
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site { padding: 5px 8px; border-radius: 16px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__select { font-size: 10.5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__badge { padding: 2px 6px; font-size: 8.5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions { gap: 2px; margin: 3px 0 0; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions .MuiButton-root { min-height: 28px; padding-inline: 8px; font-size: 9.5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions .MuiIconButton-root { width: 28px; height: 28px; padding: 5px; }
-  .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-disclosure { min-height: 28px; font-size: 10.5px; }
-}
-
-@media (min-width: 320px) and (max-width: 410px) {
-  .kt-popup-shell:not(.kt-popup-shell--window) { width: 100%; min-width: 0; }
-}
 
 @media (max-width: 395px) {
   .kt-popup-shell--window { width: 100vw; }

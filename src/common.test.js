@@ -57,6 +57,8 @@ jest.mock("./libs/browser", () => ({
       },
     },
   },
+  isExtensionContextInvalidatedError: (error) =>
+    error?.message?.includes("Extension context invalidated") === true,
 }));
 
 jest.mock("./libs/log", () => ({
@@ -260,6 +262,15 @@ describe("common iframe startup", () => {
     getSettingWithDefault.mockRejectedValueOnce(error);
 
     await expect(run()).rejects.toBe(error);
+    expect(TranslatorManager).not.toHaveBeenCalled();
+  });
+
+  test("stops quietly when the extension context is invalidated", async () => {
+    getSettingWithDefault.mockRejectedValueOnce(
+      new Error("Extension context invalidated.")
+    );
+
+    await expect(run()).resolves.toBeUndefined();
     expect(TranslatorManager).not.toHaveBeenCalled();
   });
 

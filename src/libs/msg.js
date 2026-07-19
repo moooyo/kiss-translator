@@ -1,15 +1,20 @@
-import { browser } from "./browser";
+import { browser, isExtensionContextInvalidatedError } from "./browser";
 
 /**
  * 获取当前用户正在浏览且聚焦的活跃标签页 (Tab) 信息。
  * @returns {Promise<Object|undefined>} 活跃的标签页对象
  */
 export const getCurTab = async () => {
-  const [tab] = await browser.tabs.query({
-    active: true,
-    lastFocusedWindow: true,
-  });
-  return tab;
+  try {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    return tab;
+  } catch (error) {
+    if (isExtensionContextInvalidatedError(error)) return undefined;
+    throw error;
+  }
 };
 
 /**
@@ -31,7 +36,12 @@ export const getCurTabId = async () => {
  */
 export const sendBgMsg = async (action, args) => {
   if (!browser?.runtime?.sendMessage) return undefined;
-  return browser.runtime.sendMessage({ action, args });
+  try {
+    return await browser.runtime.sendMessage({ action, args });
+  } catch (error) {
+    if (isExtensionContextInvalidatedError(error)) return undefined;
+    throw error;
+  }
 };
 
 /**
@@ -51,6 +61,7 @@ export const sendTabMsg = async (action, args) => {
     // 2. "Receiving end does not exist" (常见于用户在不支持注入扩展的浏览器内置特权页面如 chrome:// 上触发了消息)
     // 此处静默返回，避免未就绪的通信异常打断业务逻辑调用链或污染扩展错误页。
     if (
+      isExtensionContextInvalidatedError(err) ||
       err?.message?.includes("Could not establish connection") ||
       err?.message?.includes("Receiving end does not exist")
     ) {

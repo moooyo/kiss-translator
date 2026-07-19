@@ -3,8 +3,8 @@ import { browser } from "./browser";
 import { getCurTabId } from "./msg";
 import { mergeSettingPatch } from "./settingPatch";
 import {
-  debounceSyncMeta,
   getSettingWithDefault,
+  putSyncMeta,
   setSetting as persistSetting,
 } from "./storage";
 
@@ -23,7 +23,7 @@ export async function applyRuntimeSettingPatch(
 ) {
   const getSetting = dependencies.getSetting || getSettingWithDefault;
   const setSetting = dependencies.setSetting || persistSetting;
-  const markSyncMeta = dependencies.markSyncMeta || debounceSyncMeta;
+  const markSyncMeta = dependencies.markSyncMeta || putSyncMeta;
   const getActiveTabId = dependencies.getActiveTabId || getCurTabId;
   const queryTabs =
     dependencies.queryTabs || ((query) => browser.tabs.query(query));

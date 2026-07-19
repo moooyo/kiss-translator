@@ -123,13 +123,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
+          release_bundles=(
+            "release-bundles/kiss-translator_${RELEASE_TAG}_chrome.zip"
+            "release-bundles/kiss-translator_${RELEASE_TAG}_edge.zip"
+            "release-bundles/kiss-translator_${RELEASE_TAG}_firefox.zip"
+            "release-bundles/kiss-translator_${RELEASE_TAG}_thunderbird.zip"
+            "release-bundles/kiss-translator_${RELEASE_TAG}_userscript.zip"
+          )
           if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
-            gh release upload "${RELEASE_TAG}" release-bundles/kiss-translator_${RELEASE_TAG}_*.zip --clobber
+            gh release upload "${RELEASE_TAG}" "${release_bundles[@]}" --clobber
             gh release edit "${RELEASE_TAG}" \
               --title "Release ${RELEASE_TAG}" \
               --notes-file release-notes.md
           else
-            gh release create "${RELEASE_TAG}" release-bundles/kiss-translator_${RELEASE_TAG}_*.zip \
+            gh release create "${RELEASE_TAG}" "${release_bundles[@]}" \
               --verify-tag \
               --title "Release ${RELEASE_TAG}" \
               --notes-file release-notes.md

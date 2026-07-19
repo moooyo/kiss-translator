@@ -29,6 +29,8 @@ import {
   OPT_TRANS_XIAOMIMIMO,
   OPT_TRANS_ZAI,
 } from "../config";
+import { browser } from "../libs/browser";
+import { isGm } from "../libs/client";
 
 const API_ICON_FILES = {
   [OPT_TRANS_BUILTINAI]: "BuiltinAI.svg",
@@ -59,9 +61,20 @@ const API_ICON_FILES = {
   [OPT_TRANS_OPENROUTER]: "OpenRouter.svg",
 };
 
-export function getApiIconSrc(apiType) {
+export function getApiIconSrc(
+  apiType,
+  {
+    runtime = browser?.runtime,
+    publicUrl = process.env.PUBLIC_URL || ".",
+    allowPublicUrl = !isGm,
+  } = {}
+) {
   const fileName = API_ICON_FILES[apiType];
-  return fileName ? `${process.env.PUBLIC_URL || "."}/api/${fileName}` : "";
+  if (!fileName) return "";
+
+  const relativePath = `api/${fileName}`;
+  if (runtime?.getURL) return runtime.getURL(relativePath);
+  return allowPublicUrl ? `${publicUrl}/${relativePath}` : "";
 }
 
 export default function ApiProviderIcon({

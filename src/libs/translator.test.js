@@ -75,6 +75,7 @@ describe("Translator rule styles", () => {
   let originalCSSStyleSheet;
   let originalScrollBy;
   let originalChrome;
+  let originalDocumentAdoptedStyleSheetsDescriptor;
 
   beforeEach(() => {
     jest.useFakeTimers();
@@ -105,6 +106,8 @@ describe("Translator rule styles", () => {
     window.scrollBy = jest.fn();
 
     originalChrome = globalThis.chrome;
+    originalDocumentAdoptedStyleSheetsDescriptor =
+      Object.getOwnPropertyDescriptor(document, "adoptedStyleSheets");
   });
 
   afterEach(() => {
@@ -112,6 +115,15 @@ describe("Translator rule styles", () => {
     global.CSSStyleSheet = originalCSSStyleSheet;
     window.scrollBy = originalScrollBy;
     globalThis.chrome = originalChrome;
+    if (originalDocumentAdoptedStyleSheetsDescriptor) {
+      Object.defineProperty(
+        document,
+        "adoptedStyleSheets",
+        originalDocumentAdoptedStyleSheetsDescriptor
+      );
+    } else {
+      delete document.adoptedStyleSheets;
+    }
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
     jest.clearAllMocks();
@@ -410,6 +422,33 @@ describe("Translator rule styles", () => {
       shadowRoot,
       expect.objectContaining({ subtree: true })
     );
+  });
+
+  test("injects compiled translation styles into the main document", async () => {
+    document.body.innerHTML = '<main id="root"><p>Hello world</p></main>';
+
+    createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    const style = document.getElementById("kiss-translator-fallback-style");
+    expect(style).not.toBeNull();
+    expect(style.textContent).toContain(".kiss-style-");
+    expect(style.textContent).not.toContain("&:hover");
+  });
+
+  test("removes runtime styles when the translator stops", async () => {
+    document.body.innerHTML = '<main id="root"><p>Hello world</p></main>';
+    const translator = createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    expect(
+      document.getElementById("kiss-translator-fallback-style")
+    ).not.toBeNull();
+    translator.stop();
+
+    expect(
+      document.getElementById("kiss-translator-fallback-style")
+    ).toBeNull();
   });
 
   test("does not pass SVG elements to the Chrome closed shadow root API", async () => {
@@ -879,6 +918,63 @@ describe("Translator rule styles", () => {
       `.${Translator.KISS_CLASS.hoverBubble}`
     );
     expect(bubble.textContent).toBe("Second translation");
+  });
+
+  test("injects inline <style> when CSSStyleSheet constructor is unavailable", async () => {
+    global.CSSStyleSheet = class {
+      constructor() {
+        throw new Error("CSSStyleSheet not available");
+      }
+    };
+
+    document.body.innerHTML =
+      '<main id="root"><section id="host">Content</section></main>';
+    const host = document.getElementById("host");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    Object.defineProperty(shadowRoot, "adoptedStyleSheets", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    shadowRoot.innerHTML = "<p>Shadow content</p>";
+
+    createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    const style = shadowRoot.querySelector("style");
+    expect(style).not.toBeNull();
+    expect(style.id).toBe("kiss-translator-fallback-style");
+    expect(style.textContent.length).toBeGreaterThan(0);
+    expect(shadowRoot.querySelectorAll("style")).toHaveLength(1);
+  });
+
+  test("falls back to inline <style> when adoptedStyleSheets setter throws", async () => {
+    Object.defineProperty(document, "adoptedStyleSheets", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    document.body.innerHTML =
+      '<main id="root"><section id="host">Content</section></main>';
+    const host = document.getElementById("host");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    Object.defineProperty(shadowRoot, "adoptedStyleSheets", {
+      configurable: true,
+      get: () => [],
+      set: () => {
+        throw new Error("adoptedStyleSheets not allowed");
+      },
+    });
+    shadowRoot.innerHTML = "<p>Shadow content</p>";
+
+    createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    const style = shadowRoot.querySelector("style");
+    expect(style).not.toBeNull();
+    expect(style.id).toBe("kiss-translator-fallback-style");
+    expect(style.textContent.length).toBeGreaterThan(0);
+    expect(shadowRoot.querySelectorAll("style")).toHaveLength(1);
   });
 
   test("removes mouse hover bubble when mouse hover is disabled", async () => {

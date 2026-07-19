@@ -1,4 +1,3 @@
-import { keyframes } from "@emotion/css";
 import {
   OPT_STYLE_NONE,
   OPT_STYLE_LINE,
@@ -19,23 +18,25 @@ import {
   OPT_STYLE_DASHLINE_BOLD,
   OPT_STYLE_WAVYLINE_BOLD,
 } from "../config";
+import { compileRuntimeCss } from "./cssCompiler";
 
-const gradientFlow = keyframes`
+const RUNTIME_KEYFRAMES = `
+@keyframes kt-gradient-flow {
   to {
     background-position: 200% center;
   }
-`;
+}
 
-const blink = keyframes`
+@keyframes kt-translation-blink {
   0%, 100% {
     opacity: 1;
   }
   50% {
     opacity: 0;
   }
-`;
+}
 
-const glow = keyframes`
+@keyframes kt-translation-glow {
   from {
     text-shadow: 0 0 10px #fff, 
     0 0 20px #fff, 
@@ -48,6 +49,7 @@ const glow = keyframes`
     0 0 40px #ff4da6, 
     0 0 50px #ff4da6;
   }
+}
 `;
 
 const genLineStyle = (style, color, thickness = 1) => `
@@ -56,12 +58,6 @@ const genLineStyle = (style, color, thickness = 1) => `
   text-decoration-color: ${color};
   text-decoration-thickness: ${thickness}px;
   text-underline-offset: 0.3em;
-  -webkit-text-decoration-line: underline;
-  -webkit-text-decoration-style: ${style};
-  -webkit-text-decoration-color: ${color};
-  -webkit-text-decoration-thickness: ${thickness}px;
-  -webkit-text-underline-offset: 0.3em;
-
 `;
 
 const genBuiltinStyles = (color = "#7CACF8") => ({
@@ -104,10 +100,8 @@ const genBuiltinStyles = (color = "#7CACF8") => ({
   // 模糊
   [OPT_STYLE_FUZZY]: `
     filter: blur(0.2em);
-    -webkit-filter: blur(0.2em);
     &:hover {
       filter: none;
-      -webkit-filter: none;
     }
   `,
   // 高亮
@@ -118,11 +112,9 @@ const genBuiltinStyles = (color = "#7CACF8") => ({
   // 引用
   [OPT_STYLE_BLOCKQUOTE]: `
     opacity: 0.72;
-    -webkit-opacity: 0.72;
     font-style: italic;
     &:hover {
       opacity: 1;
-      -webkit-opacity: 1;
     }
   `,
   // 渐变
@@ -136,20 +128,19 @@ const genBuiltinStyles = (color = "#7CACF8") => ({
     );
     background-size: 200% auto;
     color: transparent;
-    -webkit-background-clip: text;
     background-clip: text;
-    animation: ${gradientFlow} 4s linear infinite;
+    animation: kt-gradient-flow 4s linear infinite;
     & * {
       background-color: transparent !important;
     }
   `,
   // 闪现
   [OPT_STYLE_BLINK]: `
-    animation: ${blink} 1s infinite;
+    animation: kt-translation-blink 1s infinite;
   `,
   // 发光
   [OPT_STYLE_GLOW]: `
-    animation: ${glow} 2s ease-in-out infinite alternate;
+    animation: kt-translation-glow 2s ease-in-out infinite alternate;
   `,
   // 多彩
   [OPT_STYLE_COLORFUL]: `
@@ -200,7 +191,7 @@ export const genTextClass = (customStyles = []) => {
   });
 
   const textClass = {};
-  let textStyles = `
+  let textStyles = `${RUNTIME_KEYFRAMES}
     @keyframes kt-translation-up {
       from { opacity: 0; transform: translateY(14px) scale(.97); }
       to { opacity: 1; transform: none; }
@@ -221,7 +212,7 @@ export const genTextClass = (customStyles = []) => {
       }
     `;
   });
-  return [textClass, textStyles];
+  return [textClass, compileRuntimeCss(textStyles)];
 };
 
 export const builtinStylesMap = genBuiltinStyles();

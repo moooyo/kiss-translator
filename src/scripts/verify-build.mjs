@@ -3,6 +3,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findMissingManifestArtifacts } from "./manifest-artifacts.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "../..");
@@ -47,6 +48,20 @@ if (releaseMode) {
 }
 
 const failures = [];
+const manifestArtifacts = new Map();
+
+const listFiles = async (directory, prefix = "") => {
+  const entries = await fs.readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map(async (entry) => {
+      const relativePath = path.posix.join(prefix, entry.name);
+      return entry.isDirectory()
+        ? listFiles(path.join(directory, entry.name), relativePath)
+        : [relativePath];
+    })
+  );
+  return files.flat();
+};
 
 const readZipEntries = async (filePath) => {
   const data = await fs.readFile(filePath);
@@ -91,6 +106,7 @@ const manifestPaths = [
 
 for (const relativePath of manifestPaths) {
   try {
+    const target = relativePath.split("/")[0];
     const manifest = JSON.parse(
       await fs.readFile(path.join(buildDirectory, relativePath), "utf8")
     );
@@ -99,6 +115,15 @@ for (const relativePath of manifestPaths) {
         `${relativePath} has version ${manifest.version}, expected ${packageJson.version}`
       );
     }
+    const artifactPaths = await listFiles(path.join(buildDirectory, target));
+    const missingArtifacts = findMissingManifestArtifacts(
+      manifest,
+      artifactPaths
+    );
+    missingArtifacts.forEach((artifact) =>
+      failures.push(`${relativePath} references missing artifact ${artifact}`)
+    );
+    manifestArtifacts.set(target, { manifest, artifactPaths });
   } catch (error) {
     failures.push(`${relativePath} is not valid JSON: ${error.message}`);
   }
@@ -136,26 +161,37 @@ for (const relativePath of forbiddenFiles) {
 
 if (releaseMode) {
   const archiveExpectations = {
-    [`kiss-translator_v${packageJson.version}_chrome.zip`]: "manifest.json",
-    [`kiss-translator_v${packageJson.version}_edge.zip`]: "manifest.json",
-    [`kiss-translator_v${packageJson.version}_firefox.zip`]: "manifest.json",
-    [`kiss-translator_v${packageJson.version}_thunderbird.zip`]:
-      "manifest.json",
-    [`kiss-translator_v${packageJson.version}_userscript.zip`]:
-      "kiss-translator.user.js",
+    [`kiss-translator_v${packageJson.version}_chrome.zip`]: "chrome",
+    [`kiss-translator_v${packageJson.version}_edge.zip`]: "edge",
+    [`kiss-translator_v${packageJson.version}_firefox.zip`]: "firefox",
+    [`kiss-translator_v${packageJson.version}_thunderbird.zip`]: "thunderbird",
+    [`kiss-translator_v${packageJson.version}_userscript.zip`]: "userscript",
   };
 
-  for (const [archiveName, expectedEntry] of Object.entries(
-    archiveExpectations
-  )) {
+  for (const [archiveName, target] of Object.entries(archiveExpectations)) {
     try {
       const entries = await readZipEntries(
         path.join(buildDirectory, archiveName)
       );
       if (entries.length === 0) {
         failures.push(`${archiveName} contains no files`);
-      } else if (!entries.includes(expectedEntry)) {
-        failures.push(`${archiveName} is missing root entry ${expectedEntry}`);
+      } else if (target === "userscript") {
+        if (!entries.includes("kiss-translator.user.js")) {
+          failures.push(
+            `${archiveName} is missing root entry kiss-translator.user.js`
+          );
+        }
+      } else {
+        const manifest = manifestArtifacts.get(target)?.manifest;
+        if (!manifest) {
+          failures.push(`${archiveName} has no verified source manifest`);
+          continue;
+        }
+        findMissingManifestArtifacts(manifest, entries).forEach((artifact) =>
+          failures.push(
+            `${archiveName} is missing manifest artifact ${artifact}`
+          )
+        );
       }
     } catch (error) {
       failures.push(`${archiveName} could not be inspected: ${error.message}`);

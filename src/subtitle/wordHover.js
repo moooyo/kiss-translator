@@ -166,6 +166,7 @@ export class WordTooltipController {
     this.hoverTimeout = null;
     this.activeWordEl = null;
     this.isPinned = false;
+    this.lookupRequestId = 0;
   }
 
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
@@ -195,9 +196,6 @@ export class WordTooltipController {
       clearTimeout(this.hoverTimeout);
       this.hoverTimeout = null;
     }
-    this.activeWordEl?.classList.remove("kiss-word-hover");
-    this.activeWordEl = null;
-    this.isPinned = false;
     this.hideWordTooltip();
   }
 
@@ -244,8 +242,7 @@ export class WordTooltipController {
   #handleWordHoverOut(event) {
     const target = event.target;
     if (!target.classList.contains("kiss-subtitle-word")) return;
-
-    if (this.isPinned && this.activeWordEl === target) return;
+    if (this.isPinned) return;
 
     target.classList.remove("kiss-word-hover");
     if (this.activeWordEl === target) {
@@ -263,13 +260,15 @@ export class WordTooltipController {
   }
 
   async showWordTooltip(word, { timestamp = 0 } = {}) {
+    const requestId = ++this.lookupRequestId;
     if (this.tooltipEl) {
       this.tooltipEl.remove();
     }
 
-    this.tooltipEl = document.createElement("div");
-    this.tooltipEl.className = "kiss-word-tooltip";
-    this.tooltipEl.innerHTML = trustedTypesHelper.createHTML(
+    const tooltipEl = document.createElement("div");
+    this.tooltipEl = tooltipEl;
+    tooltipEl.className = "kiss-word-tooltip";
+    tooltipEl.innerHTML = trustedTypesHelper.createHTML(
       '<div class="kiss-word-loading">Looking up...</div>'
     );
 
@@ -283,17 +282,20 @@ export class WordTooltipController {
       const top = containerRect.top + 20;
 
       const maxLeft = window.innerWidth - tooltipWidth - 10;
-      this.tooltipEl.style.left = Math.min(maxLeft, Math.max(10, left)) + "px";
-      this.tooltipEl.style.top = Math.max(10, top) + "px";
-      this.tooltipEl.style.maxWidth = tooltipWidth + "px";
-      this.tooltipEl.style.maxHeight = tooltipHeight + "px";
-      this.tooltipEl.style.overflow = "auto";
+      tooltipEl.style.left = Math.min(maxLeft, Math.max(10, left)) + "px";
+      tooltipEl.style.top = Math.max(10, top) + "px";
+      tooltipEl.style.maxWidth = tooltipWidth + "px";
+      tooltipEl.style.maxHeight = tooltipHeight + "px";
+      tooltipEl.style.overflow = "auto";
     }
 
-    document.body.appendChild(this.tooltipEl);
+    document.body.appendChild(tooltipEl);
 
     try {
       const dictResult = await apiMicrosoftDict(word);
+      if (requestId !== this.lookupRequestId || this.tooltipEl !== tooltipEl) {
+        return;
+      }
       const { phonetic, definition, examples } =
         this.#extractDictionaryData(dictResult);
 
@@ -306,6 +308,9 @@ export class WordTooltipController {
       });
       this.#renderDictionaryResult(word, dictResult);
     } catch (error) {
+      if (requestId !== this.lookupRequestId || this.tooltipEl !== tooltipEl) {
+        return;
+      }
       logger.info("Dictionary lookup failed for word:", word, error);
       this.#dispatchAddWord({
         word,
@@ -328,10 +333,13 @@ export class WordTooltipController {
   }
 
   hideWordTooltip() {
+    this.lookupRequestId += 1;
     if (this.tooltipEl) {
       this.tooltipEl.remove();
       this.tooltipEl = null;
     }
+    this.activeWordEl?.classList.remove("kiss-word-hover");
+    this.activeWordEl = null;
     this.isPinned = false;
   }
 

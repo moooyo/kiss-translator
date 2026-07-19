@@ -1,11 +1,7 @@
+import { useCallback } from "react";
 import { useSetting } from "./Setting";
 import { I18N, URL_RAW_PREFIX } from "../config";
 import { useGet } from "./Fetch";
-
-const useSettingSafe =
-  typeof useSetting === "function"
-    ? useSetting
-    : () => ({ setting: { uiLang: "en" } });
 
 /**
  * 获取多语言文本的工具函数
@@ -20,7 +16,10 @@ export const getI18n = (uiLang, key, defaultText) => {
 
 // 预柯里化语言参数，返回一个只需传入 key 的获取翻译函数
 export const useLangMap = (uiLang) => {
-  return (key, defaultText) => getI18n(uiLang, key, defaultText);
+  return useCallback(
+    (key, defaultText) => getI18n(uiLang, key, defaultText),
+    [uiLang]
+  );
 };
 
 /**
@@ -30,7 +29,7 @@ export const useLangMap = (uiLang) => {
 export const useI18n = () => {
   const {
     setting: { uiLang },
-  } = useSettingSafe();
+  } = useSetting();
   return useLangMap(uiLang);
 };
 

@@ -20,10 +20,6 @@ import {
   MSG_TRANS_TOGGLE,
   MSG_TRANS_PUTRULE,
   MSG_SAVE_RULE,
-  MSG_TRANSBOX_TOGGLE,
-  MSG_MOUSEHOVER_TOGGLE,
-  MSG_TRANSINPUT_TOGGLE,
-  MSG_RUNTIME_SETTING_PATCH,
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
   OPT_LANGS_TO_REVERSED as OPT_LANGS_TO,
 } from "../../config";
@@ -38,6 +34,7 @@ import { useSetting } from "../../hooks/Setting";
 import ApiProviderIcon from "../../components/ApiProviderIcon";
 import { COLLAPSED_SERVICE_LIMIT, getVisibleServices } from "./services";
 import { css } from "@emotion/css";
+import { usePopupFeatureToggles } from "./usePopupFeatureToggles";
 
 export function resolvePopupTextStyles(
   allTextStyles,
@@ -172,10 +169,9 @@ export default function PopupCont({
   );
 
   const handleTransToggle = useCallback(
-    async (event) => {
+    async (enabled) => {
       if (translationTogglePendingRef.current) return;
       translationTogglePendingRef.current = true;
-      const enabled = event.target.checked;
       let resolvedEnabled = enabled;
       setRule((previous) => ({
         ...previous,
@@ -217,84 +213,12 @@ export default function PopupCont({
     [i18n, processActions, setRule, showMessage]
   );
 
-  const handleTransboxToggle = useCallback(
-    async (event) => {
-      const enabled = event.target.checked;
-      setSetting((previous) => ({
-        ...previous,
-        tranboxSetting: {
-          ...previous.tranboxSetting,
-          transOpen: enabled,
-        },
-      }));
-      try {
-        if (processActions) processActions({ action: MSG_TRANSBOX_TOGGLE });
-        else await sendTabMsg(MSG_TRANSBOX_TOGGLE);
-      } catch (error) {
-        kissLog("toggle selection translation", error);
-      }
-    },
-    [processActions, setSetting]
-  );
-
-  const handleMouseHoverToggle = useCallback(
-    async (event) => {
-      const enabled = event.target.checked;
-      setSetting((previous) => ({
-        ...previous,
-        mouseHoverSetting: {
-          ...previous.mouseHoverSetting,
-          useMouseHover: enabled,
-        },
-      }));
-      try {
-        if (processActions) processActions({ action: MSG_MOUSEHOVER_TOGGLE });
-        else await sendTabMsg(MSG_MOUSEHOVER_TOGGLE);
-      } catch (error) {
-        kissLog("toggle hover translation", error);
-      }
-    },
-    [processActions, setSetting]
-  );
-
-  const handleInputToggle = useCallback(
-    async (event) => {
-      const enabled = event.target.checked;
-      setSetting((previous) => ({
-        ...previous,
-        inputRule: { ...previous.inputRule, transOpen: enabled },
-      }));
-      try {
-        if (processActions) processActions({ action: MSG_TRANSINPUT_TOGGLE });
-        else await sendTabMsg(MSG_TRANSINPUT_TOGGLE);
-      } catch (error) {
-        kissLog("toggle input translation", error);
-      }
-    },
-    [processActions, setSetting]
-  );
-
-  const handleSubtitleToggle = useCallback(
-    (event) => {
-      const enabled = event.target.checked;
-      setSetting((previous) => ({
-        ...previous,
-        subtitleSetting: { ...previous.subtitleSetting, enabled },
-      }));
-      if (isExt) {
-        void sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
-          scope: "current",
-          patch: { subtitleSetting: { enabled } },
-        }).catch((error) => kissLog("apply runtime subtitle setting", error));
-      } else {
-        updateSetting((previous) => ({
-          ...previous,
-          subtitleSetting: { ...previous.subtitleSetting, enabled },
-        }));
-      }
-    },
-    [setSetting, updateSetting]
-  );
+  const {
+    handleInputToggle,
+    handleMouseHoverToggle,
+    handleSubtitleToggle,
+    handleTransboxToggle,
+  } = usePopupFeatureToggles({ processActions, setSetting, updateSetting });
 
   const handleClearCache = useCallback(() => {
     tryClearCaches();
@@ -429,9 +353,7 @@ export default function PopupCont({
         className={`kt-popup-hero ${
           translationEnabled ? "" : "kt-popup-hero--off"
         } ${translationBusy ? "kt-popup-hero--busy" : ""}`}
-        onClick={() =>
-          handleTransToggle({ target: { checked: !translationEnabled } })
-        }
+        onClick={() => void handleTransToggle(!translationEnabled)}
       >
         <span className="kt-popup-hero__icon" aria-hidden="true">
           {translationBusy ? (
@@ -455,7 +377,7 @@ export default function PopupCont({
         <Switch
           className="kt-popup-main-switch"
           checked={translationEnabled}
-          onChange={handleTransToggle}
+          onChange={(_event, checked) => void handleTransToggle(checked)}
           onClick={(event) => event.stopPropagation()}
           inputProps={{ "aria-label": i18n("popup_translate_page") }}
         />
@@ -550,9 +472,7 @@ export default function PopupCont({
               className="kt-popup-scene"
               aria-pressed={scene.enabled}
               key={scene.key}
-              onClick={() =>
-                scene.onChange({ target: { checked: !scene.enabled } })
-              }
+              onClick={() => void scene.onChange(!scene.enabled)}
             >
               <SceneIcon />
               <span className="kt-popup-scene__copy">

@@ -41,6 +41,7 @@ jest.mock("../../libs/utils", () => ({
 }));
 
 jest.mock("../../hooks/Setting", () => ({
+  useSetting: () => ({ setting: { uiLang: "en" } }),
   SettingProvider: function SettingProvider(props) {
     mockSettingProvider(props);
     return props.children;

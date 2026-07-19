@@ -11,7 +11,17 @@ const providers = [
   { pattern: "https://www.youtube.com", start: YouTubeInitializer },
 ];
 
+export const SUBTITLE_INTERCEPTOR_ATTRIBUTE = "data-kiss-subtitle-interceptor";
+
+export function setSubtitleInterceptorEnabled(enabled) {
+  document.documentElement?.setAttribute(
+    SUBTITLE_INTERCEPTOR_ATTRIBUTE,
+    enabled ? "enabled" : "disabled"
+  );
+}
+
 export function stopSubtitle() {
+  setSubtitleInterceptorEnabled(false);
   providers.forEach((provider) => provider.start.destroy?.());
 }
 
@@ -39,6 +49,7 @@ export function runSubtitle({ href, setting }) {
     // 根据当前网页 URL (href) 查找是否有匹配的字幕服务提供商（例如匹配 YouTube 网址）
     const provider = providers.find((item) => isMatch(href, item.pattern));
     if (provider) {
+      setSubtitleInterceptorEnabled(true);
       // 1. 注入底层的劫持脚本 (INJECTOR.subtitle)
       // 该操作会在原生页面环境中动态注入一段 JS 脚本，用以劫持底层的 XHR (XMLHttpRequest) 请求。
       // 这对于拦截 YouTube 的 timedtext 异步字幕请求并将其回传给当前扩展至关重要。

@@ -3,6 +3,7 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
 } from "react";
 import Alert from "@mui/material/Alert";
@@ -12,9 +13,11 @@ const AlertContext = createContext(null);
 
 export function AlertProvider({ children }) {
   const [alert, setAlert] = useState(null);
+  const nextAlertId = useRef(0);
 
   const showAlert = useCallback((message, severity) => {
-    setAlert({ message, severity });
+    nextAlertId.current += 1;
+    setAlert({ id: nextAlertId.current, message, severity });
   }, []);
 
   const handleClose = useCallback((_event, reason) => {
@@ -36,6 +39,7 @@ export function AlertProvider({ children }) {
     <AlertContext.Provider value={value}>
       {children}
       <Snackbar
+        key={alert?.id || "closed"}
         open={Boolean(alert)}
         autoHideDuration={2600}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}

@@ -443,5 +443,6 @@ async function runInternal(isUserscript = false, lifecycleVersion) {
     stopActiveRuntime();
     console.error("[KISS-Translator]", err);
     showErr(err.message); // 向前台页面绘制报错 Banner，便于用户感知与排查问题
+    throw err;
   }
 }

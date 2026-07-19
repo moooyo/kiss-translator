@@ -53,4 +53,16 @@ describe("buildOverviewShortcutMap", () => {
       })
     );
   });
+
+  test("reads the Firefox and Thunderbird browser-action command", () => {
+    expect(
+      buildOverviewShortcutMap(setting, [
+        { name: "_execute_browser_action", shortcut: "Ctrl+Alt+K" },
+      ])
+    ).toEqual(
+      expect.objectContaining({
+        popup: ["Ctrl", "Alt", "K"],
+      })
+    );
+  });
 });

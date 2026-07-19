@@ -37,18 +37,30 @@ describe("applyRuntimeSettingPatch", () => {
   test("targets the active tab when an extension page sends a current patch", async () => {
     const sendTabMessage = jest.fn().mockResolvedValue(undefined);
     const getActiveTabId = jest.fn().mockResolvedValue(42);
+    const setSetting = jest.fn();
+    const onPersisted = jest.fn();
 
     await applyRuntimeSettingPatch(
-      { patch: { extensionEnabled: false }, scope: "current" },
+      { patch: { subtitleSetting: { enabled: false } }, scope: "current" },
       {},
       {
-        getSetting: jest.fn().mockResolvedValue({ extensionEnabled: true }),
-        setSetting: jest.fn(),
+        getSetting: jest.fn().mockResolvedValue({
+          subtitleSetting: { enabled: true, apiSlug: "Microsoft" },
+        }),
+        setSetting,
         getActiveTabId,
         sendTabMessage,
+        onPersisted,
       }
     );
 
+    expect(setSetting).toHaveBeenCalledWith({
+      subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
+    });
+    expect(onPersisted).toHaveBeenCalledWith(
+      { subtitleSetting: { enabled: false, apiSlug: "Microsoft" } },
+      { subtitleSetting: { enabled: false } }
+    );
     expect(getActiveTabId).toHaveBeenCalledTimes(1);
     expect(sendTabMessage).toHaveBeenCalledWith(
       42,

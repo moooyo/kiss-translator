@@ -142,13 +142,34 @@ export const DEFAULT_TRANBOX_SETTING = {
 };
 
 // --- 字幕默认样式属性 ---
-const SUBTITLE_WINDOW_STYLE = `padding: 12px 20px;
-background: rgba(10, 12, 16, 0.62);
+export const SUBTITLE_BACKGROUND_STYLES = Object.freeze({
+  translucent: `padding: 12px 20px;
+background-color: rgba(10, 12, 16, 0.62);
+background-image: none;
 backdrop-filter: blur(6px);
 border-radius: 16px;
 color: white;
 line-height: 1.45;
-display: inline-block`;
+display: inline-block;`,
+  gradient: `padding: 12px 20px;
+background-color: rgba(10, 12, 16, 0.62);
+background-image: linear-gradient(180deg, rgba(10, 12, 16, 0.08), rgba(10, 12, 16, 0.78));
+backdrop-filter: none;
+border-radius: 16px;
+color: white;
+line-height: 1.45;
+display: inline-block;`,
+  none: `padding: 12px 20px;
+background-color: transparent;
+background-image: none;
+backdrop-filter: none;
+border-radius: 16px;
+color: white;
+line-height: 1.45;
+display: inline-block;`,
+});
+
+const SUBTITLE_WINDOW_STYLE = SUBTITLE_BACKGROUND_STYLES.translucent;
 
 const SUBTITLE_ORIGIN_STYLE = `font-size: clamp(16px, 2cqw, 20px);
 font-weight: 550;

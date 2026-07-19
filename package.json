@@ -25,6 +25,7 @@
     "react-markdown": "^8.0.7",
     "react-router-dom": "^6.16.0",
     "react-scripts": "5.0.1",
+    "stylis": "4.2.0",
     "sval": "^0.5.2",
     "webdav": "^5.3.0",
     "webextension-polyfill": "^0.10.0"
@@ -60,7 +61,8 @@
     "zip": "zx src/scripts/archive.mjs",
     "build+zip": "cross-env CI=true pnpm build:release",
     "test": "react-app-rewired test",
-    "test:ci": "cross-env CI=true react-app-rewired test --watchAll=false --runInBand --silent",
+    "test:scripts": "node --test src/scripts/manifest-artifacts.test.mjs",
+    "test:ci": "pnpm test:scripts && cross-env CI=true react-app-rewired test --watchAll=false --runInBand --silent",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

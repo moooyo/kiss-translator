@@ -13,13 +13,22 @@ export function buildOverviewShortcutMap(setting, browserCommands = []) {
     Object.prototype.hasOwnProperty.call(commandMap, name)
       ? commandMap[name]
       : fallback;
+  const resolveFirstCommand = (names, fallback) => {
+    const matchedName = names.find((name) =>
+      Object.prototype.hasOwnProperty.call(commandMap, name)
+    );
+    return matchedName ? commandMap[matchedName] : fallback;
+  };
 
   return {
     page: normalizeShortcutKeys(
       resolveCommand("toggleTranslate", configured.toggleTranslate)
     ),
     popup: normalizeShortcutKeys(
-      resolveCommand("_execute_action", configured.togglePopup)
+      resolveFirstCommand(
+        ["_execute_action", "_execute_browser_action"],
+        configured.togglePopup
+      )
     ),
     style: normalizeShortcutKeys(
       resolveCommand("toggleStyle", configured.toggleStyle)

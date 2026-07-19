@@ -187,14 +187,17 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
     [setKeyword]
   );
 
-  // 通用的表单输入变化处理器
-  const handleChange = (e) => {
-    e.preventDefault();
-    const { name, value } = e.target;
+  const updateFormValue = (name, value) => {
     setFormValues((pre) => ({ ...pre, [name]: value }));
     if (name === "pattern" && !editMode) {
       handlePatternChange(value);
     }
+  };
+
+  // 通用的表单输入变化处理器
+  const handleChange = (e) => {
+    e.preventDefault();
+    updateFormValue(e.target.name, e.target.value);
   };
 
   // 取消按钮处理器：编辑状态下重新禁用表单并回滚修改；新增状态下直接关闭新增面板
@@ -288,10 +291,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
                     aria-pressed={textStyle === style.styleSlug}
                     disabled={disabled}
                     onClick={() =>
-                      handleChange({
-                        preventDefault: () => {},
-                        target: { name: "textStyle", value: style.styleSlug },
-                      })
+                      updateFormValue("textStyle", style.styleSlug)
                     }
                     key={style.styleSlug}
                   >

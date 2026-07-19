@@ -1,4 +1,4 @@
-import { getDefaultTranBoxView } from "./TranBox";
+import { getDefaultTranBoxView, resolveTranBoxApiSlugs } from "./TranBox";
 
 jest.mock("../../hooks/Setting", () => ({
   SettingProvider: ({ children }) => children,
@@ -24,5 +24,20 @@ describe("getDefaultTranBoxView", () => {
   test("opens translation for phrases and normal word translation", () => {
     expect(getDefaultTranBoxView("hello world", true)).toBe("translation");
     expect(getDefaultTranBoxView("library", false)).toBe("translation");
+  });
+
+  test("restores translation services after the user selects translation", () => {
+    const params = {
+      apiSlugs: ["Microsoft"],
+      text: "library",
+      singleWordNoTrans: true,
+    };
+
+    expect(
+      resolveTranBoxApiSlugs({ ...params, activeView: "dictionary" })
+    ).toEqual([]);
+    expect(
+      resolveTranBoxApiSlugs({ ...params, activeView: "translation" })
+    ).toEqual(["Microsoft"]);
   });
 });

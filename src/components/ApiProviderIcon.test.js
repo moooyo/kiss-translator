@@ -1,0 +1,36 @@
+import { OPT_TRANS_GOOGLE } from "../config";
+import { getApiIconSrc } from "./ApiProviderIcon";
+
+jest.mock("../libs/browser", () => ({ browser: undefined }));
+jest.mock("../libs/client", () => ({ isGm: false }));
+
+describe("getApiIconSrc", () => {
+  test("uses the extension origin when a runtime is available", () => {
+    const runtime = {
+      getURL: jest.fn((path) => `chrome-extension://test-id/${path}`),
+    };
+
+    expect(getApiIconSrc(OPT_TRANS_GOOGLE, { runtime })).toBe(
+      "chrome-extension://test-id/api/Google.svg"
+    );
+    expect(runtime.getURL).toHaveBeenCalledWith("api/Google.svg");
+  });
+
+  test("uses the public path outside an extension runtime", () => {
+    expect(
+      getApiIconSrc(OPT_TRANS_GOOGLE, {
+        runtime: undefined,
+        publicUrl: "/kiss-translator",
+      })
+    ).toBe("/kiss-translator/api/Google.svg");
+  });
+
+  test("uses the bundled generic icon when a userscript has no asset host", () => {
+    expect(
+      getApiIconSrc(OPT_TRANS_GOOGLE, {
+        runtime: undefined,
+        allowPublicUrl: false,
+      })
+    ).toBe("");
+  });
+});

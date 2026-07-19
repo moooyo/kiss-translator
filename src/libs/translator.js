@@ -338,7 +338,10 @@ export class Translator {
   #glossary = {}; // AI词典
   #blockSelectorInvalid = false; // 自定义块级选择器是否已确认无效
   #textClass = {}; // 译文样式class
-  #textSheet = ""; // 译文样式字典
+  #textSheet = null; // Constructed stylesheet when the host supports it
+  #textStylesRaw = ""; // Compiled CSS used by the inline fallback
+  #useSheetFallback = false; // Shared fallback mode for documents and shadows
+  #styleRoots = new Set(); // Roots that currently own this instance's styles
   #apisMap = new Map(); // 用于接口快速查找
   #favWords = []; // 收藏词汇
 
@@ -944,20 +947,82 @@ export class Translator {
   // 创建样式
   #createTextStyles() {
     const [textClass, textStyles] = genTextClass(this.#setting.customStyles);
-    const textSheet = new CSSStyleSheet();
-    textSheet.replaceSync(textStyles);
     this.#textClass = textClass;
-    this.#textSheet = textSheet;
+    this.#textStylesRaw = textStyles;
+
+    try {
+      const textSheet = new CSSStyleSheet();
+      textSheet.replaceSync(textStyles);
+      this.#textSheet = textSheet;
+    } catch (err) {
+      kissLog("createTextStyles: CSSStyleSheet not available", err);
+      this.#useSheetFallback = true;
+    }
+
+    this.#injectSheet(document);
   }
 
-  // 注入样式
-  #injectSheet(shadowRoot) {
-    if (!shadowRoot.adoptedStyleSheets.includes(this.#textSheet)) {
-      shadowRoot.adoptedStyleSheets = [
-        ...shadowRoot.adoptedStyleSheets,
-        this.#textSheet,
-      ];
+  // Inject the compiled stylesheet into either a document or a shadow root.
+  #injectSheet(root) {
+    if (this.#useSheetFallback || !this.#textSheet) {
+      this.#injectSheetFallback(root);
+      return;
     }
+
+    try {
+      if (!("adoptedStyleSheets" in root)) {
+        this.#useSheetFallback = true;
+        this.#injectSheetFallback(root);
+        return;
+      }
+      if (!root.adoptedStyleSheets.includes(this.#textSheet)) {
+        root.adoptedStyleSheets = [
+          ...(root.adoptedStyleSheets || []),
+          this.#textSheet,
+        ];
+      }
+      this.#styleRoots.add(root);
+    } catch (err) {
+      kissLog("injectTextStyles: adoptedStyleSheets not available", err);
+      this.#useSheetFallback = true;
+      this.#injectSheetFallback(root);
+    }
+  }
+
+  #injectSheetFallback(root) {
+    const fallbackStyleId = `${APP_LCNAME}-fallback-style`;
+    const existingStyle = root.getElementById?.(fallbackStyleId);
+    if (existingStyle) {
+      existingStyle.textContent = this.#textStylesRaw;
+      this.#styleRoots.add(root);
+      return;
+    }
+
+    const style = document.createElement("style");
+    style.id = fallbackStyleId;
+    style.textContent = this.#textStylesRaw;
+    if (root === document) {
+      (document.head || document.documentElement).appendChild(style);
+    } else {
+      root.appendChild(style);
+    }
+    this.#styleRoots.add(root);
+  }
+
+  #removeTextStyles() {
+    const fallbackStyleId = `${APP_LCNAME}-fallback-style`;
+    this.#styleRoots.forEach((root) => {
+      root.getElementById?.(fallbackStyleId)?.remove();
+      if (!("adoptedStyleSheets" in root) || !this.#textSheet) return;
+      try {
+        root.adoptedStyleSheets = root.adoptedStyleSheets.filter(
+          (sheet) => sheet !== this.#textSheet
+        );
+      } catch (err) {
+        kissLog("removeTextStyles", err);
+      }
+    });
+    this.#styleRoots.clear();
   }
 
   // 解析专业术语字符串
@@ -1299,11 +1364,17 @@ export class Translator {
 
   // 监控shadowroot
   #startObserveShadowRoot(shadowRoot) {
-    if (shadowRoot.host.matches(`#${APP_CONSTS.fabID}, #${APP_CONSTS.boxID}`)) {
-      return;
+    try {
+      if (
+        shadowRoot.host.matches(`#${APP_CONSTS.fabID}, #${APP_CONSTS.boxID}`)
+      ) {
+        return;
+      }
+      this.#startObserveRoot(shadowRoot);
+      this.#injectSheet(shadowRoot);
+    } catch (err) {
+      kissLog("startObserveShadowRoot", err);
     }
-    this.#startObserveRoot(shadowRoot);
-    this.#injectSheet(shadowRoot);
   }
 
   // 监控根节点
@@ -3280,6 +3351,7 @@ overflow-wrap: anywhere !important;`;
     this.#disableMouseHover();
     this.#disableTransOnlyRevert();
     this.#removeInjector();
+    this.#removeTextStyles();
     this.#isInitialized = false;
   }
 

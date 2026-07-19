@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Navigator from "./Navigator";
 import { useI18n } from "../../hooks/I18n";
+import { useMediaQueryMatch } from "../../hooks/MediaQuery";
 import { OPTIONS_STYLES } from "./styles";
 
 export default function Layout() {
@@ -11,20 +12,7 @@ export default function Layout() {
   const [navigationOpen, setNavigationOpen] = useState(false);
   const navigationTriggerRef = useRef(null);
   const [latestVersion, setLatestVersion] = useState("");
-  const [isMobile, setIsMobile] = useState(
-    () =>
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(max-width: 859px)").matches
-  );
-
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return undefined;
-    const mediaQuery = window.matchMedia("(max-width: 859px)");
-    const handleChange = (event) => setIsMobile(event.matches);
-    setIsMobile(mediaQuery.matches);
-    mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
-  }, []);
+  const isMobile = useMediaQueryMatch("(max-width: 859px)");
 
   useEffect(() => {
     if (process.env.NODE_ENV === "test") return undefined;

@@ -1,5 +1,5 @@
 import { useCallback, useMemo } from "react";
-import { API_SPE_TYPES } from "../config";
+import { API_SPE_TYPES, SUBTITLE_BACKGROUND_STYLES } from "../config";
 import {
   createM3CssVariables,
   resolveM3Colors,
@@ -154,6 +154,16 @@ function Range({ label, name, value, min, max, onChange }) {
   );
 }
 
+export function resolveSubtitleBackgroundMode(windowStyle = "") {
+  if (/background(?:-image)?\s*:\s*linear-gradient/i.test(windowStyle)) {
+    return "gradient";
+  }
+  if (/background(?:-color)?\s*:\s*(?:transparent|none)/i.test(windowStyle)) {
+    return "none";
+  }
+  return "translucent";
+}
+
 export function Menus({
   i18n,
   formData,
@@ -225,11 +235,7 @@ export function Menus({
     apiSlug = serviceOptions[0]?.value || "",
     windowStyle = "",
   } = formData;
-  const backgroundMode = windowStyle.includes("linear-gradient")
-    ? "gradient"
-    : /background(?:-color)?\s*:\s*(?:transparent|none)/i.test(windowStyle)
-      ? "none"
-      : "translucent";
+  const backgroundMode = resolveSubtitleBackgroundMode(windowStyle);
   const normalizedProgress = Math.min(
     100,
     Math.max(0, Number(progressed) || 0)
@@ -241,14 +247,6 @@ export function Menus({
       : normalizedProgress === 100
         ? i18n("download_subtitles")
         : i18n("download_processed_subtitles");
-
-  const backgroundStyles = {
-    translucent:
-      "padding:12px 20px;background:rgba(10,12,16,.62);backdrop-filter:blur(6px);border-radius:16px;color:#fff;line-height:1.45;display:inline-block;",
-    gradient:
-      "padding:12px 20px;background:linear-gradient(180deg,rgba(10,12,16,.08),rgba(10,12,16,.78));border-radius:16px;color:#fff;line-height:1.45;display:inline-block;",
-    none: "padding:12px 20px;background:transparent;border-radius:16px;color:#fff;line-height:1.45;display:inline-block;",
-  };
 
   return (
     <div
@@ -316,7 +314,10 @@ export function Menus({
         label={i18n("subtitle_background")}
         value={backgroundMode}
         onChange={(value) =>
-          handleChange({ name: "windowStyle", value: backgroundStyles[value] })
+          handleChange({
+            name: "windowStyle",
+            value: SUBTITLE_BACKGROUND_STYLES[value],
+          })
         }
         items={[
           {

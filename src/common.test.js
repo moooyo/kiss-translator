@@ -255,6 +255,14 @@ describe("common iframe startup", () => {
     expect(runSubtitle).not.toHaveBeenCalled();
   });
 
+  test("rejects startup failures so the entry point can retry injection", async () => {
+    const error = new Error("storage unavailable");
+    getSettingWithDefault.mockRejectedValueOnce(error);
+
+    await expect(run()).rejects.toBe(error);
+    expect(TranslatorManager).not.toHaveBeenCalled();
+  });
+
   test("stops and restarts the active runtime without a page reload", async () => {
     await run();
     expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(1);

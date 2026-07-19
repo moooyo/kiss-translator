@@ -17,6 +17,7 @@ describe("WordTooltipController pinned state", () => {
   });
 
   test("ignores hover changes while a clicked word is pinned", () => {
+    jest.useFakeTimers();
     const controller = new WordTooltipController({});
     const root = document.getElementById("captions");
     const [first, second] = root.querySelectorAll(".kiss-subtitle-word");
@@ -25,11 +26,44 @@ describe("WordTooltipController pinned state", () => {
     first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     second.dispatchEvent(new Event("pointerenter", { bubbles: true }));
     second.dispatchEvent(new Event("pointerleave", { bubbles: true }));
+    jest.advanceTimersByTime(150);
 
     expect(controller.activeWordEl).toBe(first);
+    expect(controller.isPinned).toBe(true);
+    expect(controller.tooltipEl).not.toBeNull();
     expect(first.classList.contains("kiss-word-hover")).toBe(true);
     expect(second.classList.contains("kiss-word-hover")).toBe(false);
 
+    controller.destroy();
+    jest.useRealTimers();
+  });
+
+  test("ignores a stale dictionary response after another lookup starts", async () => {
+    const pending = [];
+    apiMicrosoftDict.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push(resolve);
+        })
+    );
+    const controller = new WordTooltipController({});
+    const root = document.getElementById("captions");
+    const [first, second] = root.querySelectorAll(".kiss-subtitle-word");
+    controller.attachSpanListeners(root);
+
+    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    pending[0]({ trs: [{ def: "first definition" }] });
+    await Promise.resolve();
+
+    expect(controller.tooltipEl.textContent).toBe("Looking up...");
+
+    pending[1]({ trs: [{ def: "second definition" }] });
+    await Promise.resolve();
+
+    expect(controller.tooltipEl.textContent).toContain("second");
+    expect(controller.tooltipEl.textContent).toContain("second definition");
+    expect(controller.tooltipEl.textContent).not.toContain("first definition");
     controller.destroy();
   });
 

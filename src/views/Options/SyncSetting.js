@@ -39,6 +39,21 @@ import CodeRoundedIcon from "@mui/icons-material/CodeRounded";
 import VisibilityIcon from "@mui/icons-material/Visibility";
 import VisibilityOffIcon from "@mui/icons-material/VisibilityOff";
 
+const SYNC_METHOD_METADATA = {
+  [OPT_SYNCTYPE_WEBDAV]: {
+    Icon: FolderSharedRoundedIcon,
+    descriptionKey: "sync_method_webdav_description",
+  },
+  [OPT_SYNCTYPE_GIST]: {
+    Icon: CodeRoundedIcon,
+    descriptionKey: "sync_method_gist_description",
+  },
+  [OPT_SYNCTYPE_WORKER]: {
+    Icon: CloudSyncRoundedIcon,
+    descriptionKey: "sync_method_worker_description",
+  },
+};
+
 /**
  * 云端备份与同步设置主面板组件 (SyncSetting)
  */
@@ -88,6 +103,10 @@ export default function SyncSetting() {
     await updateSync({
       [name]: value,
     });
+  };
+
+  const handleSyncTypeChange = async (syncTypeValue) => {
+    await updateSync({ syncType: syncTypeValue });
   };
 
   // 触发物理网络数据上传/下载同步
@@ -259,33 +278,19 @@ export default function SyncSetting() {
 
         <div className="kt-sync-methods">
           {OPT_SYNCTYPE_ALL.map((item) => {
-            const Icon =
-              item === "WebDAV"
-                ? FolderSharedRoundedIcon
-                : item.toLowerCase().includes("gist")
-                  ? CodeRoundedIcon
-                  : CloudSyncRoundedIcon;
+            const { Icon, descriptionKey } = SYNC_METHOD_METADATA[item];
             return (
               <button
                 type="button"
                 className="kt-sync-method"
                 aria-pressed={syncType === item}
                 key={item}
-                onClick={() =>
-                  handleChange({
-                    preventDefault: () => {},
-                    target: { name: "syncType", value: item },
-                  })
-                }
+                onClick={() => void handleSyncTypeChange(item)}
               >
                 <Icon />
                 <span className="kt-sync-method__name">{item}</span>
                 <span className="kt-sync-method__description">
-                  {item === "WebDAV"
-                    ? "Nextcloud · Nutstore"
-                    : item.toLowerCase().includes("gist")
-                      ? "Private GitHub Gist"
-                      : "Cloudflare Worker"}
+                  {i18n(descriptionKey)}
                 </span>
               </button>
             );

@@ -260,12 +260,12 @@ export default function TranBox(props) {
   const followSelection = props.followSelection;
   const setFollowSelection = props.setFollowSelection;
 
-  let realApiSlugs = props.tranboxSetting.apiSlugs;
-  // 检查是否开启了“如果是单字，则不进行全文大模型/机器翻译，仅展示词典与建议”的性能优化设置
-  if (props.tranboxSetting.singleWordNoTrans && isValidWord(props.text)) {
-    // 强制清空要调用的翻译引擎 API slugs
-    realApiSlugs = [];
-  }
+  const realApiSlugs = resolveTranBoxApiSlugs({
+    apiSlugs: props.tranboxSetting.apiSlugs,
+    text: props.text,
+    singleWordNoTrans: props.tranboxSetting.singleWordNoTrans,
+    activeView,
+  });
 
   return (
     // 为子组件提供独立翻译框专属的 Setting 上下文
@@ -323,4 +323,15 @@ export default function TranBox(props) {
 
 export function getDefaultTranBoxView(text, singleWordNoTrans) {
   return singleWordNoTrans && isValidWord(text) ? "dictionary" : "translation";
+}
+
+export function resolveTranBoxApiSlugs({
+  apiSlugs = [],
+  text,
+  singleWordNoTrans,
+  activeView,
+}) {
+  const shouldSuppressAutomaticTranslation =
+    activeView === "dictionary" && singleWordNoTrans && isValidWord(text);
+  return shouldSuppressAutomaticTranslation ? [] : apiSlugs;
 }

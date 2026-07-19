@@ -30,7 +30,7 @@ import { useSubtitle } from "../../hooks/Subtitle";
 import { useApiList } from "../../hooks/Api";
 import { usePromptList } from "../../hooks/Prompt";
 import ValidationInput from "../../hooks/ValidationInput";
-import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import { useCallback, useMemo } from "react";
 import { normalizeSubtitleMode } from "../../subtitle/modes";
 import {
   SettingsAdvanced,
@@ -42,190 +42,18 @@ import {
   SettingsSelect,
   SettingsSwitch,
 } from "./SettingsCard";
-
-/**
- * 将 CSS 字符串解析成键值对 JavaScript 对象
- */
-const parseCssToObject = (cssString) => {
-  const result = {};
-  if (!cssString) return result;
-
-  const properties = cssString.split(";").filter((p) => p.trim());
-  properties.forEach((prop) => {
-    const colonIndex = prop.indexOf(":");
-    if (colonIndex > 0) {
-      const key = prop.substring(0, colonIndex).trim();
-      const value = prop.substring(colonIndex + 1).trim();
-      result[key] = value;
-    }
-  });
-  return result;
-};
-
-const cssObjectToReactStyle = (cssObject) =>
-  Object.fromEntries(
-    Object.entries(cssObject).map(([property, value]) => {
-      if (property.startsWith("--")) return [property, value];
-      const camelProperty = property.replace(/-([a-z])/g, (_, letter) =>
-        letter.toUpperCase()
-      );
-      const reactProperty = camelProperty.startsWith("webkit")
-        ? `W${camelProperty.slice(1)}`
-        : camelProperty;
-      return [reactProperty, value];
-    })
-  );
-
-/**
- * 将 JavaScript CSS 样式对象转换回标准 CSS 字符串
- */
-const objectToCss = (obj) => {
-  const entries = Object.entries(obj).filter(
-    ([, value]) => value !== undefined && value !== ""
-  );
-  if (entries.length === 0) {
-    return "";
-  }
-  return entries.map(([key, value]) => `${key}: ${value}`).join(";\n") + ";";
-};
-
-/**
- * 提取并解析 rgba() 或 rgb() 颜色字符串的 R、G、B、A 属性
- */
-const parseRgba = (rgbaString) => {
-  const match = rgbaString?.match(
-    /rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/
-  );
-  if (match) {
-    return {
-      r: parseInt(match[1], 10),
-      g: parseInt(match[2], 10),
-      b: parseInt(match[3], 10),
-      a: match[4] !== undefined ? parseFloat(match[4]) : 1,
-    };
-  }
-  return null;
-};
-
-/**
- * 将 RGB 十进制数值转换为 Hex 十六进制颜色代码
- */
-const rgbToHex = (r, g, b) => {
-  return (
-    "#" +
-    [r, g, b]
-      .map((x) => {
-        let v = Number(x);
-        if (Number.isNaN(v)) v = 0;
-        v = Math.min(255, Math.max(0, Math.round(v)));
-        return v.toString(16).padStart(2, "0");
-      })
-      .join("")
-  );
-};
-
-/**
- * 将 Hex 十六进制颜色代码转换成 RGB 十进制颜色对象
- */
-const hexToRgb = (hex) => {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return result
-    ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
-    : { r: 0, g: 0, b: 0 };
-};
-
-/**
- * 从 CSS 字体大小声明中解析出具体的值 (如从 clamp 表达式中提取其弹性首选 rem 等)
- */
-const parseFontSize = (fontSizeStr) => {
-  if (!fontSizeStr) return { min: 1, preferred: 2, max: 3, unit: "rem" };
-
-  const clampMatch = fontSizeStr.match(
-    /clamp\s*\(\s*([\d.]+)(\w+)\s*,\s*([\d.]+)(\w+)\s*,\s*([\d.]+)(\w+)\s*\)/
-  );
-  if (clampMatch) {
-    return {
-      min: parseFloat(clampMatch[1]),
-      preferred: parseFloat(clampMatch[3]),
-      max: parseFloat(clampMatch[5]),
-      unit: clampMatch[2],
-    };
-  }
-
-  const simpleMatch = fontSizeStr.match(/([\d.]+)(\w+)/);
-  if (simpleMatch) {
-    const value = parseFloat(simpleMatch[1]);
-    return {
-      min: value * 0.5,
-      preferred: value,
-      max: value * 1.5,
-      unit: simpleMatch[2],
-    };
-  }
-
-  return { min: 1, preferred: 2, max: 3, unit: "rem" };
-};
-
-/**
- * 从 CSS 的 padding 声明中解析出上下和左右内边距
- */
-const parsePadding = (paddingStr) => {
-  if (!paddingStr) return { vertical: 0.5, horizontal: 1, unit: "em" };
-
-  const parts = paddingStr.trim().split(/\s+/);
-  if (parts.length === 1) {
-    const match = parts[0].match(/([\d.]+)(\w+)/);
-    if (match) {
-      return {
-        vertical: parseFloat(match[1]),
-        horizontal: parseFloat(match[1]),
-        unit: match[2],
-      };
-    }
-  } else if (parts.length >= 2) {
-    const vMatch = parts[0].match(/([\d.]+)(\w+)/);
-    const hMatch = parts[1].match(/([\d.]+)(\w+)/);
-    if (vMatch && hMatch) {
-      return {
-        vertical: parseFloat(vMatch[1]),
-        horizontal: parseFloat(hMatch[1]),
-        unit: vMatch[2],
-      };
-    }
-  }
-  return { vertical: 0.5, horizontal: 1, unit: "em" };
-};
-
-/**
- * 将常见的 CSS 颜色名转化成十六进制颜色代码
- */
-const colorToHex = (colorStr) => {
-  if (!colorStr) return "#ffffff";
-  const namedColors = {
-    white: "#ffffff",
-    black: "#000000",
-    red: "#ff0000",
-    green: "#00ff00",
-    blue: "#0000ff",
-    yellow: "#ffff00",
-    cyan: "#00ffff",
-    magenta: "#ff00ff",
-    gray: "#808080",
-    grey: "#808080",
-    orange: "#ffa500",
-    transparent: "#ffffff",
-  };
-  const lower = colorStr.toLowerCase().trim();
-  if (namedColors[lower]) return namedColors[lower];
-  if (colorStr.startsWith("#")) return colorStr;
-  const rgba = parseRgba(colorStr);
-  if (rgba) return rgbToHex(rgba.r, rgba.g, rgba.b);
-  return "#ffffff";
-};
+import {
+  colorToHex,
+  cssObjectToReactStyle,
+  hexToRgb,
+  objectToCss,
+  parseCssToObject,
+  parseFontSize,
+  parsePadding,
+  resolveBackgroundRgba,
+  rgbToHex,
+} from "./subtitleStyleUtils";
+import { useSubtitleStyleEditor } from "./useSubtitleStyleEditor";
 
 // YouTube 默认字幕容器的最大参考宽度
 const YOUTUBE_CAPTION_CONTAINER_WIDTH = 640;
@@ -338,17 +166,7 @@ export default function SubtitleSetting() {
     updateSubtitle({
       [name]: value,
     });
-    // 如果修改了自定义 CSS 源码，同步刷新本地的 CSS 临时解析缓存
-    if (name === "originStyle") {
-      setLocalOriginStyle(value);
-      originCssRef.current = parseCssToObject(value);
-    } else if (name === "translationStyle") {
-      setLocalTransStyle(value);
-      transCssRef.current = parseCssToObject(value);
-    } else if (name === "windowStyle") {
-      setLocalWindowStyle(value);
-      windowCssRef.current = parseCssToObject(value);
-    }
+    styleEditor.syncStyleSource(name, value);
   };
 
   const handleSegPromptChange = (e) => {
@@ -419,123 +237,21 @@ export default function SubtitleSetting() {
   const segmentationValue =
     segSlug && segSlug !== "-" ? `ai:${segSlug}` : useAlgorithmBreaker;
 
-  // 维护一份本地的 CSS 临时样式值，以供 Slider 滑块频繁拖拽时实现低延迟渲染
-  const [localOriginStyle, setLocalOriginStyle] = useState(originStyle);
-  const [localTransStyle, setLocalTransStyle] = useState(translationStyle);
-  const [localWindowStyle, setLocalWindowStyle] = useState(windowStyle);
-
-  // 监听外部配置的样式同步更新本地
-  useEffect(() => {
-    setLocalOriginStyle(originStyle);
-  }, [originStyle]);
-  useEffect(() => {
-    setLocalTransStyle(translationStyle);
-  }, [translationStyle]);
-  useEffect(() => {
-    setLocalWindowStyle(windowStyle);
-  }, [windowStyle]);
-
-  // 控制频繁 Slider 输入时的防抖定时器
-  const debounceTimers = useRef({});
-  const rafIds = useRef({ origin: 0, trans: 0, window: 0 });
-
-  const originCssRef = useRef(parseCssToObject(localOriginStyle));
-  const transCssRef = useRef(parseCssToObject(localTransStyle));
-  const windowCssRef = useRef(parseCssToObject(localWindowStyle));
-
-  // 组件卸载时销毁所有动画帧与防抖定时器
-  useEffect(() => {
-    return () => {
-      Object.values(debounceTimers.current).forEach(clearTimeout);
-      debounceTimers.current = {};
-      Object.values(rafIds.current).forEach(
-        (id) => id && cancelAnimationFrame(id)
-      );
-      rafIds.current = { origin: 0, trans: 0, window: 0 };
-    };
-  }, []);
-
-  // 防抖保存最终 CSS 样式至 Chrome 扩展的持久存储中，避免拖动滑块时高频读写造成卡顿
-  const debouncedUpdate = useCallback(
-    (name, value) => {
-      if (debounceTimers.current[name]) {
-        clearTimeout(debounceTimers.current[name]);
-      }
-      debounceTimers.current[name] = setTimeout(() => {
-        updateSubtitle({ [name]: value });
-      }, 200);
-    },
-    [updateSubtitle]
-  );
-
-  // 使用 requestAnimationFrame 优化滑动时预览的流畅性
-  const scheduleRafUpdate = useCallback((name, setter, cssString) => {
-    const rafKey = {
-      originStyle: "origin",
-      translationStyle: "trans",
-      windowStyle: "window",
-    }[name];
-    if (rafIds.current[rafKey]) {
-      cancelAnimationFrame(rafIds.current[rafKey]);
-    }
-    rafIds.current[rafKey] = requestAnimationFrame(() => {
-      rafIds.current[rafKey] = 0;
-      setter(cssString);
-    });
-  }, []);
-
-  // 联动更新原文的 CSS 并触发防抖同步
-  const updateOriginCss = useCallback(
-    (key, value) => {
-      originCssRef.current[key] = value;
-      const css = objectToCss(originCssRef.current);
-      scheduleRafUpdate("originStyle", setLocalOriginStyle, css);
-      debouncedUpdate("originStyle", css);
-    },
-    [debouncedUpdate, scheduleRafUpdate]
-  );
-
-  // 联动更新译文的 CSS 并触发防抖同步
-  const updateTranslationCss = useCallback(
-    (key, value) => {
-      transCssRef.current[key] = value;
-      const css = objectToCss(transCssRef.current);
-      scheduleRafUpdate("translationStyle", setLocalTransStyle, css);
-      debouncedUpdate("translationStyle", css);
-    },
-    [debouncedUpdate, scheduleRafUpdate]
-  );
-
-  // 联动更新背景窗格的 CSS 并触发防抖同步
-  const updateWindowCss = useCallback(
-    (key, value) => {
-      windowCssRef.current[key] = value;
-      const css = objectToCss(windowCssRef.current);
-      scheduleRafUpdate("windowStyle", setLocalWindowStyle, css);
-      debouncedUpdate("windowStyle", css);
-    },
-    [debouncedUpdate, scheduleRafUpdate]
-  );
-
-  // 直接全量更新背景窗格 CSS 并防抖
-  const updateWindowCssDirect = useCallback(
-    (css) => {
-      windowCssRef.current = parseCssToObject(css);
-      scheduleRafUpdate("windowStyle", setLocalWindowStyle, css);
-      debouncedUpdate("windowStyle", css);
-    },
-    [debouncedUpdate, scheduleRafUpdate]
-  );
-
-  useEffect(() => {
-    originCssRef.current = parseCssToObject(localOriginStyle);
-  }, [localOriginStyle]);
-  useEffect(() => {
-    transCssRef.current = parseCssToObject(localTransStyle);
-  }, [localTransStyle]);
-  useEffect(() => {
-    windowCssRef.current = parseCssToObject(localWindowStyle);
-  }, [localWindowStyle]);
+  const styleEditor = useSubtitleStyleEditor({
+    originStyle,
+    translationStyle,
+    windowStyle,
+    updateSubtitle,
+  });
+  const {
+    localOriginStyle,
+    localTransStyle,
+    localWindowStyle,
+    updateOriginCss,
+    updateTranslationCss,
+    updateWindowCss,
+    updateWindowCssDirect,
+  } = styleEditor;
 
   // 从本地计算生成的临时 CSS 键值对，用于给 Slider 及其余受控组件展示当前样式属性值
   const originCssObj = useMemo(
@@ -555,9 +271,7 @@ export default function SubtitleSetting() {
   const transFontSize = parseFontSize(transCssObj["font-size"] || "");
 
   const windowPadding = parsePadding(windowCssObj["padding"] || "0.5em 1em");
-  const windowBgRgba = parseRgba(
-    windowCssObj["background-color"] || "rgba(0, 0, 0, 0.5)"
-  ) || { r: 0, g: 0, b: 0, a: 0.5 };
+  const windowBgRgba = resolveBackgroundRgba(windowCssObj);
   const windowBgHex = rgbToHex(windowBgRgba.r, windowBgRgba.g, windowBgRgba.b);
   const windowLineHeight = parseFloat(windowCssObj["line-height"]) || 1.3;
   const windowHasTextShadow = !!windowCssObj["text-shadow"];
@@ -1185,7 +899,7 @@ export default function SubtitleSetting() {
                                 "1px 1px 2px black"
                               );
                             } else {
-                              const newObj = { ...windowCssRef.current };
+                              const newObj = { ...windowCssObj };
                               delete newObj["text-shadow"];
                               updateWindowCssDirect(objectToCss(newObj));
                             }

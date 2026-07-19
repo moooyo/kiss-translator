@@ -18,9 +18,13 @@ export async function applyRuntimeSettingPatch(
     dependencies.sendTabMessage ||
     ((tabId, message) => browser.tabs.sendMessage(tabId, message));
 
+  // The patch always updates the global default. Scope controls only which
+  // already-open tabs receive the live update; other tabs keep session state
+  // until their next runtime start.
   const currentSetting = await getSetting();
   const nextSetting = mergeSettingPatch(currentSetting, patch);
   await setSetting(nextSetting);
+  await dependencies.onPersisted?.(nextSetting, patch);
 
   let tabs;
   if (scope === "current") {

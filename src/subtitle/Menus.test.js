@@ -1,7 +1,11 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { DEFAULT_SUBTITLE_SETTING, OPT_TRANS_OPENAI } from "../config";
-import { MENU_STYLES, Menus } from "./Menus";
+import {
+  DEFAULT_SUBTITLE_SETTING,
+  OPT_TRANS_OPENAI,
+  SUBTITLE_BACKGROUND_STYLES,
+} from "../config";
+import { MENU_STYLES, Menus, resolveSubtitleBackgroundMode } from "./Menus";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -12,6 +16,20 @@ describe("subtitle control alignment", () => {
     );
     expect(MENU_STYLES).toMatch(
       /\.kt-subtitle-segmented button\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/
+    );
+  });
+
+  test("recognizes canonical and legacy background declarations", () => {
+    expect(
+      resolveSubtitleBackgroundMode(SUBTITLE_BACKGROUND_STYLES.gradient)
+    ).toBe("gradient");
+    expect(
+      resolveSubtitleBackgroundMode(
+        "background:linear-gradient(180deg,transparent,#000);"
+      )
+    ).toBe("gradient");
+    expect(resolveSubtitleBackgroundMode(SUBTITLE_BACKGROUND_STYLES.none)).toBe(
+      "none"
     );
   });
 });

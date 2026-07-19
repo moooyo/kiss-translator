@@ -3,6 +3,8 @@
  * @description 国际化本地化字典文件，包含支持的界面语言、自定义 API 请求帮助文档，以及多语言文案对照（支持中文、英文、繁体中文、日文、韩文）。
  */
 
+import { SETTINGS_I18N } from "./locales/settings";
+
 export const UI_LANGS = [
   ["en", "English"],
   ["zh", "简体中文"],
@@ -254,6 +256,7 @@ async ({ res, ...args }) => {
 }`;
 
 export const I18N = {
+  ...SETTINGS_I18N,
   app_name: {
     zh: `简约翻译`,
     en: `KISS Translator`,

@@ -1,5 +1,6 @@
 import {
   Fragment,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -183,6 +184,7 @@ function PromptFields({
   onCopy,
   onDelete,
   onCollapse,
+  onDirtyChange,
 }) {
   const i18n = useI18n();
   const confirm = useConfirm();
@@ -207,6 +209,10 @@ function PromptFields({
     [formData, isPreset, prompt]
   );
 
+  useEffect(() => {
+    onDirtyChange?.(isModified);
+  }, [isModified, onDirtyChange]);
+
   const handleChange = (event) => {
     const { name, value } = event.target;
     setFormData((prev) => ({
@@ -217,6 +223,7 @@ function PromptFields({
 
   const handleSave = () => {
     onSave(formData);
+    onDirtyChange?.(false);
   };
 
   const handleInsertPlaceholder = (name, inputRef, placeholder) => {
@@ -374,6 +381,7 @@ function PromptFields({
 
 export default function Prompts() {
   const i18n = useI18n();
+  const confirm = useConfirm();
   const {
     prompts,
     addPrompt,
@@ -384,6 +392,7 @@ export default function Prompts() {
   } = usePromptList();
   const [selectedPromptSlug, setSelectedPromptSlug] = useState("");
   const [editorOpen, setEditorOpen] = useState(false);
+  const [editorDirty, setEditorDirty] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const detailPanelRef = useRef(null);
   const addMenuOpen = Boolean(anchorEl);
@@ -468,9 +477,20 @@ export default function Prompts() {
     setAnchorEl(null);
   };
 
-  const handleAddPromptFromTemplate = (template) => {
+  const confirmDiscardChanges = useCallback(async () => {
+    if (!editorDirty) return true;
+    return confirm({
+      message: i18n("discard_prompt_changes_confirm"),
+      confirmText: i18n("discard_changes"),
+      cancelText: i18n("cancel"),
+    });
+  }, [confirm, editorDirty, i18n]);
+
+  const handleAddPromptFromTemplate = async (template) => {
+    if (!(await confirmDiscardChanges())) return;
     const templateName = getPromptDisplayName(template, i18n);
     const promptSlug = addPrompt(template, templateName);
+    setEditorDirty(false);
     setSelectedPromptSlug(promptSlug);
     setEditorOpen(true);
     handleClose();
@@ -478,14 +498,25 @@ export default function Prompts() {
 
   const handleCopyPrompt = (prompt, promptDisplayName) => {
     const promptSlug = copyPrompt(prompt, promptDisplayName);
+    setEditorDirty(false);
     setSelectedPromptSlug(promptSlug);
     setEditorOpen(true);
   };
 
-  const handleOpenPrompt = (prompt) => {
+  const handleOpenPrompt = async (prompt) => {
     if (!prompt) return;
-    setSelectedPromptSlug(normalizePrompt(prompt).slug);
+    const promptSlug = normalizePrompt(prompt).slug;
+    if (editorOpen && promptSlug === selectedPromptSlug) return;
+    if (!(await confirmDiscardChanges())) return;
+    setEditorDirty(false);
+    setSelectedPromptSlug(promptSlug);
     setEditorOpen(true);
+  };
+
+  const handleCloseEditor = async () => {
+    if (!(await confirmDiscardChanges())) return;
+    setEditorDirty(false);
+    setEditorOpen(false);
   };
 
   return (
@@ -503,7 +534,7 @@ export default function Prompts() {
                   size="small"
                   variant="contained"
                   disabled={!row.prompt}
-                  onClick={() => handleOpenPrompt(row.prompt)}
+                  onClick={() => void handleOpenPrompt(row.prompt)}
                 >
                   {i18n("edit")}
                 </Button>
@@ -539,7 +570,7 @@ export default function Prompts() {
             <Button
               size="small"
               variant="text"
-              onClick={() => setEditorOpen(false)}
+              onClick={() => void handleCloseEditor()}
               startIcon={<ArrowBackIcon />}
             >
               {i18n("back")}
@@ -597,9 +628,7 @@ export default function Prompts() {
                       normalizePrompt(prompt).slug === selectedPromptSlug
                     }
                     isPreset={isPresetPromptSlug(normalizePrompt(prompt).slug)}
-                    onSelect={() =>
-                      setSelectedPromptSlug(normalizePrompt(prompt).slug)
-                    }
+                    onSelect={() => void handleOpenPrompt(prompt)}
                   />
                 ))}
               </List>
@@ -632,7 +661,9 @@ export default function Prompts() {
                   }
                   onCopy={handleCopyPrompt}
                   onDelete={deletePrompt}
+                  onDirtyChange={setEditorDirty}
                   onCollapse={() => {
+                    setEditorDirty(false);
                     setSelectedPromptSlug("");
                     setEditorOpen(false);
                   }}
@@ -660,7 +691,7 @@ export default function Prompts() {
             {group.templates.map((template) => (
               <MenuItem
                 key={normalizePrompt(template).slug}
-                onClick={() => handleAddPromptFromTemplate(template)}
+                onClick={() => void handleAddPromptFromTemplate(template)}
                 sx={{ gap: 1 }}
               >
                 <LockIcon fontSize="small" color="action" />

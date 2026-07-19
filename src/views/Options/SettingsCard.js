@@ -157,17 +157,24 @@ export function SettingsRange({
   label,
   onChange,
 }) {
+  const [draftValue, setDraftValue] = useState(value);
+
+  useEffect(() => {
+    setDraftValue(value);
+  }, [value]);
+
   return (
     <Box className="kt-settings-range">
       <Slider
-        value={value}
+        value={draftValue}
         min={min}
         max={max}
         step={step}
         aria-label={label}
-        onChange={(_event, nextValue) => onChange(Number(nextValue))}
+        onChange={(_event, nextValue) => setDraftValue(Number(nextValue))}
+        onChangeCommitted={(_event, nextValue) => onChange(Number(nextValue))}
       />
-      <Typography component="output">{`${value}${unit}`}</Typography>
+      <Typography component="output">{`${draftValue}${unit}`}</Typography>
     </Box>
   );
 }

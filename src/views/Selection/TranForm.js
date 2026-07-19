@@ -338,7 +338,19 @@ export default function TranForm({
             }}
           />
           <div className="kt-popup-translation-input__footer">
-            <span>{editText.length} / 5000</span>
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <span>{editText.length} / 5000</span>
+              {!editText.trim() && (
+                <IconButton
+                  size="small"
+                  onClick={handlePaste}
+                  title={i18n("paste")}
+                  aria-label={i18n("paste")}
+                >
+                  <ContentPasteIcon fontSize="inherit" />
+                </IconButton>
+              )}
+            </Stack>
             <Button
               variant="contained"
               disabled={!editText.trim()}

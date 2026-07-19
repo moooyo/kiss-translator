@@ -7,8 +7,6 @@ export const POPUP_STYLES = String.raw`
   color: var(--kt-on);
 }
 
-.kt-popup-shell:focus { outline: none; }
-
 .kt-popup-shell--window {
   width: min(560px, 100vw);
   min-width: 0;

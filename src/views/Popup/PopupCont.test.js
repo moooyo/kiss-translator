@@ -51,7 +51,7 @@ async function flushEffects() {
   });
 }
 
-function renderPopupCont() {
+function renderPopupCont(props = {}) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
@@ -90,6 +90,7 @@ function renderPopupCont() {
         setRule={jest.fn()}
         setSetting={jest.fn()}
         handleOpenSetting={jest.fn()}
+        {...props}
       />
     );
   });
@@ -143,21 +144,76 @@ describe("PopupCont capability parity", () => {
     view.cleanup();
   });
 
-  test("exposes review and sponsorship actions from the normal popup", async () => {
+  test("exposes support actions as a keyboard-accessible disclosure", async () => {
     const view = renderPopupCont();
     await flushEffects();
 
     const supportButton = Array.from(
       view.container.querySelectorAll("button")
     ).find((button) => button.textContent.includes("popup_support"));
+    expect(supportButton.getAttribute("aria-expanded")).toBe("false");
     act(() => supportButton.click());
 
-    const supportLinks = view.container.querySelectorAll(
-      '.kt-popup-support a[role="menuitem"]'
+    const supportDisclosure = view.container.querySelector(".kt-popup-support");
+    const supportLinks = supportDisclosure.querySelectorAll("a");
+    expect(supportButton.getAttribute("aria-controls")).toBe(
+      supportDisclosure.id
     );
+    expect(supportDisclosure.getAttribute("aria-labelledby")).toBe(
+      supportButton.id
+    );
+    expect(supportButton.compareDocumentPosition(supportDisclosure)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(
+      supportButton.closest(".kt-popup-disclosure-row").nextElementSibling
+    ).toBe(supportDisclosure);
     expect(supportLinks).toHaveLength(2);
     expect(supportLinks[0].textContent).toBe("comment_support");
     expect(supportLinks[1].textContent).toBe("appreciate_support");
+    expect(supportDisclosure.getAttribute("role")).toBe("region");
+    expect(supportLinks[0].hasAttribute("role")).toBe(false);
+    expect(document.activeElement).toBe(supportLinks[0]);
+
+    act(() => {
+      supportLinks[0].dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+      );
+    });
+
+    expect(view.container.querySelector(".kt-popup-support")).toBeNull();
+    expect(supportButton.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(supportButton);
+    view.cleanup();
+  });
+
+  test("places the content popup support disclosure after its trigger", async () => {
+    const view = renderPopupCont({
+      isContent: true,
+      processActions: jest.fn(),
+    });
+    await flushEffects();
+
+    const footerButtons = view.container.querySelectorAll(
+      ".kt-popup-footer button"
+    );
+    const supportButton = footerButtons[footerButtons.length - 1];
+    expect(supportButton.textContent).toContain("popup_support");
+
+    act(() => supportButton.click());
+
+    const supportDisclosure = view.container.querySelector(".kt-popup-support");
+    const firstSupportLink = supportDisclosure.querySelector("a");
+    expect(supportButton.compareDocumentPosition(supportDisclosure)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING
+    );
+    expect(supportButton.closest("footer").nextElementSibling).toBe(
+      supportDisclosure
+    );
+    expect(supportButton.getAttribute("aria-controls")).toBe(
+      supportDisclosure.id
+    );
+    expect(document.activeElement).toBe(firstSupportLink);
     view.cleanup();
   });
 

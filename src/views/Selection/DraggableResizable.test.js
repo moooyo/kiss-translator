@@ -115,4 +115,20 @@ describe("DraggableResizable auto height bounds", () => {
     const updater = panel.setPosition.mock.calls.at(-1)[0];
     expect(updater({ x: 0, y: 400 })).toEqual({ x: 0, y: 200 });
   });
+
+  test("keeps header overlays visible while clipping the scrolling body", () => {
+    renderPanel();
+
+    const draggable = container.querySelector(".KT-draggable");
+    const body = container.querySelector(".KT-draggable-body");
+    const header = container.querySelector(".KT-draggable-header");
+    const content = container.querySelector(".KT-draggable-container");
+
+    expect(draggable.style.overflow).toBe("visible");
+    expect(getComputedStyle(body).overflow).toBe("visible");
+    expect(header.style.overflow).toBe("visible");
+    expect(header.style.borderRadius).toBe("21px 21px 0 0");
+    expect(getComputedStyle(content).overflow).toBe("hidden auto");
+    expect(getComputedStyle(content).borderRadius).toBe("0 0 21px 21px");
+  });
 });

@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import DeleteSweepRoundedIcon from "@mui/icons-material/DeleteSweepRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -81,6 +88,10 @@ export default function PopupCont({
   const [translationBusy, setTranslationBusy] = useState(false);
   const busyTimerRef = useRef(null);
   const translationTogglePendingRef = useRef(false);
+  const supportTriggerRef = useRef(null);
+  const supportFirstLinkRef = useRef(null);
+  const supportDisclosureId = useId();
+  const supportTriggerId = `${supportDisclosureId}-trigger`;
   const { allTextStyles } = useAllTextStyles();
   const popupTextStyles = useMemo(
     () =>
@@ -109,6 +120,10 @@ export default function PopupCont({
   useEffect(() => {
     onExpandedChange?.(showAdvanced || showAllServices || showSupport);
   }, [onExpandedChange, showAdvanced, showAllServices, showSupport]);
+
+  useEffect(() => {
+    if (showSupport) supportFirstLinkRef.current?.focus();
+  }, [showSupport]);
 
   useEffect(
     () => () => {
@@ -224,6 +239,14 @@ export default function PopupCont({
     tryClearCaches();
     showMessage(i18n("clear_success"));
   }, [i18n, showMessage]);
+
+  const handleSupportKeyDown = useCallback((event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setShowSupport(false);
+    supportTriggerRef.current?.focus();
+  }, []);
 
   const handleSaveRule = useCallback(async () => {
     if (!selectedDomain) return;
@@ -346,6 +369,32 @@ export default function PopupCont({
     ["scanAll", i18n("scan_all_nodes"), scanAll === "true"],
     ["isPlainText", i18n("plain_text_translate"), isPlainText],
   ];
+
+  const supportDisclosure = showSupport && (
+    <div
+      className="kt-popup-support"
+      id={supportDisclosureId}
+      role="region"
+      aria-labelledby={supportTriggerId}
+      onKeyDown={handleSupportKeyDown}
+    >
+      <a
+        ref={supportFirstLinkRef}
+        href={process.env.REACT_APP_REVIEW_URL}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {i18n("comment_support")}
+      </a>
+      <a
+        href={process.env.REACT_APP_SUPPORT_URL}
+        target="_blank"
+        rel="noreferrer"
+      >
+        {i18n("appreciate_support")}
+      </a>
+    </div>
+  );
 
   return (
     <section className="kt-popup-content">
@@ -558,8 +607,11 @@ export default function PopupCont({
         </button>
         {!isContent && (
           <Button
+            ref={supportTriggerRef}
+            id={supportTriggerId}
             className="kt-popup-disclosure-support"
             variant="text"
+            aria-controls={supportDisclosureId}
             aria-expanded={showSupport}
             onClick={() => setShowSupport((current) => !current)}
           >
@@ -567,6 +619,8 @@ export default function PopupCont({
           </Button>
         )}
       </div>
+
+      {!isContent && supportDisclosure}
 
       {showAdvanced && (
         <div className="kt-popup-advanced">
@@ -645,50 +699,35 @@ export default function PopupCont({
         </div>
       )}
 
-      {showSupport && (
-        <div className="kt-popup-support" role="menu">
-          <a
-            role="menuitem"
-            href={process.env.REACT_APP_REVIEW_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {i18n("comment_support")}
-          </a>
-          <a
-            role="menuitem"
-            href={process.env.REACT_APP_SUPPORT_URL}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {i18n("appreciate_support")}
-          </a>
-        </div>
-      )}
-
       {isContent && (
-        <footer className="kt-popup-footer">
-          {[shortcutMap.page, shortcutMap.selection]
-            .filter((keys) => keys.length > 0)
-            .map((keys) => (
-              <span className="kt-popup-footer__keys" key={keys.join("+")}>
-                {keys.map((key) => (
-                  <kbd key={key}>{key}</kbd>
-                ))}
-              </span>
-            ))}
-          <span className="kt-popup-footer__spacer" />
-          <Button
-            variant="text"
-            aria-expanded={showSupport}
-            onClick={() => setShowSupport((current) => !current)}
-          >
-            {i18n("popup_support")}
-          </Button>
-          <Button variant="text" onClick={handleOpenSetting}>
-            {i18n("popup_all_settings")}
-          </Button>
-        </footer>
+        <>
+          <footer className="kt-popup-footer">
+            {[shortcutMap.page, shortcutMap.selection]
+              .filter((keys) => keys.length > 0)
+              .map((keys) => (
+                <span className="kt-popup-footer__keys" key={keys.join("+")}>
+                  {keys.map((key) => (
+                    <kbd key={key}>{key}</kbd>
+                  ))}
+                </span>
+              ))}
+            <span className="kt-popup-footer__spacer" />
+            <Button variant="text" onClick={handleOpenSetting}>
+              {i18n("popup_all_settings")}
+            </Button>
+            <Button
+              ref={supportTriggerRef}
+              id={supportTriggerId}
+              variant="text"
+              aria-controls={supportDisclosureId}
+              aria-expanded={showSupport}
+              onClick={() => setShowSupport((current) => !current)}
+            >
+              {i18n("popup_support")}
+            </Button>
+          </footer>
+          {supportDisclosure}
+        </>
       )}
 
       <Snackbar

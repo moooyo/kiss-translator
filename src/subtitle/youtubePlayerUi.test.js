@@ -85,4 +85,44 @@ describe("YouTubePlayerUi", () => {
     ui.showNotification("hidden");
     expect(notification.style.opacity).toBe("0");
   });
+
+  test("does not accumulate notifications across repeated teardown cycles", () => {
+    document.body.innerHTML = "<div><div><video></video></div></div>";
+    const videoEl = document.querySelector("video");
+    const ui = createUi(videoEl);
+
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      ui.showNotification(`cycle-${cycle}`, 1000);
+      expect(document.querySelectorAll(".kiss-notification")).toHaveLength(1);
+      expect(jest.getTimerCount()).toBe(1);
+
+      ui.destroyNotification();
+      expect(document.querySelectorAll(".kiss-notification")).toHaveLength(0);
+      expect(jest.getTimerCount()).toBe(0);
+    }
+
+    ui.showNotification("resumed", 1000);
+    expect(document.querySelectorAll(".kiss-notification")).toHaveLength(1);
+    expect(document.querySelector(".kiss-notification").textContent).toBe(
+      "resumed"
+    );
+  });
+
+  test("destroys only the notification owned by the UI instance", () => {
+    document.body.innerHTML = "<div><div><video></video></div></div>";
+    const videoEl = document.querySelector("video");
+    const ui = createUi(videoEl);
+    const foreignNotification = document.createElement("div");
+    foreignNotification.className = "kiss-notification";
+    document.body.appendChild(foreignNotification);
+
+    ui.showNotification("owned");
+    expect(document.querySelectorAll(".kiss-notification")).toHaveLength(2);
+
+    ui.destroyNotification();
+    expect(document.querySelectorAll(".kiss-notification")).toHaveLength(1);
+    expect(document.querySelector(".kiss-notification")).toBe(
+      foreignNotification
+    );
+  });
 });

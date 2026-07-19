@@ -37,3 +37,15 @@ describe("Safari popup sizing", () => {
     );
   });
 });
+
+describe("popup keyboard focus", () => {
+  test("does not suppress the compatible global focus outline", () => {
+    expect(POPUP_STYLES).not.toMatch(/:focus\s*\{\s*outline:\s*(?:0|none)/);
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-language select\s*\{[^}]*outline:\s*0;/
+    );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-translation-input textarea\s*\{[^}]*outline:\s*0;/
+    );
+  });
+});

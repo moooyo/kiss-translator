@@ -451,6 +451,52 @@ describe("Translator rule styles", () => {
     ).toBeNull();
   });
 
+  test("preserves a foreign fallback style in the document", async () => {
+    document.head.innerHTML =
+      '<style id="kiss-translator-fallback-style">.foreign { color: red; }</style>';
+    document.body.innerHTML = '<main id="root"><p>Hello world</p></main>';
+    const foreignStyle = document.head.querySelector("style");
+    const translator = createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    const canonicalStyles = document.querySelectorAll(
+      "#kiss-translator-fallback-style"
+    );
+    expect(canonicalStyles).toHaveLength(1);
+    expect(canonicalStyles[0]).toBe(foreignStyle);
+    expect(foreignStyle.textContent).toBe(".foreign { color: red; }");
+    const ownedStyle = document.querySelector(
+      "style[data-kiss-translator-fallback-style]"
+    );
+    expect(ownedStyle).not.toBeNull();
+    expect(ownedStyle.textContent).toContain(".kiss-style-");
+
+    translator.stop();
+
+    expect(foreignStyle.isConnected).toBe(true);
+    expect(foreignStyle.textContent).toBe(".foreign { color: red; }");
+    expect(ownedStyle.isConnected).toBe(false);
+  });
+
+  test("removes only its own adopted stylesheet when stopped", async () => {
+    const foreignSheet = { owner: "page" };
+    Object.defineProperty(document, "adoptedStyleSheets", {
+      configurable: true,
+      writable: true,
+      value: [foreignSheet],
+    });
+    document.body.innerHTML = '<main id="root"><p>Hello world</p></main>';
+    const translator = createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    expect(document.adoptedStyleSheets).toHaveLength(2);
+    expect(document.adoptedStyleSheets).toContain(foreignSheet);
+
+    translator.stop();
+
+    expect(document.adoptedStyleSheets).toEqual([foreignSheet]);
+  });
+
   test("does not pass SVG elements to the Chrome closed shadow root API", async () => {
     document.body.innerHTML = `
       <main id="root">
@@ -946,6 +992,44 @@ describe("Translator rule styles", () => {
     expect(style.id).toBe("kiss-translator-fallback-style");
     expect(style.textContent.length).toBeGreaterThan(0);
     expect(shadowRoot.querySelectorAll("style")).toHaveLength(1);
+  });
+
+  test("preserves a foreign fallback style in a shadow root", async () => {
+    global.CSSStyleSheet = class {
+      constructor() {
+        throw new Error("CSSStyleSheet not available");
+      }
+    };
+
+    document.body.innerHTML =
+      '<main id="root"><section id="host">Content</section></main>';
+    const host = document.getElementById("host");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    const foreignStyle = document.createElement("style");
+    foreignStyle.id = "kiss-translator-fallback-style";
+    foreignStyle.textContent = ".foreign { color: red; }";
+    shadowRoot.append(foreignStyle, document.createElement("p"));
+    apiTranslate.mockResolvedValue({ trText: "", isSame: true });
+    const translator = createTranslator({ scanAll: "true" });
+    await flushAsync();
+
+    const canonicalStyles = shadowRoot.querySelectorAll(
+      "#kiss-translator-fallback-style"
+    );
+    expect(canonicalStyles).toHaveLength(1);
+    expect(canonicalStyles[0]).toBe(foreignStyle);
+    expect(foreignStyle.textContent).toBe(".foreign { color: red; }");
+    const ownedStyle = shadowRoot.querySelector(
+      "style[data-kiss-translator-fallback-style]"
+    );
+    expect(ownedStyle).not.toBeNull();
+    expect(ownedStyle.textContent).toContain(".kiss-style-");
+
+    translator.stop();
+
+    expect(foreignStyle.isConnected).toBe(true);
+    expect(foreignStyle.textContent).toBe(".foreign { color: red; }");
+    expect(ownedStyle.isConnected).toBe(false);
   });
 
   test("falls back to inline <style> when adoptedStyleSheets setter throws", async () => {

@@ -326,3 +326,38 @@ describe("TranForm panel views", () => {
     act(() => dictionary.root.unmount());
   });
 });
+
+describe("TranForm popup input", () => {
+  beforeEach(() => {
+    apiDict.mockReset();
+    document.body.innerHTML = "";
+  });
+
+  test("pastes clipboard text into an empty popup input", async () => {
+    const setText = jest.fn();
+    const readText = jest.fn().mockResolvedValue("  clipboard text  ");
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { readText },
+    });
+    const { container, root } = renderTranForm({
+      text: "",
+      setText,
+      popupStyle: true,
+    });
+    await flushEffects();
+
+    const pasteButton = container.querySelector('button[aria-label="paste"]');
+    expect(pasteButton).not.toBeNull();
+
+    await act(async () => {
+      pasteButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await Promise.resolve();
+    });
+
+    expect(readText).toHaveBeenCalledTimes(1);
+    expect(setText).toHaveBeenCalledWith("clipboard text");
+
+    act(() => root.unmount());
+  });
+});

@@ -8,7 +8,10 @@ describe("settings segmented controls", () => {
     const buttonRule = OPTIONS_STYLES.match(
       /\.kt-settings-segmented > button\s*\{([^}]*)\}/
     )?.[1];
-    const focusRule = OPTIONS_STYLES.match(
+    const fallbackFocusRule = OPTIONS_STYLES.match(
+      /\.kt-settings-segmented > button:focus\s*\{([^}]*)\}/
+    )?.[1];
+    const enhancedFocusRule = OPTIONS_STYLES.match(
       /\.kt-settings-segmented > button:focus-visible\s*\{([^}]*)\}/
     )?.[1];
     const labelRule = OPTIONS_STYLES.match(
@@ -23,8 +26,14 @@ describe("settings segmented controls", () => {
     expect(buttonRule).toContain("overflow: hidden");
     expect(labelRule).toContain("text-overflow: ellipsis");
     expect(labelRule).toContain("white-space: nowrap");
-    expect(focusRule).toContain("outline: none");
-    expect(focusRule).toContain("box-shadow: inset");
+    expect(fallbackFocusRule).toContain("outline: none");
+    expect(fallbackFocusRule).toContain(
+      "box-shadow: inset 0 0 0 2px var(--kt-pri)"
+    );
+    expect(fallbackFocusRule).not.toContain("color-mix");
+    expect(enhancedFocusRule).toContain("outline: none");
+    expect(enhancedFocusRule).toContain("box-shadow: inset");
+    expect(OPTIONS_STYLES).toContain("@supports selector(:focus-visible)");
     expect(OPTIONS_STYLES).toMatch(
       /\.kt-options-page \.MuiSwitch-root\.MuiSwitch-sizeSmall \.MuiSwitch-switchBase\s*\{[^}]*display:\s*grid;[^}]*place-items:\s*center;/
     );

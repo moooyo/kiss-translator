@@ -1,9 +1,9 @@
 export const SELECTION_STYLES = String.raw`
-.KT-draggable { border-radius: 22px !important; animation: kt-m3-rise .45s var(--kt-spring); }
-.KT-draggable-body { border: 1px solid var(--kt-linev) !important; border-radius: 22px !important; background: var(--kt-sf0) !important; box-shadow: var(--kt-shadow-2) !important; }
-.KT-draggable-header { background: var(--kt-sf0); }
-.KT-draggable-container { background: var(--kt-sf0) !important; }
-.kt-tranbox-header { min-height: 56px; display: flex; align-items: center; gap: 6px; position: relative; padding: 7px 8px 7px 10px; border-bottom: 1px solid var(--kt-linev); background: var(--kt-sf0); color: var(--kt-on); }
+.KT-draggable { overflow: visible !important; border-radius: 22px !important; animation: kt-m3-rise .45s var(--kt-spring); }
+.KT-draggable-body { overflow: visible !important; border: 1px solid var(--kt-linev) !important; border-radius: 22px !important; background: var(--kt-sf0) !important; box-shadow: var(--kt-shadow-2) !important; }
+.KT-draggable-header { overflow: visible; border-radius: 21px 21px 0 0; background: var(--kt-sf0); }
+.KT-draggable-container { overflow-x: hidden; border-radius: 0 0 21px 21px; background: var(--kt-sf0) !important; }
+.kt-tranbox-header { min-height: 56px; display: flex; align-items: center; gap: 6px; position: relative; padding: 7px 8px 7px 10px; border-bottom: 1px solid var(--kt-linev); border-radius: 21px 21px 0 0; background: var(--kt-sf0); color: var(--kt-on); }
 .kt-tranbox-header__drag { display: flex; color: var(--kt-onv); cursor: move; }
 .kt-tranbox-header__drag svg { width: 19px; height: 19px; }
 .kt-tranbox-header__segments { min-width: 0; max-width: 174px; flex: 1; }

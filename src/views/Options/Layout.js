@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import Header from "./Header";
 import Navigator from "./Navigator";
@@ -11,6 +11,7 @@ export default function Layout() {
   const i18n = useI18n();
   const [navigationOpen, setNavigationOpen] = useState(false);
   const navigationTriggerRef = useRef(null);
+  const backgroundRef = useRef(null);
   const [latestVersion, setLatestVersion] = useState("");
   const isMobile = useMediaQueryMatch("(max-width: 859px)");
 
@@ -50,11 +51,28 @@ export default function Layout() {
     document.body.scrollTop = 0;
   }, [location.pathname]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!isMobile || !navigationOpen) return undefined;
     const navigation = document.getElementById("kt-options-navigation");
     if (!navigation) return undefined;
-    getNavigationFocusTargets(navigation)[0]?.focus();
+    const background = backgroundRef.current;
+    const backgroundFocusTargets = getNavigationFocusTargets(background).map(
+      (element) => [element, element.getAttribute("tabindex")]
+    );
+    backgroundFocusTargets.forEach(([element]) => {
+      element.setAttribute("tabindex", "-1");
+    });
+
+    const focusNavigation = (last = false) => {
+      const focusTargets = getNavigationFocusTargets(navigation);
+      const target = last
+        ? focusTargets[focusTargets.length - 1]
+        : focusTargets[0];
+      (target || navigation).focus();
+    };
+    focusNavigation();
+    background?.setAttribute("aria-hidden", "true");
+    background?.setAttribute("inert", "");
 
     const handleKeyDown = (event) => {
       if (event.key === "Escape") {
@@ -63,21 +81,41 @@ export default function Layout() {
         return;
       }
       const focusTargets = getNavigationFocusTargets(navigation);
-      if (event.key !== "Tab" || focusTargets.length === 0) return;
+      if (event.key !== "Tab") return;
+      if (focusTargets.length === 0) {
+        event.preventDefault();
+        navigation.focus();
+        return;
+      }
       const first = focusTargets[0];
       const last = focusTargets[focusTargets.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
+      if (!navigation.contains(document.activeElement)) {
         event.preventDefault();
-        last.focus();
+        focusNavigation(event.shiftKey);
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        focusNavigation(true);
       } else if (!event.shiftKey && document.activeElement === last) {
         event.preventDefault();
-        first.focus();
+        focusNavigation();
       }
     };
 
+    const handleFocusIn = (event) => {
+      if (!navigation.contains(event.target)) focusNavigation();
+    };
+
     document.addEventListener("keydown", handleKeyDown);
+    document.addEventListener("focusin", handleFocusIn);
     return () => {
       document.removeEventListener("keydown", handleKeyDown);
+      document.removeEventListener("focusin", handleFocusIn);
+      background?.removeAttribute("aria-hidden");
+      background?.removeAttribute("inert");
+      backgroundFocusTargets.forEach(([element, tabIndex]) => {
+        if (tabIndex === null) element.removeAttribute("tabindex");
+        else element.setAttribute("tabindex", tabIndex);
+      });
       navigationTriggerRef.current?.focus();
     };
   }, [isMobile, navigationOpen]);
@@ -125,56 +163,63 @@ export default function Layout() {
   return (
     <div className="kt-options-shell">
       <style>{OPTIONS_STYLES}</style>
-      <Header
-        navigationOpen={navigationOpen}
-        onDrawerToggle={(event) => {
-          navigationTriggerRef.current = event.currentTarget;
-          setNavigationOpen(true);
-        }}
-      />
-      <div className="kt-options-layout">
-        <Navigator open={navigationOpen} isMobile={isMobile} />
-        {isMobile && navigationOpen && (
+      <div className="kt-options-background" ref={backgroundRef}>
+        <Header
+          navigationOpen={navigationOpen}
+          onDrawerToggle={(event) => {
+            navigationTriggerRef.current = event.currentTarget;
+            setNavigationOpen(true);
+          }}
+        />
+        <div className="kt-options-layout">
+          {!isMobile && <Navigator open={false} isMobile={false} />}
+          <main className="kt-options-main">
+            <div className="kt-options-main__inner">
+              <header className="kt-options-page-header">
+                <h1>{page[0]}</h1>
+                {page[1] && <p>{page[1]}</p>}
+              </header>
+              {latestVersion && (
+                <div className="kt-options-version-alert" role="status">
+                  <span>
+                    {i18n("version_warning")
+                      .replace("{0}", process.env.REACT_APP_VERSION)
+                      .replace("{1}", latestVersion)}
+                  </span>
+                  <a
+                    href={process.env.REACT_APP_RELEASES_URL}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {i18n("download_update")}
+                  </a>
+                </div>
+              )}
+              <div className="kt-options-page">
+                <Outlet />
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+      {isMobile && navigationOpen && (
+        <>
           <button
             type="button"
             className="kt-options-overlay kt-options-overlay--open"
-            aria-label={i18n("options_close_navigation")}
+            tabIndex={-1}
+            aria-hidden="true"
             onClick={() => setNavigationOpen(false)}
           />
-        )}
-        <main className="kt-options-main">
-          <div className="kt-options-main__inner">
-            <header className="kt-options-page-header">
-              <h1>{page[0]}</h1>
-              {page[1] && <p>{page[1]}</p>}
-            </header>
-            {latestVersion && (
-              <div className="kt-options-version-alert" role="status">
-                <span>
-                  {i18n("version_warning")
-                    .replace("{0}", process.env.REACT_APP_VERSION)
-                    .replace("{1}", latestVersion)}
-                </span>
-                <a
-                  href={process.env.REACT_APP_RELEASES_URL}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {i18n("download_update")}
-                </a>
-              </div>
-            )}
-            <div className="kt-options-page">
-              <Outlet />
-            </div>
-          </div>
-        </main>
-      </div>
+          <Navigator open isMobile onClose={() => setNavigationOpen(false)} />
+        </>
+      )}
     </div>
   );
 }
 
 export function getNavigationFocusTargets(navigation) {
+  if (!navigation) return [];
   return Array.from(
     navigation.querySelectorAll(
       'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'

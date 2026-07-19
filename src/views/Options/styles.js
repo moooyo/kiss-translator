@@ -1,5 +1,6 @@
 export const OPTIONS_STYLES = String.raw`
 .kt-options-shell { min-height: 100vh; background: var(--kt-bg); color: var(--kt-on); }
+.kt-options-background { position: relative; z-index: 0; }
 .kt-options-mobile-header { display: none; }
 .kt-options-layout { min-height: 100vh; display: grid; grid-template-columns: 270px minmax(0, 1fr); }
 .kt-options-sidebar {
@@ -33,6 +34,9 @@ export const OPTIONS_STYLES = String.raw`
 .kt-options-nav__link.active { background: var(--kt-pric); color: var(--kt-onpric); font-weight: 650; }
 .kt-options-nav__link svg { width: 20px; height: 20px; flex: none; }
 .kt-options-nav__empty { padding: 24px 16px; color: var(--kt-onv); font-size: 12px; text-align: center; }
+.kt-options-sidebar__close { width: 40px; height: 40px; display: grid; place-items: center; position: absolute; top: 14px; right: 12px; z-index: 1; padding: 0; border: 0; border-radius: 999px; background: transparent; color: var(--kt-onv); cursor: pointer; }
+.kt-options-sidebar__close:hover { background: var(--kt-sf2); color: var(--kt-on); }
+.kt-options-sidebar__close svg { width: 22px; height: 22px; }
 .kt-options-overlay { display: none; }
 
 .kt-options-main { min-width: 0; padding: 38px clamp(24px, 5vw, 72px) 80px; }
@@ -94,9 +98,17 @@ export const OPTIONS_STYLES = String.raw`
 .kt-settings-segmented > button.Mui-selected:hover { background: var(--kt-secc); }
 .kt-settings-segmented__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .kt-settings-segmented > button svg { width: 15px; height: 15px; flex: none; }
-.kt-settings-segmented > button:focus { outline: none; }
-.kt-settings-segmented > button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kt-pri) 58%, transparent); }
-.kt-settings-segmented > button[aria-checked="true"]:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kt-onsecc) 55%, transparent); }
+.kt-settings-segmented > button:focus { outline: none; box-shadow: inset 0 0 0 2px var(--kt-pri); }
+.kt-settings-segmented > button[aria-checked="true"]:focus { box-shadow: inset 0 0 0 2px var(--kt-onsecc); }
+@supports selector(:focus-visible) {
+  .kt-settings-segmented > button:focus { box-shadow: none; }
+  .kt-settings-segmented > button:focus-visible { outline: none; box-shadow: inset 0 0 0 2px var(--kt-pri); }
+  .kt-settings-segmented > button[aria-checked="true"]:focus-visible { box-shadow: inset 0 0 0 2px var(--kt-onsecc); }
+}
+@supports (box-shadow: inset 0 0 0 2px color-mix(in srgb, red 50%, transparent)) {
+  .kt-settings-segmented > button:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kt-pri) 58%, transparent); }
+  .kt-settings-segmented > button[aria-checked="true"]:focus-visible { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--kt-onsecc) 55%, transparent); }
+}
 .kt-settings-range { min-width: 220px; display: grid; grid-template-columns: minmax(120px, 1fr) 58px; align-items: center; gap: 12px; }
 .kt-settings-range .MuiSlider-root { color: var(--kt-pri); }
 .kt-settings-range output { padding: 6px 9px; border-radius: 10px; background: var(--kt-sf2); color: var(--kt-onv); font-family: ui-monospace, monospace; font-size: 10.5px; text-align: center; }
@@ -208,6 +220,7 @@ export const OPTIONS_STYLES = String.raw`
   .kt-options-mobile-header__name { flex: 1; font-size: 14px; font-weight: 700; }
   .kt-options-sidebar { position: fixed; left: 0; transform: translateX(-105%); transition: transform .35s var(--kt-spring); box-shadow: var(--kt-shadow-2); }
   .kt-options-sidebar--open { transform: translateX(0); }
+  .kt-options-sidebar--open .kt-options-brand { padding-right: 60px; }
   .kt-options-overlay { display: block; position: fixed; inset: 0; z-index: 15; border: 0; background: rgba(0, 0, 0, .35); opacity: 0; pointer-events: none; transition: opacity .25s; }
   .kt-options-overlay--open { opacity: 1; pointer-events: auto; }
   .kt-options-main { padding: 26px 18px 60px; }

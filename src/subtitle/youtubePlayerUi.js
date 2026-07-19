@@ -254,9 +254,22 @@ export class YouTubePlayerUi {
    */
   hideNotification() {
     clearTimeout(this.#notificationTimeout);
+    this.#notificationTimeout = null;
     if (this.#notificationEl) {
       this.#notificationEl.style.opacity = "0";
     }
+  }
+
+  /**
+   * Destroys the notification owned by this UI instance.
+   *
+   * @returns {void}
+   */
+  destroyNotification() {
+    clearTimeout(this.#notificationTimeout);
+    this.#notificationTimeout = null;
+    this.#notificationEl?.remove();
+    this.#notificationEl = null;
   }
 
   /**

@@ -39,6 +39,11 @@ export const addWordHoverStyles = ({
       text-decoration: none;
     }
 
+    .kiss-subtitle-word:focus-visible {
+      outline: 2px solid ${baseColors.primary};
+      outline-offset: 2px;
+    }
+
     /* 查词气泡弹窗主体样式 */
     .kiss-word-tooltip {
       ${baseVariables}
@@ -167,28 +172,72 @@ export class WordTooltipController {
     this.activeWordEl = null;
     this.isPinned = false;
     this.lookupRequestId = 0;
+    this.spanListeners = new Map();
   }
 
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
     if (!root) return;
 
-    const spans = root.querySelectorAll(".kiss-subtitle-word");
+    this.spanListeners.forEach((record, span) => {
+      if (!span.isConnected || !record.root.contains(span)) {
+        this.#detachSpanListeners(span, record);
+      }
+    });
+
+    const spans = Array.from(root.querySelectorAll(".kiss-subtitle-word"));
     spans.forEach((span) => {
-      if (span.dataset.kissListenerAttached) return;
+      const existingRecord = this.spanListeners.get(span);
+      if (existingRecord) {
+        existingRecord.getTimestamp = getTimestamp;
+        existingRecord.root = root;
+        return;
+      }
+
+      const record = {
+        getTimestamp,
+        root,
+        originalAttributes: new Map(
+          ["role", "tabindex", "aria-pressed"].map((name) => [
+            name,
+            span.getAttribute(name),
+          ])
+        ),
+      };
       const enterHandler = (event) =>
-        this.#handleWordHover(event, getTimestamp);
+        this.#handleWordHover(event, record.getTimestamp);
       const leaveHandler = (event) => this.#handleWordHoverOut(event);
       const clickHandler = (event) =>
-        this.#handleWordClick(event, getTimestamp);
+        this.#handleWordClick(event, record.getTimestamp, record.root);
+      const keydownHandler = (event) => this.#handleWordKeyDown(event, record);
+      record.handlers = {
+        enterHandler,
+        leaveHandler,
+        clickHandler,
+        keydownHandler,
+      };
+
+      span.setAttribute("role", "button");
+      span.setAttribute("aria-pressed", "false");
       span.addEventListener("pointerenter", enterHandler);
       span.addEventListener("pointerleave", leaveHandler);
       span.addEventListener("click", clickHandler);
-      span.dataset.kissListenerAttached = "1";
+      span.addEventListener("keydown", keydownHandler);
+      this.spanListeners.set(span, record);
+    });
+
+    const tabStop =
+      spans.find((span) => span.getAttribute("tabindex") === "0") || spans[0];
+    spans.forEach((span) => {
+      span.tabIndex = span === tabStop ? 0 : -1;
     });
   }
 
   destroy() {
     this.clearHoverState();
+    this.spanListeners.forEach((record, span) => {
+      this.#detachSpanListeners(span, record);
+    });
+    this.spanListeners.clear();
   }
 
   clearHoverState() {
@@ -199,7 +248,7 @@ export class WordTooltipController {
     this.hideWordTooltip();
   }
 
-  #handleWordClick(event, getTimestamp) {
+  #handleWordClick(event, getTimestamp, root) {
     const target = event.target;
     if (!target.classList.contains("kiss-subtitle-word")) return;
 
@@ -211,12 +260,66 @@ export class WordTooltipController {
     }
 
     this.activeWordEl?.classList.remove("kiss-word-hover");
+    this.activeWordEl?.setAttribute("aria-pressed", "false");
+    this.#setRovingTabStop(root, target);
     target.classList.add("kiss-word-hover");
+    target.setAttribute("aria-pressed", "true");
     this.activeWordEl = target;
     this.isPinned = true;
     this.showWordTooltip(target.dataset.word, {
       timestamp: getTimestamp?.() ?? 0,
     });
+  }
+
+  #handleWordKeyDown(event, record) {
+    if (event.key === "Enter" || event.key === " ") {
+      this.#handleWordClick(event, record.getTimestamp, record.root);
+      return;
+    }
+
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
+      return;
+    }
+
+    const spans = Array.from(
+      record.root.querySelectorAll(".kiss-subtitle-word")
+    );
+    const currentIndex = spans.indexOf(event.target);
+    if (currentIndex < 0 || spans.length === 0) return;
+
+    event.preventDefault();
+    let nextIndex;
+    if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = spans.length - 1;
+    else if (event.key === "ArrowRight") {
+      nextIndex = (currentIndex + 1) % spans.length;
+    } else {
+      nextIndex = (currentIndex - 1 + spans.length) % spans.length;
+    }
+
+    this.#setRovingTabStop(record.root, spans[nextIndex]);
+    spans[nextIndex].focus();
+  }
+
+  #setRovingTabStop(root, activeSpan) {
+    if (!root) return;
+    root.querySelectorAll(".kiss-subtitle-word").forEach((span) => {
+      span.tabIndex = span === activeSpan ? 0 : -1;
+    });
+  }
+
+  #detachSpanListeners(span, record) {
+    const { enterHandler, leaveHandler, clickHandler, keydownHandler } =
+      record.handlers;
+    span.removeEventListener("pointerenter", enterHandler);
+    span.removeEventListener("pointerleave", leaveHandler);
+    span.removeEventListener("click", clickHandler);
+    span.removeEventListener("keydown", keydownHandler);
+    record.originalAttributes.forEach((value, name) => {
+      if (value === null) span.removeAttribute(name);
+      else span.setAttribute(name, value);
+    });
+    this.spanListeners.delete(span);
   }
 
   #handleWordHover(event, getTimestamp) {
@@ -339,6 +442,7 @@ export class WordTooltipController {
       this.tooltipEl = null;
     }
     this.activeWordEl?.classList.remove("kiss-word-hover");
+    this.activeWordEl?.setAttribute("aria-pressed", "false");
     this.activeWordEl = null;
     this.isPinned = false;
   }
@@ -347,6 +451,7 @@ export class WordTooltipController {
     const closeButton = this.tooltipEl?.querySelector("[data-kiss-close]");
     closeButton?.addEventListener("click", () => {
       this.activeWordEl?.classList.remove("kiss-word-hover");
+      this.activeWordEl?.setAttribute("aria-pressed", "false");
       this.activeWordEl = null;
       this.hideWordTooltip();
     });

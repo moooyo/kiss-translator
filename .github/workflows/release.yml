@@ -12,7 +12,7 @@ on:
         type: string
 
 concurrency:
-  group: release-${{ github.event.inputs.tag || github.ref }}
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 permissions:
@@ -73,10 +73,14 @@ jobs:
           path: build/*.zip
           if-no-files-found: error
           retention-days: 14
-      - name: Upload GitHub Pages artifact
-        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+      - name: Upload website artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
+          name: release-website-${{ env.RELEASE_TAG }}
           path: build/web
+          if-no-files-found: error
+          include-hidden-files: true
+          retention-days: 14
 
   release:
     name: Publish GitHub release
@@ -127,12 +131,30 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      contents: write
     steps:
-      - name: Deploy GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+      - name: Check out GitHub Pages branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: gh-pages
+          fetch-depth: 1
+      - name: Download website artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-website-${{ env.RELEASE_TAG }}
+          path: ${{ runner.temp }}/release-website
+      - name: Publish website to gh-pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          find . -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf -- {} +
+          cp -a "${RUNNER_TEMP}/release-website/." .
+          git add --all
+          if git diff --cached --quiet; then
+            echo "The gh-pages branch already contains the website for ${RELEASE_TAG}."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Deploy ${RELEASE_TAG}"
+          git push origin HEAD:gh-pages

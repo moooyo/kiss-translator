@@ -22,6 +22,23 @@ export function useSubtitleStyleEditor({
   const debounceTimers = useRef({});
   const pendingUpdates = useRef({});
   const animationFrames = useRef({});
+  const updateSubtitleRef = useRef(updateSubtitle);
+  updateSubtitleRef.current = updateSubtitle;
+
+  const flushPendingUpdate = useCallback((name) => {
+    if (!Object.prototype.hasOwnProperty.call(pendingUpdates.current, name)) {
+      return;
+    }
+
+    if (debounceTimers.current[name]) {
+      clearTimeout(debounceTimers.current[name]);
+      delete debounceTimers.current[name];
+    }
+
+    const value = pendingUpdates.current[name];
+    delete pendingUpdates.current[name];
+    updateSubtitleRef.current({ [name]: value });
+  }, []);
 
   const cancelPendingUpdate = useCallback((name) => {
     if (debounceTimers.current[name]) {
@@ -69,13 +86,12 @@ export function useSubtitleStyleEditor({
         clearTimeout(debounceTimers.current[name]);
       }
       pendingUpdates.current[name] = value;
-      debounceTimers.current[name] = setTimeout(() => {
-        delete debounceTimers.current[name];
-        delete pendingUpdates.current[name];
-        updateSubtitle({ [name]: value });
-      }, 200);
+      debounceTimers.current[name] = setTimeout(
+        () => flushPendingUpdate(name),
+        200
+      );
     },
-    [updateSubtitle]
+    [flushPendingUpdate]
   );
 
   const updateCssProperty = useCallback(
@@ -103,11 +119,10 @@ export function useSubtitleStyleEditor({
         cancelAnimationFrame(frame)
       );
       Object.values(debounceTimers.current).forEach(clearTimeout);
-      Object.entries(pendingUpdates.current).forEach(([name, value]) =>
-        updateSubtitle({ [name]: value })
-      );
+      debounceTimers.current = {};
+      Object.keys(pendingUpdates.current).forEach(flushPendingUpdate);
     },
-    [updateSubtitle]
+    [flushPendingUpdate]
   );
 
   const updateOriginCss = useCallback(

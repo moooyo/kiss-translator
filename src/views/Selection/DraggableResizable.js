@@ -269,7 +269,7 @@ export default function DraggableResizable({
         gridTemplateRows: `${lineWidth * 2}px auto ${lineWidth * 2}px`,
         zIndex: 2147483647,
         borderRadius: "22px",
-        overflow: "hidden",
+        overflow: "visible",
       }}
       {...props}
     >
@@ -318,7 +318,8 @@ export default function DraggableResizable({
           maxWidth: size.w,
           minWidth: 0,
           borderRadius: "22px",
-          overflow: "hidden",
+          overflow: "visible",
+          isolation: "isolate",
           backgroundColor: theme.palette.background.paper,
           boxShadow: glowShadow,
         }}
@@ -327,7 +328,11 @@ export default function DraggableResizable({
         <Pointer
           className="KT-draggable-header"
           direction="Header"
-          style={{ cursor: "move" }}
+          style={{
+            cursor: "move",
+            borderRadius: "21px 21px 0 0",
+            overflow: "visible",
+          }}
           {...opts}
         >
           {header}
@@ -363,6 +368,7 @@ export default function DraggableResizable({
 
             return {
               ...containerStyle,
+              borderRadius: "0 0 21px 21px",
               backgroundColor: theme.palette.background.paper,
               "&::-webkit-scrollbar": {
                 width: 10,

@@ -121,7 +121,6 @@ export default function Popup() {
       activationTimer = window.setTimeout(clearSafariAutofocus, 0);
     };
 
-    initialFocusGuardRef.current = true;
     window.addEventListener("focus", handleWindowFocus);
     const mountTimer = window.setTimeout(clearSafariAutofocus, 0);
     const settleTimer = window.setTimeout(clearSafariAutofocus, 120);
@@ -272,7 +271,9 @@ export default function Popup() {
               : ""
         }`}
       >
-        {globallyDisabled ? (
+        {activeTab === "text" ? (
+          <TranslationTab />
+        ) : globallyDisabled ? (
           <div className="kt-popup-disabled" role="status">
             <strong>{i18n("popup_extension_disabled")}</strong>
             <span>{i18n("popup_extension_disabled_description")}</span>
@@ -284,8 +285,6 @@ export default function Popup() {
               {i18n("setting")}
             </Button>
           </div>
-        ) : activeTab === "text" ? (
-          <TranslationTab />
         ) : rule && setting ? (
           <PopupCont
             rule={rule}

@@ -6,6 +6,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
 const mockSendTabMsg = jest.fn();
 let mockPopupContentAutofocus = false;
+let mockSetting;
 
 jest.mock("./loadData", () => ({
   loadPopupData: () => mockSendTabMsg(),
@@ -25,7 +26,7 @@ jest.mock("../../hooks/I18n", () => ({
 }));
 
 jest.mock("../../hooks/Setting", () => ({
-  useSetting: () => ({ setting: {} }),
+  useSetting: () => ({ setting: mockSetting }),
 }));
 
 jest.mock("./Header", () => {
@@ -43,12 +44,19 @@ jest.mock("./PopupCont", () => {
 
 jest.mock("../Selection/TranForm", () => {
   const React = require("react");
-  return () => React.createElement("div", null, "translation");
+  return () =>
+    React.createElement(
+      "div",
+      null,
+      "translation",
+      React.createElement("input", { "aria-label": "translation-input" })
+    );
 });
 
 describe("Popup focus", () => {
   beforeEach(() => {
     mockPopupContentAutofocus = false;
+    mockSetting = { tranboxSetting: {} };
     mockSendTabMsg.mockResolvedValue(undefined);
     window.history.replaceState({}, "", "/popup.html");
   });
@@ -127,6 +135,57 @@ describe("Popup focus", () => {
     container.remove();
   });
 
+  test("does not steal focus after the user switches tabs during loading", async () => {
+    let resolvePopupData;
+    mockSendTabMsg.mockReturnValue(
+      new Promise((resolve) => {
+        resolvePopupData = resolve;
+      })
+    );
+
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Popup />);
+      await Promise.resolve();
+    });
+
+    const textTab = Array.from(container.querySelectorAll('[role="tab"]')).find(
+      (tab) => tab.textContent === "popup_text_translation"
+    );
+    await act(async () => {
+      textTab.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true }));
+      textTab.click();
+      await Promise.resolve();
+    });
+
+    const translationInput = container.querySelector(
+      '[aria-label="translation-input"]'
+    );
+    act(() => {
+      translationInput.dispatchEvent(
+        new MouseEvent("pointerdown", { bubbles: true })
+      );
+      translationInput.focus();
+    });
+
+    await act(async () => {
+      resolvePopupData({
+        rule: { transOpen: "false" },
+        setting: { darkMode: "auto" },
+      });
+      await Promise.resolve();
+      await new Promise((resolve) => window.setTimeout(resolve, 150));
+    });
+
+    expect(document.activeElement).toBe(translationInput);
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
   test("renders a paused state when the global switch is disabled", async () => {
     mockSendTabMsg.mockResolvedValue({
       disabled: true,
@@ -146,6 +205,40 @@ describe("Popup focus", () => {
     expect(container.querySelector(".kt-popup-disabled")).not.toBeNull();
     expect(container.textContent).toContain("popup_extension_disabled");
     expect(container.textContent).not.toContain("load_setting_err");
+
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  test("keeps text translation usable when the global switch is disabled", async () => {
+    mockSendTabMsg.mockResolvedValue({
+      disabled: true,
+      rule: null,
+      setting: { extensionEnabled: false, darkMode: "auto" },
+    });
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Popup />);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const textTab = Array.from(container.querySelectorAll('[role="tab"]')).find(
+      (tab) => tab.textContent === "popup_text_translation"
+    );
+    await act(async () => {
+      textTab.click();
+      await Promise.resolve();
+    });
+
+    expect(container.textContent).toContain("translation");
+    expect(
+      container.querySelector('[aria-label="translation-input"]')
+    ).not.toBeNull();
+    expect(container.querySelector(".kt-popup-disabled")).toBeNull();
 
     act(() => root.unmount());
     container.remove();

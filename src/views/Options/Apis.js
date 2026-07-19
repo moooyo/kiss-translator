@@ -197,7 +197,7 @@ function SensitiveTextField({ value = "", onChange, inputProps, ...props }) {
   );
 }
 
-function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
+function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse, onDirtyChange }) {
   const { api, update, reset } = useApiItem(apiSlug);
   const { prompts } = usePromptList();
   const i18n = useI18n();
@@ -233,6 +233,10 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
 
     return JSON.stringify(api) !== JSON.stringify(activeFormData);
   }, [api, apiSlug, activeFormData]);
+
+  useEffect(() => {
+    onDirtyChange?.(isModified);
+  }, [isModified, onDirtyChange]);
 
   const handleChange = (e) => {
     e?.preventDefault();
@@ -1369,6 +1373,7 @@ export default function Apis() {
 
   const [alphaSortDir, setAlphaSortDir] = useState("asc");
   const [detailKey, setDetailKey] = useState(0);
+  const [detailDirty, setDetailDirty] = useState(false);
   const [selectedApiSlug, setSelectedApiSlug] = useState("");
   const [bulkMode, setBulkMode] = useState(false);
   const [checkedApiSlugs, setCheckedApiSlugs] = useState([]);
@@ -1499,6 +1504,29 @@ export default function Apis() {
     disableApis(checkedApiSlugs);
     setDetailKey((key) => key + 1);
   }, [checkedApiSlugs, disableApis]);
+
+  const handleToggleApi = useCallback(
+    async (api) => {
+      if (detailDirty) {
+        const isConfirmed = await confirm({
+          message: i18n(
+            "discard_api_changes_confirm",
+            "This API has unsaved changes. Discard them?"
+          ),
+          confirmText: i18n("discard_changes"),
+          cancelText: i18n("cancel"),
+        });
+
+        if (!isConfirmed) return;
+        setDetailDirty(false);
+      }
+
+      if (api.isDisabled) enableApis([api.apiSlug]);
+      else disableApis([api.apiSlug]);
+      setDetailKey((key) => key + 1);
+    },
+    [confirm, detailDirty, disableApis, enableApis, i18n]
+  );
 
   const handleDeleteCheckedApis = useCallback(async () => {
     const isConfirmed = await confirm({
@@ -1711,11 +1739,7 @@ export default function Apis() {
                 onDragOver={(event) => handleDragOver(event, api.apiSlug)}
                 onDrop={(event) => handleDrop(event, api.apiSlug)}
                 onDragEnd={handleDragEnd}
-                onToggle={() => {
-                  if (api.isDisabled) enableApis([api.apiSlug]);
-                  else disableApis([api.apiSlug]);
-                  setDetailKey((key) => key + 1);
-                }}
+                onToggle={() => handleToggleApi(api)}
               />
             ))}
           </List>
@@ -1726,6 +1750,7 @@ export default function Apis() {
                 apiSlug={selectedApiItem.api.apiSlug}
                 deleteApi={deleteApi}
                 copyApi={copyApi}
+                onDirtyChange={setDetailDirty}
               />
             </Box>
           )}

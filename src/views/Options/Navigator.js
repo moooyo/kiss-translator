@@ -3,6 +3,7 @@ import ApiRoundedIcon from "@mui/icons-material/ApiRounded";
 import BookmarksRoundedIcon from "@mui/icons-material/BookmarksRounded";
 import BugReportRoundedIcon from "@mui/icons-material/BugReportRounded";
 import CloudSyncRoundedIcon from "@mui/icons-material/CloudSyncRounded";
+import CloseRoundedIcon from "@mui/icons-material/CloseRounded";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import InfoRoundedIcon from "@mui/icons-material/InfoRounded";
 import KeyboardRoundedIcon from "@mui/icons-material/KeyboardRounded";
@@ -17,7 +18,7 @@ import { NavLink } from "react-router-dom";
 import Logo from "../../components/Logo";
 import { useI18n } from "../../hooks/I18n";
 
-export default function Navigator({ open, isMobile = false }) {
+export default function Navigator({ open, isMobile = false, onClose }) {
   const i18n = useI18n();
   const [query, setQuery] = useState("");
 
@@ -114,8 +115,10 @@ export default function Navigator({ open, isMobile = false }) {
     <aside
       id="kt-options-navigation"
       className={`kt-options-sidebar ${open ? "kt-options-sidebar--open" : ""}`}
-      aria-hidden={isMobile && !open}
-      inert={isMobile && !open ? "" : undefined}
+      role={isMobile ? "dialog" : undefined}
+      aria-modal={isMobile ? "true" : undefined}
+      aria-labelledby={isMobile ? "kt-options-navigation-title" : undefined}
+      tabIndex={isMobile ? -1 : undefined}
     >
       <a
         className="kt-options-brand"
@@ -125,7 +128,12 @@ export default function Navigator({ open, isMobile = false }) {
       >
         <Logo size={30} />
         <span>
-          <span className="kt-options-brand__name">{i18n("app_name")}</span>
+          <span
+            id="kt-options-navigation-title"
+            className="kt-options-brand__name"
+          >
+            {i18n("app_name")}
+          </span>
           <span className="kt-options-brand__version">
             v{process.env.REACT_APP_VERSION}
           </span>
@@ -170,6 +178,16 @@ export default function Navigator({ open, isMobile = false }) {
           </div>
         )}
       </nav>
+      {isMobile && (
+        <button
+          type="button"
+          className="kt-options-sidebar__close"
+          aria-label={i18n("options_close_navigation")}
+          onClick={onClose}
+        >
+          <CloseRoundedIcon />
+        </button>
+      )}
     </aside>
   );
 }

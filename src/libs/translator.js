@@ -341,7 +341,8 @@ export class Translator {
   #textSheet = null; // Constructed stylesheet when the host supports it
   #textStylesRaw = ""; // Compiled CSS used by the inline fallback
   #useSheetFallback = false; // Shared fallback mode for documents and shadows
-  #styleRoots = new Set(); // Roots that currently own this instance's styles
+  #adoptedStyleRoots = new Set(); // Roots that adopted this instance's sheet
+  #fallbackStyles = new Map(); // Exact fallback nodes owned by this instance
   #apisMap = new Map(); // 用于接口快速查找
   #favWords = []; // 收藏词汇
 
@@ -975,13 +976,13 @@ export class Translator {
         this.#injectSheetFallback(root);
         return;
       }
-      if (!root.adoptedStyleSheets.includes(this.#textSheet)) {
+      if (!(root.adoptedStyleSheets || []).includes(this.#textSheet)) {
         root.adoptedStyleSheets = [
           ...(root.adoptedStyleSheets || []),
           this.#textSheet,
         ];
       }
-      this.#styleRoots.add(root);
+      this.#adoptedStyleRoots.add(root);
     } catch (err) {
       kissLog("injectTextStyles: adoptedStyleSheets not available", err);
       this.#useSheetFallback = true;
@@ -991,38 +992,58 @@ export class Translator {
 
   #injectSheetFallback(root) {
     const fallbackStyleId = `${APP_LCNAME}-fallback-style`;
-    const existingStyle = root.getElementById?.(fallbackStyleId);
-    if (existingStyle) {
-      existingStyle.textContent = this.#textStylesRaw;
-      this.#styleRoots.add(root);
+    const fallbackStyleAttribute = `data-${APP_LCNAME}-fallback-style`;
+    const ownedStyle = this.#fallbackStyles.get(root);
+    if (ownedStyle?.getRootNode() === root) {
+      const canonicalStyle = root.getElementById?.(fallbackStyleId);
+      if (canonicalStyle && canonicalStyle !== ownedStyle) {
+        ownedStyle.removeAttribute("id");
+        ownedStyle.setAttribute(fallbackStyleAttribute, "");
+      } else {
+        ownedStyle.id = fallbackStyleId;
+        ownedStyle.removeAttribute(fallbackStyleAttribute);
+      }
+      ownedStyle.textContent = this.#textStylesRaw;
       return;
     }
 
-    const style = document.createElement("style");
-    style.id = fallbackStyleId;
+    const ownerDocument =
+      root === document
+        ? document
+        : root.ownerDocument || root.host?.ownerDocument;
+    const style = (ownerDocument || document).createElement("style");
+    if (root.getElementById?.(fallbackStyleId)) {
+      style.setAttribute(fallbackStyleAttribute, "");
+    } else {
+      style.id = fallbackStyleId;
+    }
     style.textContent = this.#textStylesRaw;
     if (root === document) {
       (document.head || document.documentElement).appendChild(style);
     } else {
       root.appendChild(style);
     }
-    this.#styleRoots.add(root);
+    this.#fallbackStyles.set(root, style);
   }
 
   #removeTextStyles() {
-    const fallbackStyleId = `${APP_LCNAME}-fallback-style`;
-    this.#styleRoots.forEach((root) => {
-      root.getElementById?.(fallbackStyleId)?.remove();
-      if (!("adoptedStyleSheets" in root) || !this.#textSheet) return;
+    this.#fallbackStyles.forEach((style) => style.remove());
+    this.#fallbackStyles.clear();
+
+    this.#adoptedStyleRoots.forEach((root) => {
+      if (!this.#textSheet) return;
       try {
-        root.adoptedStyleSheets = root.adoptedStyleSheets.filter(
-          (sheet) => sheet !== this.#textSheet
-        );
+        const adoptedStyleSheets = root.adoptedStyleSheets || [];
+        if (adoptedStyleSheets.includes(this.#textSheet)) {
+          root.adoptedStyleSheets = adoptedStyleSheets.filter(
+            (sheet) => sheet !== this.#textSheet
+          );
+        }
       } catch (err) {
         kissLog("removeTextStyles", err);
       }
     });
-    this.#styleRoots.clear();
+    this.#adoptedStyleRoots.clear();
   }
 
   // 解析专业术语字符串

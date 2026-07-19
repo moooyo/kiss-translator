@@ -185,9 +185,23 @@ export const M3_GLOBAL_CSS = String.raw`
   -webkit-tap-highlight-color: transparent;
 }
 
-.kt-m3-root :focus-visible {
-  outline: 3px solid color-mix(in srgb, var(--kt-pri) 55%, transparent);
+.kt-m3-root :focus {
+  outline: 3px solid var(--kt-pri);
   outline-offset: 2px;
+}
+
+@supports selector(:focus-visible) {
+  .kt-m3-root :focus { outline: none; }
+  .kt-m3-root :focus-visible {
+    outline: 3px solid var(--kt-pri);
+    outline-offset: 2px;
+  }
+}
+
+@supports (outline-color: color-mix(in srgb, red 50%, transparent)) {
+  .kt-m3-root :focus-visible {
+    outline-color: color-mix(in srgb, var(--kt-pri) 55%, transparent);
+  }
 }
 
 .kt-m3-root ::-webkit-scrollbar {

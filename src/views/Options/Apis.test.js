@@ -7,6 +7,7 @@ import { fetchModelList } from "../../libs/modelList";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 HTMLElement.prototype.scrollTo = jest.fn();
+const mockConfirm = jest.fn();
 
 jest.mock("../../hooks/I18n", () => ({
   useI18n: () => (key, fallback) => fallback || key,
@@ -22,7 +23,7 @@ jest.mock("../../hooks/Prompt", () => ({
 }));
 
 jest.mock("../../hooks/Confirm", () => ({
-  useConfirm: () => jest.fn(),
+  useConfirm: () => mockConfirm,
 }));
 
 jest.mock("../../hooks/Alert", () => ({
@@ -100,12 +101,13 @@ async function flushEffects() {
 }
 
 async function renderApis(api = createApi(), update = jest.fn()) {
+  const apis = Array.isArray(api) ? api : [api];
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
 
   useApiList.mockReturnValue({
-    transApis: [api],
+    transApis: apis,
     addApi: jest.fn(),
     deleteApi: jest.fn(),
     deleteApis: jest.fn(),
@@ -116,11 +118,11 @@ async function renderApis(api = createApi(), update = jest.fn()) {
     alphaSortApis: jest.fn(),
     reorderApis: jest.fn(),
   });
-  useApiItem.mockReturnValue({
-    api,
+  useApiItem.mockImplementation((apiSlug) => ({
+    api: apis.find((item) => item.apiSlug === apiSlug),
     update,
     reset: jest.fn(),
-  });
+  }));
 
   await act(async () => {
     root.render(<Apis />);
@@ -149,6 +151,14 @@ function getSaveButton(container) {
   return Array.from(container.querySelectorAll("button")).find(
     (button) => button.textContent === "save"
   );
+}
+
+function getListToggle(container, apiName) {
+  const input = container.querySelector(`input[aria-label="${apiName}"]`);
+  if (!input) {
+    throw new Error(`Unable to find list toggle for ${apiName}`);
+  }
+  return input;
 }
 
 describe("Apis model list", () => {
@@ -271,6 +281,89 @@ describe("Apis model list", () => {
 
     expect(modelInput.getAttribute("aria-invalid")).toBe("false");
     expect(view.container.textContent).not.toContain("model_list_fetch_failed");
+
+    view.unmount();
+  });
+});
+
+describe("Apis list toggles", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("keeps a selected API draft when its toggle is cancelled", async () => {
+    const api = createApi();
+    const view = await renderApis(api);
+    const { disableApis } = useApiList.mock.results[0].value;
+    const urlInput = getInput(view.container, "url");
+
+    await act(async () => {
+      Simulate.change(urlInput, {
+        target: { name: "url", value: "https://draft.example/v1" },
+      });
+    });
+    mockConfirm.mockResolvedValueOnce(false);
+
+    await act(async () => {
+      Simulate.change(getListToggle(view.container, api.apiName));
+      await Promise.resolve();
+    });
+
+    expect(mockConfirm).toHaveBeenCalledWith({
+      message: "This API has unsaved changes. Discard them?",
+      confirmText: "discard_changes",
+      cancelText: "cancel",
+    });
+    expect(disableApis).not.toHaveBeenCalled();
+    expect(urlInput.value).toBe("https://draft.example/v1");
+    expect(view.update).not.toHaveBeenCalled();
+
+    view.unmount();
+  });
+
+  test("confirms before toggling another API and deliberately discards the draft", async () => {
+    const selectedApi = createApi();
+    const otherApi = createApi({
+      apiSlug: "Other",
+      apiName: "Other",
+      isDisabled: true,
+    });
+    const view = await renderApis([selectedApi, otherApi]);
+    const { enableApis } = useApiList.mock.results[0].value;
+    const urlInput = getInput(view.container, "url");
+
+    await act(async () => {
+      Simulate.change(urlInput, {
+        target: { name: "url", value: "https://draft.example/v1" },
+      });
+    });
+    mockConfirm.mockResolvedValueOnce(true);
+
+    await act(async () => {
+      Simulate.change(getListToggle(view.container, otherApi.apiName));
+      await Promise.resolve();
+    });
+
+    expect(enableApis).toHaveBeenCalledWith([otherApi.apiSlug]);
+    expect(getInput(view.container, "url").value).toBe(selectedApi.url);
+    expect(view.update).not.toHaveBeenCalled();
+
+    view.unmount();
+  });
+
+  test("toggles immediately when the detail has no draft", async () => {
+    const api = createApi();
+    const view = await renderApis(api);
+    const { disableApis } = useApiList.mock.results[0].value;
+
+    await act(async () => {
+      Simulate.change(getListToggle(view.container, api.apiName));
+      await Promise.resolve();
+    });
+
+    expect(mockConfirm).not.toHaveBeenCalled();
+    expect(disableApis).toHaveBeenCalledWith([api.apiSlug]);
 
     view.unmount();
   });

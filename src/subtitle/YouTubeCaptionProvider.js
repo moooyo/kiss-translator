@@ -70,6 +70,8 @@ export class YouTubeCaptionProvider {
   #processingVersion = 0;
   // 当前已成功激活并运行的字幕轨唯一标识 Key
   #activeTrackKey = null;
+  #activeTrackVideoId = null;
+  #lastInterceptedRequest = null;
   // AI 断句后续 chunk 的按需调度器；为 null 表示当前使用内置断句或尚未生成后续 chunk。
   #aiChunkScheduler = null;
   // 当前字幕断句/分块处理的取消控制器，用于视频或字幕轨切换时中止旧流式请求
@@ -189,6 +191,8 @@ export class YouTubeCaptionProvider {
       this.#processingId = null;
       this.#processingVersion += 1;
       this.#activeTrackKey = null;
+      this.#activeTrackVideoId = null;
+      this.#lastInterceptedRequest = null;
       this.#aiChunkScheduler = null;
       this.#subtitleAbortController?.abort();
       this.#subtitleAbortController = null;
@@ -212,12 +216,15 @@ export class YouTubeCaptionProvider {
         this.#moAds(adContainer);
       })
     );
+
+    this.#resumeCurrentTrack();
   }
 
   destroy() {
     if (!this.#initialized) return;
     this.#initialized = false;
     this.#processingVersion += 1;
+    this.#processingId = null;
     this.#subtitleAbortController?.abort();
     this.#subtitleAbortController = null;
     this.#aiChunkScheduler = null;
@@ -241,8 +248,36 @@ export class YouTubeCaptionProvider {
     this.#adObserver?.disconnect();
     this.#adObserver = null;
     this.#destroyManager();
-    this.#playerUi.hideNotification();
+    this.#playerUi.destroyNotification();
     this.#playerUi.removeToggleButton();
+  }
+
+  /**
+   * Restores the current video's cached track after the provider runtime resumes.
+   * Completed subtitles are rendered directly. Interrupted processing restarts
+   * from normalized events, or replays the intercepted request if normalization
+   * had not completed before suspension.
+   *
+   * @private
+   * @returns {void}
+   */
+  #resumeCurrentTrack() {
+    const videoId = this.#videoId;
+    if (!videoId || !this.#setting.autoTranslate) return;
+
+    if (this.#activeTrackVideoId === videoId && this.#flatEvents.length) {
+      if (this.#subtitles.length && this.#progressed >= 100) {
+        this.#startManager();
+      } else {
+        void this.#translateCachedEvents();
+      }
+      return;
+    }
+
+    if (this.#lastInterceptedRequest?.videoId === videoId) {
+      const { url, responseText } = this.#lastInterceptedRequest;
+      void this.#handleInterceptedRequest(url, responseText);
+    }
   }
 
   /**
@@ -595,6 +630,7 @@ export class YouTubeCaptionProvider {
     const interceptedKind = potUrl.searchParams.get("kind") || null;
     const trackKey = buildTrackKey(potUrl);
     const fromLang = getFromLang(lang);
+    this.#lastInterceptedRequest = { videoId, url, responseText };
 
     if (this.#flatEvents.length && trackKey === this.#activeTrackKey) {
       logger.debug("Youtube Provider: track was processed:", trackKey);
@@ -678,6 +714,7 @@ export class YouTubeCaptionProvider {
       this.#flatEvents = flatEvents;
       this.#fromLang = fromLang;
       this.#activeTrackKey = trackKey;
+      this.#activeTrackVideoId = videoId;
       this.#docInfo = getDocInfo();
       if (!this.#setting.autoTranslate) {
         this.#playerUi.updateMenuProps();
@@ -1112,12 +1149,16 @@ export const YouTubeInitializer = (() => {
   let provider = null;
 
   const initialize = async (setting) => {
-    if (provider) return provider;
-
-    logger.info("Bilingual Subtitle Extension: Initializing...");
-    provider = new YouTubeCaptionProvider(setting);
+    if (!provider) {
+      logger.info("Bilingual Subtitle Extension: Initializing...");
+      provider = new YouTubeCaptionProvider(setting);
+    }
     provider.initialize();
     return provider;
+  };
+
+  initialize.suspend = () => {
+    provider?.destroy();
   };
 
   initialize.destroy = () => {

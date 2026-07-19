@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import Accordion from "@mui/material/Accordion";
 import AccordionDetails from "@mui/material/AccordionDetails";
@@ -74,6 +74,52 @@ export function SettingsSegmented({
   label,
   className = "",
 }) {
+  const itemRefs = useRef([]);
+  const normalizedItems = items.map((item) =>
+    typeof item === "object" ? item : { value: item, label: String(item) }
+  );
+  const enabledIndexes = normalizedItems.reduce((indexes, item, index) => {
+    if (!item.disabled) indexes.push(index);
+    return indexes;
+  }, []);
+  const selectedIndex = normalizedItems.findIndex(
+    (item) => !item.disabled && item.value === value
+  );
+  const tabbableIndex =
+    selectedIndex === -1 ? (enabledIndexes[0] ?? -1) : selectedIndex;
+
+  const handleKeyDown = (event, currentIndex) => {
+    let targetIndex;
+
+    if (event.key === "Home") {
+      targetIndex = enabledIndexes[0];
+    } else if (event.key === "End") {
+      targetIndex = enabledIndexes[enabledIndexes.length - 1];
+    } else {
+      const direction = {
+        ArrowDown: 1,
+        ArrowLeft: -1,
+        ArrowRight: 1,
+        ArrowUp: -1,
+      }[event.key];
+
+      if (direction === undefined || enabledIndexes.length === 0) return;
+
+      const currentPosition = enabledIndexes.indexOf(currentIndex);
+      const nextPosition =
+        (currentPosition + direction + enabledIndexes.length) %
+        enabledIndexes.length;
+      targetIndex = enabledIndexes[nextPosition];
+    }
+
+    if (targetIndex === undefined) return;
+
+    event.preventDefault();
+    itemRefs.current[targetIndex]?.focus();
+    const nextValue = normalizedItems[targetIndex].value;
+    if (nextValue !== value) onChange(nextValue);
+  };
+
   return (
     <ToggleButtonGroup
       exclusive
@@ -85,15 +131,12 @@ export function SettingsSegmented({
       aria-label={label}
       role="radiogroup"
     >
-      {items.map((item) => {
-        const normalized =
-          typeof item === "object"
-            ? item
-            : { value: item, label: String(item) };
+      {normalizedItems.map((normalized, index) => {
         const selected = normalized.value === value;
         return (
           <ToggleButton
             value={normalized.value}
+            disabled={Boolean(normalized.disabled)}
             role="radio"
             aria-checked={selected}
             aria-label={
@@ -101,6 +144,11 @@ export function SettingsSegmented({
                 ? normalized.label
                 : undefined
             }
+            tabIndex={index === tabbableIndex ? 0 : -1}
+            ref={(element) => {
+              itemRefs.current[index] = element;
+            }}
+            onKeyDown={(event) => handleKeyDown(event, index)}
             key={normalized.value}
           >
             <span className="kt-settings-segmented__label">

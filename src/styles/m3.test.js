@@ -45,3 +45,17 @@ describe("M3 global motion", () => {
     expect(M3_GLOBAL_CSS).toContain("prefers-reduced-motion: reduce");
   });
 });
+
+describe("M3 keyboard focus", () => {
+  test("provides a solid focus fallback before progressive enhancement", () => {
+    const fallbackRule = M3_GLOBAL_CSS.match(
+      /\.kt-m3-root :focus\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(fallbackRule).toContain("outline: 3px solid var(--kt-pri)");
+    expect(fallbackRule).toContain("outline-offset: 2px");
+    expect(fallbackRule).not.toContain("color-mix");
+    expect(M3_GLOBAL_CSS).toContain("@supports selector(:focus-visible)");
+    expect(M3_GLOBAL_CSS).toContain("@supports (outline-color: color-mix");
+  });
+});

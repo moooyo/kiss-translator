@@ -13,6 +13,7 @@ describe("WordTooltipController pinned state", () => {
       </div>
     `;
     document.getElementById("kiss-word-hover-styles")?.remove();
+    apiMicrosoftDict.mockClear();
     apiMicrosoftDict.mockImplementation(() => new Promise(() => {}));
   });
 
@@ -36,6 +37,74 @@ describe("WordTooltipController pinned state", () => {
 
     controller.destroy();
     jest.useRealTimers();
+  });
+
+  test("adds button semantics and provides roving keyboard focus", () => {
+    const controller = new WordTooltipController({});
+    const root = document.getElementById("captions");
+    const [first, second] = root.querySelectorAll(".kiss-subtitle-word");
+    first.setAttribute("aria-label", "Existing accessible name");
+    controller.attachSpanListeners(root);
+
+    expect(first.getAttribute("role")).toBe("button");
+    expect(first.getAttribute("aria-label")).toBe("Existing accessible name");
+    expect(first.getAttribute("aria-pressed")).toBe("false");
+    expect(first.getAttribute("tabindex")).toBe("0");
+    expect(second.getAttribute("tabindex")).toBe("-1");
+
+    first.focus();
+    first.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })
+    );
+
+    expect(document.activeElement).toBe(second);
+    expect(first.getAttribute("tabindex")).toBe("-1");
+    expect(second.getAttribute("tabindex")).toBe("0");
+    controller.destroy();
+    expect(first.getAttribute("aria-label")).toBe("Existing accessible name");
+  });
+
+  test.each(["Enter", " "])("pins a word with the %p key", (key) => {
+    const getTimestamp = jest.fn(() => 42);
+    const controller = new WordTooltipController({});
+    const root = document.getElementById("captions");
+    const first = root.querySelector(".kiss-subtitle-word");
+    controller.attachSpanListeners(root, getTimestamp);
+    const event = new KeyboardEvent("keydown", {
+      key,
+      bubbles: true,
+      cancelable: true,
+    });
+
+    first.dispatchEvent(event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
+    expect(apiMicrosoftDict).toHaveBeenCalledWith("first");
+    expect(getTimestamp).toHaveBeenCalledTimes(1);
+    expect(first.getAttribute("aria-pressed")).toBe("true");
+    expect(controller.activeWordEl).toBe(first);
+    expect(controller.isPinned).toBe(true);
+    controller.destroy();
+  });
+
+  test("does not duplicate listeners and removes them on destroy", () => {
+    const controller = new WordTooltipController({});
+    const root = document.getElementById("captions");
+    const first = root.querySelector(".kiss-subtitle-word");
+    controller.attachSpanListeners(root);
+    controller.attachSpanListeners(root);
+
+    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
+
+    controller.destroy();
+    expect(first.hasAttribute("role")).toBe(false);
+    expect(first.hasAttribute("tabindex")).toBe(false);
+    expect(first.hasAttribute("aria-pressed")).toBe(false);
+
+    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
   });
 
   test("ignores a stale dictionary response after another lookup starts", async () => {

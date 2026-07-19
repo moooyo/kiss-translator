@@ -5,7 +5,10 @@ import {
 } from "./subtitle";
 
 jest.mock("./YouTubeCaptionProvider.js", () => ({
-  YouTubeInitializer: Object.assign(jest.fn(), { destroy: jest.fn() }),
+  YouTubeInitializer: Object.assign(jest.fn(), {
+    destroy: jest.fn(),
+    suspend: jest.fn(),
+  }),
 }));
 jest.mock("../libs/utils.js", () => ({ isMatch: jest.fn() }));
 jest.mock("../libs/log.js", () => ({ logger: { error: jest.fn() } }));
@@ -29,5 +32,9 @@ describe("subtitle interceptor state", () => {
     expect(
       document.documentElement.getAttribute(SUBTITLE_INTERCEPTOR_ATTRIBUTE)
     ).toBe("disabled");
+
+    const { YouTubeInitializer } = require("./YouTubeCaptionProvider.js");
+    expect(YouTubeInitializer.suspend).toHaveBeenCalledTimes(1);
+    expect(YouTubeInitializer.destroy).not.toHaveBeenCalled();
   });
 });

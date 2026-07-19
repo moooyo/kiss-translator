@@ -22,7 +22,7 @@ export function setSubtitleInterceptorEnabled(enabled) {
 
 export function stopSubtitle() {
   setSubtitleInterceptorEnabled(false);
-  providers.forEach((provider) => provider.start.destroy?.());
+  providers.forEach((provider) => provider.start.suspend?.());
 }
 
 /**

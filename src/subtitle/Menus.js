@@ -1,7 +1,7 @@
 import { useCallback, useMemo } from "react";
 import { API_SPE_TYPES } from "../config";
 
-const MENU_STYLES = String.raw`
+export const MENU_STYLES = String.raw`
 .kt-subtitle-panel {
   --kt-pri: #0b57d0;
   --kt-onpri: #ffffff;
@@ -51,12 +51,12 @@ const MENU_STYLES = String.raw`
 .kt-subtitle-row__label { overflow: hidden; font-size: 12.5px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .kt-subtitle-row__hint { margin-top: 2px; color: var(--kt-onv); font-size: 10.5px; }
 .kt-subtitle-switch { width: 52px; height: 32px; flex: none; position: relative; padding: 0; border: 2px solid var(--kt-line); border-radius: 999px; background: var(--kt-sf3); cursor: pointer; transition: background .35s var(--kt-spring), border-color .35s var(--kt-spring); }
-.kt-subtitle-switch::after { content: ""; width: 16px; height: 16px; position: absolute; top: 6px; left: 6px; border-radius: 50%; background: var(--kt-line); transition: all .35s var(--kt-spring); }
+.kt-subtitle-switch::after { content: ""; width: 16px; height: 16px; position: absolute; top: 50%; left: 6px; border-radius: 50%; background: var(--kt-line); transform: translateY(-50%); transition: all .35s var(--kt-spring); }
 .kt-subtitle-switch[aria-checked="true"] { border-color: var(--kt-pri); background: var(--kt-pri); }
-.kt-subtitle-switch[aria-checked="true"]::after { width: 24px; height: 24px; top: 2px; left: 22px; background: var(--kt-onpri); }
+.kt-subtitle-switch[aria-checked="true"]::after { width: 24px; height: 24px; top: 50%; left: 22px; background: var(--kt-onpri); }
 .kt-subtitle-select { max-width: 142px; min-height: 38px; padding: 0 30px 0 12px; border: 0; border-radius: 999px; outline: 0; background: var(--kt-sf2); color: var(--kt-on); font: inherit; font-size: 11.5px; font-weight: 650; }
 .kt-subtitle-segmented { display: flex; gap: 3px; margin: 8px 0 5px; padding: 3px; border-radius: 999px; background: var(--kt-sf2); }
-.kt-subtitle-segmented button { min-height: 34px; flex: 1; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--kt-onv); cursor: pointer; font: inherit; font-size: 11px; }
+.kt-subtitle-segmented button { min-width: 0; min-height: 34px; flex: 1; overflow: hidden; padding: 0 8px; border: 0; border-radius: 999px; background: transparent; color: var(--kt-onv); cursor: pointer; font: inherit; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .kt-subtitle-segmented button[aria-pressed="true"] { background: var(--kt-secc); color: var(--kt-onsecc); font-weight: 700; }
 .kt-subtitle-section-label { margin-top: 12px; font-size: 11.5px; font-weight: 700; }
 .kt-subtitle-range { min-height: 62px; display: grid; grid-template-columns: minmax(0, 1fr) 104px 42px; align-items: center; gap: 9px; padding: 9px 0; border-bottom: 1px solid var(--kt-linev); }

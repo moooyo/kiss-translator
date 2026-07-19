@@ -39,6 +39,7 @@ import {
   ServiceLogo,
 } from "../../components/M3";
 import { POPUP_STYLES } from "./styles";
+import { COLLAPSED_SERVICE_LIMIT, getVisibleServices } from "./services";
 import { css } from "@emotion/css";
 
 const API_ICON_FILES = {
@@ -104,6 +105,7 @@ export default function PopupCont({
   handleOpenSetting,
   processActions,
   isContent = false,
+  onExpandedChange,
 }) {
   const i18n = useI18n();
   const { setting: contextSetting, updateSetting } = useSetting();
@@ -118,6 +120,7 @@ export default function PopupCont({
   const [showSupport, setShowSupport] = useState(false);
   const [translationBusy, setTranslationBusy] = useState(false);
   const busyTimerRef = useRef(null);
+  const translationTogglePendingRef = useRef(false);
   const { allTextStyles } = useAllTextStyles();
   const popupTextStyles = useMemo(
     () =>
@@ -150,6 +153,17 @@ export default function PopupCont({
       if (busyTimerRef.current) window.clearTimeout(busyTimerRef.current);
     },
     []
+  );
+
+  useEffect(() => {
+    onExpandedChange?.(showAdvanced || showAllServices || showSupport);
+  }, [onExpandedChange, showAdvanced, showAllServices, showSupport]);
+
+  useEffect(
+    () => () => {
+      onExpandedChange?.(false);
+    },
+    [onExpandedChange]
   );
 
   const blacklistValue = contextSetting?.blacklist || "";
@@ -205,30 +219,44 @@ export default function PopupCont({
 
   const handleTransToggle = useCallback(
     async (event) => {
+      if (translationTogglePendingRef.current) return;
+      translationTogglePendingRef.current = true;
       const enabled = event.target.checked;
+      let resolvedEnabled = enabled;
       setRule((previous) => ({
         ...previous,
         transOpen: enabled ? "true" : "false",
       }));
-      if (enabled) setTranslationBusy(true);
+      setTranslationBusy(enabled);
       try {
+        let response;
         if (processActions) {
-          processActions({ action: MSG_TRANS_TOGGLE });
+          response = processActions({
+            action: MSG_TRANS_TOGGLE,
+            args: { enabled },
+          });
         } else {
-          await sendTabMsg(MSG_TRANS_TOGGLE);
+          response = await sendTabMsg(MSG_TRANS_TOGGLE, { enabled });
+        }
+        if (response?.rule) {
+          resolvedEnabled =
+            response.rule.transOpen === true ||
+            response.rule.transOpen === "true";
+          setRule(response.rule);
         }
       } catch (error) {
         kissLog("toggle translation", error);
       } finally {
+        translationTogglePendingRef.current = false;
         if (busyTimerRef.current) window.clearTimeout(busyTimerRef.current);
         busyTimerRef.current = window.setTimeout(
           () => {
             setTranslationBusy(false);
             showMessage(
-              enabled ? i18n("popup_enabled") : i18n("popup_disabled")
+              resolvedEnabled ? i18n("popup_enabled") : i18n("popup_disabled")
             );
           },
-          enabled ? 900 : 0
+          resolvedEnabled ? 900 : 0
         );
       }
     },
@@ -399,7 +427,7 @@ export default function PopupCont({
     scanAll,
     isPlainText: plainTextValue = false,
   } = rule || {};
-  const translationEnabled = transOpen === "true";
+  const translationEnabled = transOpen === true || transOpen === "true";
   const isPlainText = plainTextValue === true || plainTextValue === "true";
   const tranboxEnabled = !!setting?.tranboxSetting?.transOpen;
   const mouseHoverEnabled = !!setting?.mouseHoverSetting?.useMouseHover;
@@ -412,12 +440,10 @@ export default function PopupCont({
   const isAutoSource =
     !fromLang || fromLang === "auto" || fromLang === "$global";
 
-  const visibleServices = useMemo(() => {
-    if (showAllServices || services.length <= 3) return services;
-    const first = services.slice(0, 3);
-    if (first.some(({ key }) => key === apiSlug)) return first;
-    return [...services.slice(0, 2), activeService].filter(Boolean);
-  }, [activeService, apiSlug, services, showAllServices]);
+  const visibleServices = useMemo(
+    () => getVisibleServices(services, apiSlug, showAllServices),
+    [apiSlug, services, showAllServices]
+  );
 
   const scenes = [
     {
@@ -490,8 +516,8 @@ export default function PopupCont({
           </span>
         </span>
         <M3Switch
+          className="kt-popup-main-switch"
           checked={translationEnabled}
-          onClick={(event) => event.stopPropagation()}
           onChange={handleTransToggle}
           aria-label={i18n("popup_translate_page")}
         />
@@ -559,7 +585,7 @@ export default function PopupCont({
               <span className="kt-popup-service__name">{service.name}</span>
             </button>
           ))}
-          {services.length > 3 && (
+          {services.length > COLLAPSED_SERVICE_LIMIT && (
             <button
               type="button"
               className="kt-popup-service kt-popup-more-service"
@@ -764,14 +790,18 @@ export default function PopupCont({
       )}
 
       <footer className="kt-popup-footer">
-        <span className="kt-popup-footer__keys">
-          <kbd>Alt</kbd>
-          <kbd>Q</kbd>
-        </span>
-        <span className="kt-popup-footer__keys">
-          <kbd>Alt</kbd>
-          <kbd>S</kbd>
-        </span>
+        {isContent && (
+          <>
+            <span className="kt-popup-footer__keys">
+              <kbd>Alt</kbd>
+              <kbd>Q</kbd>
+            </span>
+            <span className="kt-popup-footer__keys">
+              <kbd>Alt</kbd>
+              <kbd>S</kbd>
+            </span>
+          </>
+        )}
         <span className="kt-popup-footer__spacer" />
         <M3Button
           variant="text"
@@ -780,9 +810,11 @@ export default function PopupCont({
         >
           {i18n("popup_support")}
         </M3Button>
-        <M3Button variant="text" onClick={handleOpenSetting}>
-          {i18n("popup_all_settings")}
-        </M3Button>
+        {isContent && (
+          <M3Button variant="text" onClick={handleOpenSetting}>
+            {i18n("popup_all_settings")}
+          </M3Button>
+        )}
       </footer>
 
       <M3Snackbar

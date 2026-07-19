@@ -273,16 +273,17 @@ export const M3_GLOBAL_CSS = String.raw`
   place-items: center;
   position: absolute;
   left: 6px;
-  top: 8px;
+  top: 50%;
   border-radius: 50%;
   background: var(--kt-line);
   color: transparent;
+  transform: translateY(-50%);
   transition: width .35s var(--kt-spring), height .35s var(--kt-spring), left .35s var(--kt-spring), top .35s var(--kt-spring), background .35s;
 }
 
 .kt-m3-switch__thumb svg { width: 16px; height: 16px; }
 .kt-m3-switch > input:checked + .kt-m3-switch__track { border-color: var(--kt-pri); background: var(--kt-pri); }
-.kt-m3-switch > input:checked + .kt-m3-switch__track .kt-m3-switch__thumb { width: 24px; height: 24px; left: 24px; top: 4px; background: var(--kt-onpri); color: var(--kt-pri); }
+.kt-m3-switch > input:checked + .kt-m3-switch__track .kt-m3-switch__thumb { width: 24px; height: 24px; left: 24px; top: 50%; background: var(--kt-onpri); color: var(--kt-pri); }
 .kt-m3-switch > input:focus-visible + .kt-m3-switch__track { outline: 3px solid color-mix(in srgb, var(--kt-pri) 45%, transparent); outline-offset: 2px; }
 .kt-m3-switch > input:disabled + .kt-m3-switch__track { opacity: .38; cursor: default; }
 
@@ -313,8 +314,10 @@ export const M3_GLOBAL_CSS = String.raw`
   transition: background .35s var(--kt-spring), color .35s var(--kt-spring), transform .15s;
 }
 
-.kt-m3-segmented > button[aria-selected="true"] { background: var(--kt-secc); color: var(--kt-onsecc); font-weight: 650; }
+.kt-m3-segmented > button[aria-selected="true"],
+.kt-m3-segmented > button[aria-checked="true"] { background: var(--kt-secc); color: var(--kt-onsecc); font-weight: 650; }
 .kt-m3-segmented > button:active { transform: scale(.97); }
+.kt-m3-segmented__label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .kt-m3-card {
   border: 1px solid var(--kt-linev);

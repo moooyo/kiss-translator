@@ -1,9 +1,20 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { DEFAULT_SUBTITLE_SETTING, OPT_TRANS_OPENAI } from "../config";
-import { Menus } from "./Menus";
+import { MENU_STYLES, Menus } from "./Menus";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
+
+describe("subtitle control alignment", () => {
+  test("centers switch thumbs and constrains selected labels", () => {
+    expect(MENU_STYLES).toMatch(
+      /\.kt-subtitle-switch::after\s*\{[^}]*top:\s*50%;[^}]*transform:\s*translateY\(-50%\);/
+    );
+    expect(MENU_STYLES).toMatch(
+      /\.kt-subtitle-segmented button\s*\{[^}]*overflow:\s*hidden;[^}]*text-overflow:\s*ellipsis;/
+    );
+  });
+});
 
 function renderMenus({
   autoTranslate = true,

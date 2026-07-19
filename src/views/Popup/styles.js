@@ -1,15 +1,17 @@
 export const POPUP_STYLES = String.raw`
 .kt-popup-shell {
   width: 396px;
-  max-width: 100vw;
-  max-height: 100vh;
+  min-width: 396px;
   overflow: hidden;
   background: var(--kt-sf0);
   color: var(--kt-on);
 }
 
+.kt-popup-shell:focus { outline: none; }
+
 .kt-popup-shell--window {
   width: min(560px, 100vw);
+  min-width: 0;
   min-height: 100vh;
 }
 
@@ -30,8 +32,11 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-header__drag { display: flex; color: var(--kt-onv); cursor: move; }
 
 .kt-popup-tabs { margin: 0 18px; }
-.kt-popup-scroll { height: min(492px, calc(100vh - 108px)); overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
-.kt-popup-scroll--text { max-height: 560px; }
+.kt-popup-scroll { height: auto; overflow: visible; }
+.kt-popup-scroll--expanded { max-height: 492px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.kt-popup-scroll--text { max-height: 492px; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none; }
+.kt-popup-scroll--expanded::-webkit-scrollbar,
+.kt-popup-scroll--text::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .kt-popup-content { display: flex; flex-direction: column; gap: 14px; padding: 14px 18px 18px; }
 
 .kt-popup-loading {
@@ -83,6 +88,14 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-hero__progress { height: 4px; position: absolute; right: 0; bottom: 0; left: 0; background: color-mix(in srgb, var(--kt-pri) 18%, transparent); }
 .kt-popup-hero__progress::after { content: ""; position: absolute; inset-block: 0; border-radius: 999px; background: var(--kt-pri); animation: kt-m3-sweep 1.05s ease-in-out infinite; }
 
+.kt-popup-main-switch { width: 46px; height: 26px; }
+.kt-popup-main-switch .kt-m3-switch__track { border-width: 1.5px; background: var(--kt-sf4); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kt-line) 14%, transparent); transition: background .25s, border-color .25s, transform .15s; }
+.kt-popup-main-switch .kt-m3-switch__thumb { width: 18px; height: 18px; left: 4px; top: 50%; background: var(--kt-line); transform: translateY(-50%); }
+.kt-popup-main-switch .kt-m3-switch__thumb svg { display: none; }
+.kt-popup-main-switch > input:checked + .kt-m3-switch__track { border-color: var(--kt-pri); background: var(--kt-pri); box-shadow: none; }
+.kt-popup-main-switch > input:checked + .kt-m3-switch__track .kt-m3-switch__thumb { width: 20px; height: 20px; left: 23px; top: 50%; background: var(--kt-onpri); }
+.kt-popup-main-switch:active .kt-m3-switch__track { transform: scale(.96); }
+
 .kt-popup-language-row { display: grid; grid-template-columns: 1fr 40px 1fr; gap: 8px; }
 .kt-popup-language {
   min-width: 0;
@@ -103,7 +116,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-service {
   min-width: 0;
   display: flex;
-  flex: 0 1 auto;
+  flex: 1 1 0;
   align-items: center;
   gap: 7px;
   padding: 5px 11px 5px 6px;
@@ -123,6 +136,8 @@ export const POPUP_STYLES = String.raw`
 .kt-service-logo { width: 22px; height: 22px; display: grid; flex: none; place-items: center; border: 1px solid var(--kt-linev); border-radius: 50%; background: #fff; }
 .kt-service-logo img { width: 14px; height: 14px; object-fit: contain; }
 .kt-popup-more-service { min-width: max-content; padding-inline: 11px 8px; border-color: transparent; background: var(--kt-sf2); color: var(--kt-onv); font-weight: 650; }
+.kt-popup-more-service { flex: 0 0 auto; }
+.kt-popup-services--open .kt-popup-service { flex: 0 1 auto; }
 .kt-popup-more-service svg { width: 17px; height: 17px; }
 
 .kt-popup-scenes { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -221,8 +236,21 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-empty { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--kt-onv); text-align: center; }
 .kt-popup-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
 
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-content { gap: 9px; padding: 10px 16px 12px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero { padding: 12px 14px; border-radius: 20px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero__icon { width: 40px; height: 40px; border-radius: 14px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero__icon svg { width: 24px; height: 24px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-language { padding: 7px 12px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-section-label { margin-bottom: 5px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scenes { gap: 6px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-scene { padding: 7px 10px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site { padding: 10px 12px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions { margin: 7px -2px -2px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-site__actions .kt-m3-button { min-height: 34px; }
+.kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-disclosure { min-height: 34px; }
+
 @media (max-width: 395px) {
-  .kt-popup-shell { width: 100vw; }
+  .kt-popup-shell--window { width: 100vw; }
   .kt-popup-content { padding-inline: 14px; }
   .kt-popup-tabs { margin-inline: 14px; }
 }

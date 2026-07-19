@@ -27,7 +27,10 @@ export function M3Switch({
   ...props
 }) {
   return (
-    <label className={`kt-m3-switch ${className}`.trim()}>
+    <label
+      className={`kt-m3-switch ${className}`.trim()}
+      onClick={(event) => event.stopPropagation()}
+    >
       <input type="checkbox" aria-label={ariaLabel} {...props} />
       <span className="kt-m3-switch__track" aria-hidden="true">
         <span className="kt-m3-switch__thumb">
@@ -97,11 +100,11 @@ export function M3Segmented({
               selected || (selectedIndex === -1 && index === 0) ? 0 : -1
             }
             key={itemValue}
+            title={typeof label === "string" ? label : undefined}
             onClick={() => onChange(itemValue)}
             onKeyDown={(event) => handleKeyDown(event, index)}
           >
-            {selected && <CheckRoundedIcon fontSize="inherit" />}
-            {label}
+            <span className="kt-m3-segmented__label">{label}</span>
           </button>
         );
       })}

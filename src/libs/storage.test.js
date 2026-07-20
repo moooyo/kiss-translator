@@ -45,6 +45,8 @@ describe("settings storage migration", () => {
     delete globalThis.GM_setValue;
     delete globalThis.GM_getValue;
     delete globalThis.GM_deleteValue;
+    delete globalThis.GM_addValueChangeListener;
+    delete globalThis.GM_removeValueChangeListener;
   });
 
   afterEach(() => {
@@ -52,6 +54,8 @@ describe("settings storage migration", () => {
     delete globalThis.GM_setValue;
     delete globalThis.GM_getValue;
     delete globalThis.GM_deleteValue;
+    delete globalThis.GM_addValueChangeListener;
+    delete globalThis.GM_removeValueChangeListener;
   });
 
   test("runDataMigration backs up raw v1 settings and stores v2 with prompt slugs", async () => {
@@ -234,5 +238,77 @@ describe("settings storage migration", () => {
     expect(globalThis.GM_getValue).toHaveBeenCalledWith("legacy-gm-key");
     expect(globalThis.GM_deleteValue).toHaveBeenCalledWith("legacy-gm-key");
     expect(stored.has("legacy-gm-key")).toBe(false);
+  });
+
+  test("GM storage forwards external value changes to object subscribers", async () => {
+    let handleValueChange;
+    const addValueChangeListener = jest.fn((key, listener) => {
+      handleValueChange = listener;
+      return 41;
+    });
+    const removeValueChangeListener = jest.fn();
+    globalThis.GM = {
+      addValueChangeListener,
+      removeValueChangeListener,
+    };
+    const { storage } = loadGmStorageModule();
+    const listener = jest.fn();
+
+    const unsubscribe = storage.subscribeObj("setting", listener);
+    expect(addValueChangeListener).toHaveBeenCalledWith(
+      "setting",
+      expect.any(Function)
+    );
+
+    handleValueChange(
+      "setting",
+      JSON.stringify({ enabled: false }),
+      JSON.stringify({ enabled: true }),
+      true
+    );
+    expect(listener).toHaveBeenCalledWith({ enabled: true });
+
+    listener.mockClear();
+    handleValueChange(
+      "setting",
+      JSON.stringify({ enabled: true }),
+      JSON.stringify({ enabled: false }),
+      false
+    );
+    expect(listener).not.toHaveBeenCalled();
+
+    unsubscribe();
+    await Promise.resolve();
+    expect(removeValueChangeListener).toHaveBeenCalledWith(41);
+  });
+
+  test("GM storage subscribes through legacy value change APIs", async () => {
+    let handleValueChange;
+    globalThis.GM = {};
+    globalThis.GM_addValueChangeListener = jest.fn((key, listener) => {
+      handleValueChange = listener;
+      return 42;
+    });
+    globalThis.GM_removeValueChangeListener = jest.fn();
+    const { storage } = loadGmStorageModule();
+    const listener = jest.fn();
+
+    const unsubscribe = storage.subscribeObj("setting", listener);
+    expect(globalThis.GM_addValueChangeListener).toHaveBeenCalledWith(
+      "setting",
+      expect.any(Function)
+    );
+
+    handleValueChange(
+      "setting",
+      JSON.stringify({ enabled: true }),
+      JSON.stringify({ enabled: false }),
+      true
+    );
+    expect(listener).toHaveBeenCalledWith({ enabled: false });
+
+    unsubscribe();
+    await Promise.resolve();
+    expect(globalThis.GM_removeValueChangeListener).toHaveBeenCalledWith(42);
   });
 });

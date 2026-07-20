@@ -153,9 +153,10 @@ function subscribe(key, listener) {
       globalThis.GM_removeValueChangeListener;
     if (typeof addValueChangeListener === "function") {
       const listenerId = Promise.resolve(
-        addValueChangeListener(key, (_name, _oldValue, newValue) =>
-          listener(newValue ?? null)
-        )
+        addValueChangeListener(key, (_name, _oldValue, newValue, remote) => {
+          if (remote === false) return;
+          listener(newValue ?? null);
+        })
       );
       removeExternalListener = () => {
         void listenerId

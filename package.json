@@ -62,7 +62,7 @@
     "zip": "zx src/scripts/archive.mjs",
     "build+zip": "cross-env CI=true pnpm build:release",
     "test": "react-app-rewired test",
-    "test:scripts": "node --test src/scripts/manifest-artifacts.test.mjs src/scripts/release-archives.test.mjs",
+    "test:scripts": "node --test src/scripts/manifest-artifacts.test.mjs src/scripts/release-archives.test.mjs src/scripts/userscript-metadata.test.mjs",
     "test:ci": "pnpm test:scripts && cross-env CI=true react-app-rewired test --watchAll=false --runInBand --silent",
     "eject": "react-scripts eject"
   },

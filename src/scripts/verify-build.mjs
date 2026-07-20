@@ -8,6 +8,7 @@ import {
   findReleaseArchiveSetFailures,
   getExpectedReleaseArchives,
 } from "./release-archives.mjs";
+import { findMissingUserscriptValueChangeGrants } from "./userscript-metadata.mjs";
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.resolve(scriptDirectory, "../..");
@@ -89,6 +90,26 @@ for (const relativePath of requiredFiles) {
     }
   } catch {
     failures.push(`${relativePath} is missing`);
+  }
+}
+
+const userscriptPaths = requiredFiles.filter((relativePath) =>
+  relativePath.endsWith(".user.js")
+);
+
+for (const relativePath of userscriptPaths) {
+  try {
+    const source = await fs.readFile(
+      path.join(buildDirectory, relativePath),
+      "utf8"
+    );
+    findMissingUserscriptValueChangeGrants(source).forEach((grant) =>
+      failures.push(`${relativePath} is missing required @grant ${grant}`)
+    );
+  } catch (error) {
+    failures.push(
+      `${relativePath} metadata could not be inspected: ${error.message}`
+    );
   }
 }
 

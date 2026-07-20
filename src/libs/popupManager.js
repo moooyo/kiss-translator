@@ -35,6 +35,7 @@ export class PopupManager extends ShadowDomManager {
     super({
       id: APP_CONSTS.popupID,
       className: "notranslate",
+      cacheKey: APP_CONSTS.popupID,
       reactComponent: Action,
       props: { translator, processActions },
     });

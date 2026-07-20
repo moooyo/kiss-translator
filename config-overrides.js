@@ -276,10 +276,6 @@ switch (process.env.REACT_APP_CLIENT) {
 module.exports = {
   webpack: webpackConfig,
   jest: (config) => {
-    config.testMatch = [
-      "**/src/**/__tests__/**/*.{js,jsx,ts,tsx}",
-      "**/src/**/*.{spec,test}.{js,jsx,ts,tsx}",
-    ];
     config.transformIgnorePatterns = [
       "node_modules[\\\\/](?!.*@streamparser[\\\\/]json)",
     ];

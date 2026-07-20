@@ -1,7 +1,6 @@
 import { MSG_TRANS_GETRULE } from "../../config";
 import { browser } from "../../libs/browser";
 import { getCurTab, sendTabMsg } from "../../libs/msg";
-import { getSettingWithDefault } from "../../libs/storage";
 
 const sleep = (milliseconds) =>
   new Promise((resolve) => window.setTimeout(resolve, milliseconds));
@@ -20,21 +19,10 @@ async function trySend(sendMessage) {
   }
 }
 
-async function tryLoadDisabledState(getSetting) {
-  try {
-    const setting = await getSetting();
-    if (setting?.extensionEnabled !== false) return undefined;
-    return { rule: null, setting, disabled: true };
-  } catch (_error) {
-    return undefined;
-  }
-}
-
 export async function loadPopupData({
   sendMessage = () => sendTabMsg(MSG_TRANS_GETRULE),
   getTab = getCurTab,
   executeScript = (details) => browser?.scripting?.executeScript(details),
-  getSetting = getSettingWithDefault,
   wait = sleep,
 } = {}) {
   let response = await trySend(sendMessage);
@@ -43,9 +31,6 @@ export async function loadPopupData({
   await wait(80);
   response = await trySend(sendMessage);
   if (hasPopupData(response)) return response;
-
-  const disabledState = await tryLoadDisabledState(getSetting);
-  if (disabledState) return disabledState;
 
   let tab;
   try {

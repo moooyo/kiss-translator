@@ -186,11 +186,10 @@ describe("Popup focus", () => {
     container.remove();
   });
 
-  test("renders a paused state when the global switch is disabled", async () => {
+  test("renders the page panel when popup data is available", async () => {
     mockSendTabMsg.mockResolvedValue({
-      disabled: true,
       rule: { pattern: "*", transOpen: "true" },
-      setting: { extensionEnabled: false, darkMode: "auto" },
+      setting: { darkMode: "auto" },
     });
     const container = document.createElement("div");
     document.body.appendChild(container);
@@ -202,43 +201,8 @@ describe("Popup focus", () => {
       await Promise.resolve();
     });
 
-    expect(container.querySelector(".kt-popup-disabled")).not.toBeNull();
-    expect(container.textContent).toContain("popup_extension_disabled");
+    expect(container.textContent).toContain("content");
     expect(container.textContent).not.toContain("load_setting_err");
-
-    act(() => root.unmount());
-    container.remove();
-  });
-
-  test("keeps text translation usable when the global switch is disabled", async () => {
-    mockSendTabMsg.mockResolvedValue({
-      disabled: true,
-      rule: null,
-      setting: { extensionEnabled: false, darkMode: "auto" },
-    });
-    const container = document.createElement("div");
-    document.body.appendChild(container);
-    const root = createRoot(container);
-
-    await act(async () => {
-      root.render(<Popup />);
-      await Promise.resolve();
-      await Promise.resolve();
-    });
-
-    const textTab = Array.from(container.querySelectorAll('[role="tab"]')).find(
-      (tab) => tab.textContent === "popup_text_translation"
-    );
-    await act(async () => {
-      textTab.click();
-      await Promise.resolve();
-    });
-
-    expect(container.textContent).toContain("translation");
-    expect(
-      container.querySelector('[aria-label="translation-input"]')
-    ).not.toBeNull();
-    expect(container.querySelector(".kt-popup-disabled")).toBeNull();
 
     act(() => root.unmount());
     container.remove();

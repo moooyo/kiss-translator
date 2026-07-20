@@ -25,7 +25,7 @@ describe("loadPopupData", () => {
       .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce(popupData);
     const executeScript = jest.fn().mockResolvedValue(undefined);
-    const wait = jest.fn().mockResolvedValue(undefined);
+    const waitMock = jest.fn().mockResolvedValue(undefined);
 
     await expect(
       loadPopupData({
@@ -35,8 +35,7 @@ describe("loadPopupData", () => {
           url: "https://example.com/article",
         }),
         executeScript,
-        getSetting: jest.fn().mockResolvedValue({ extensionEnabled: true }),
-        wait,
+        wait: waitMock,
       })
     ).resolves.toBe(popupData);
 
@@ -59,7 +58,6 @@ describe("loadPopupData", () => {
           url: "safari-web-extension://example/options.html",
         }),
         executeScript,
-        getSetting: jest.fn().mockResolvedValue({ extensionEnabled: true }),
         wait: jest.fn().mockResolvedValue(undefined),
       })
     ).resolves.toBeUndefined();
@@ -67,10 +65,10 @@ describe("loadPopupData", () => {
     expect(executeScript).not.toHaveBeenCalled();
   });
 
-  test("returns an explicit disabled state without reinjecting content.js", async () => {
+  test("finishes the normal retry sequence when content remains unavailable", async () => {
     const sendMessage = jest.fn().mockResolvedValue(undefined);
-    const executeScript = jest.fn();
-    const setting = { extensionEnabled: false, darkMode: "auto" };
+    const executeScript = jest.fn().mockResolvedValue(undefined);
+    const waitMock = jest.fn().mockResolvedValue(undefined);
 
     await expect(
       loadPopupData({
@@ -80,11 +78,15 @@ describe("loadPopupData", () => {
           url: "https://example.com/article",
         }),
         executeScript,
-        getSetting: jest.fn().mockResolvedValue(setting),
-        wait: jest.fn().mockResolvedValue(undefined),
+        wait: waitMock,
       })
-    ).resolves.toEqual({ rule: null, setting, disabled: true });
+    ).resolves.toBeUndefined();
 
-    expect(executeScript).not.toHaveBeenCalled();
+    expect(executeScript).toHaveBeenCalledWith({
+      target: { tabId: 19, allFrames: true },
+      files: ["content.js"],
+    });
+    expect(sendMessage).toHaveBeenCalledTimes(8);
+    expect(waitMock).toHaveBeenCalledTimes(7);
   });
 });

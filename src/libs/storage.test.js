@@ -1,3 +1,5 @@
+jest.mock("webextension-polyfill", () => ({}));
+
 import {
   STOKEY_SETTING,
   STOKEY_SETTING_BACKUP_V1_BEFORE_V2,

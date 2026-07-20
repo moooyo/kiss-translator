@@ -137,7 +137,6 @@ export function ContentFabContent({
       key="fab"
       {...fabProps}
       snapEdge
-      persistPosition
       onStart={() => setMoved(false)}
       onMove={() => setMoved(true)}
       handler={

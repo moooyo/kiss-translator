@@ -4,8 +4,9 @@
  * WebExtension Port 代理，以及 SSE 数据帧的增量解包与取消传播。
  */
 
+import browser from "webextension-polyfill";
 import { isExt, isGm } from "./client";
-import { browser, isBg } from "./browser";
+import { isBg } from "./browser";
 import { PORT_STREAM_FETCH } from "../config";
 import { createSSEParser, createAsyncQueue } from "./stream";
 import {

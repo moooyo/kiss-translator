@@ -256,10 +256,6 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-dictionary .MuiTab-root { min-height: 36px; font-size: 11.5px; }
 .kt-popup-empty { min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--kt-onv); text-align: center; }
 .kt-popup-empty__actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
-.kt-popup-disabled { min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; margin: 14px 18px 18px; padding: 28px 24px; border: 1px solid var(--kt-linev); border-radius: 24px; background: var(--kt-sf1); color: var(--kt-onv); text-align: center; }
-.kt-popup-disabled strong { color: var(--kt-on); font-size: 16px; }
-.kt-popup-disabled span { max-width: 280px; font-size: 12px; line-height: 1.55; }
-.kt-popup-disabled .MuiButton-root { margin-top: 6px; }
 
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-content { gap: 9px; padding: 10px 16px 12px; }
 .kt-popup-shell:not(.kt-popup-shell--window) .kt-popup-hero { padding: 12px 14px; border-radius: 20px; }

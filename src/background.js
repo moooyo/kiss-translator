@@ -472,10 +472,10 @@ browser.runtime.onInstalled.addListener(async (details) => {
     registerMsgDisplayScript();
   }
 
-  const { contextMenuType, csplist, orilist, subrulesList, extensionEnabled } =
+  const { contextMenuType, csplist, orilist, subrulesList } =
     await getSettingWithDefault();
 
-  addContextMenus(extensionEnabled === false ? 0 : contextMenuType);
+  addContextMenus(contextMenuType);
   updateCspRules({ csplist, orilist });
   trySyncAllSubRules({ subrulesList });
 });
@@ -492,7 +492,6 @@ browser.runtime.onStartup.addListener(async () => {
     csplist,
     orilist,
     logLevel,
-    extensionEnabled,
   } = await getSettingWithDefault();
 
   logger.setLevel(logLevel);
@@ -506,7 +505,7 @@ browser.runtime.onStartup.addListener(async () => {
   }
 
   // REVIEW: 针对“Firefox 重启后菜单消失”的系统 Bug，此处在启动时必须重新添加一次 addContextMenus
-  addContextMenus(extensionEnabled === false ? 0 : contextMenuType);
+  addContextMenus(contextMenuType);
 
   updateCspRules({ csplist, orilist });
   trySyncSettingAndRules();
@@ -548,19 +547,7 @@ const messageHandlers = {
   [MSG_OPEN_SEPARATE_WINDOW]: () => openSeparateWindowWithSavedBounds(), // 打开独立翻译小窗口
   [MSG_UPDATE_ICON]: (args, sender) => updateIcon(args, sender?.tab?.id), // 变更页面的插件高亮图标
   [MSG_RUNTIME_SETTING_PATCH]: (args, sender) =>
-    applyRuntimeSettingPatch(args, sender, {
-      onPersisted: async (setting, patch) => {
-        if (Object.prototype.hasOwnProperty.call(patch, "extensionEnabled")) {
-          try {
-            await addContextMenus(
-              setting.extensionEnabled === false ? 0 : setting.contextMenuType
-            );
-          } catch (error) {
-            kissLog("update context menus for runtime setting", error);
-          }
-        }
-      },
-    }),
+    applyRuntimeSettingPatch(args, sender),
 };
 
 /**

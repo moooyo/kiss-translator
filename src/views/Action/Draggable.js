@@ -61,7 +61,6 @@ export default function Draggable({
   snapEdge,
   onStart,
   onMove,
-  persistPosition,
   handler, // 点击并开始拖拽的触发区域
   children, // 容器内部的主体渲染元素
   usePaper,
@@ -190,10 +189,6 @@ export default function Draggable({
   // 鼠标松开/手指抬起，清除拖拽 origin，并阻止事件冒泡防止底层元素误触
   const handlePointerUp = (e) => {
     e.stopPropagation();
-    if (persistPosition && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      setFabPosition({ x: rect.left, y: rect.top });
-    }
     setOrigin(null);
   };
 

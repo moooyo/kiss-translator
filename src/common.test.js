@@ -143,7 +143,6 @@ describe("common iframe startup", () => {
       stop: mockTranslatorManagerStop,
     }));
     getSettingWithDefault.mockResolvedValue({
-      extensionEnabled: true,
       blacklist: "",
       tranboxSetting: { blacklist: "", transOpen: true },
       inputRule: { blacklist: "", transOpen: true },
@@ -243,20 +242,6 @@ describe("common iframe startup", () => {
     expect(runSubtitle).toHaveBeenCalledTimes(1);
   });
 
-  test("skips all page features when the global extension switch is off", async () => {
-    getSettingWithDefault.mockResolvedValue({
-      extensionEnabled: false,
-      logLevel: 1,
-    });
-
-    await run();
-
-    expect(matchRule).not.toHaveBeenCalled();
-    expect(TranslatorManager).not.toHaveBeenCalled();
-    expect(mockTranslatorManagerStart).not.toHaveBeenCalled();
-    expect(runSubtitle).not.toHaveBeenCalled();
-  });
-
   test("rejects startup failures so the entry point can retry injection", async () => {
     const error = new Error("storage unavailable");
     getSettingWithDefault.mockRejectedValueOnce(error);
@@ -274,83 +259,27 @@ describe("common iframe startup", () => {
     expect(TranslatorManager).not.toHaveBeenCalled();
   });
 
-  test("stops and restarts the active runtime without a page reload", async () => {
-    await run();
-    expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(1);
-
-    getSettingWithDefault.mockResolvedValueOnce({
-      extensionEnabled: false,
-      logLevel: 1,
-    });
-    await applyRuntimeSettingPatch();
-    expect(mockTranslatorManagerStop).toHaveBeenCalledTimes(1);
-    expect(stopSubtitle).toHaveBeenCalled();
-
-    getSettingWithDefault.mockResolvedValueOnce({
-      extensionEnabled: true,
-      blacklist: "",
-      tranboxSetting: { blacklist: "", transOpen: true },
-      inputRule: { blacklist: "", transOpen: true },
-      mouseHoverSetting: { blacklist: "", useMouseHover: true },
-      subtitleSetting: { enabled: true },
-      logLevel: 1,
-    });
-    await applyRuntimeSettingPatch();
-    expect(mockTranslatorManagerStart).toHaveBeenCalledTimes(2);
-  });
-
-  test("does not finish a stale startup after the global switch turns off", async () => {
-    let releaseRule;
-    let signalRuleReached;
-    const ruleReached = new Promise((resolve) => {
-      signalRuleReached = resolve;
-    });
-    matchRule.mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          releaseRule = resolve;
-          signalRuleReached();
-        })
-    );
-
-    const starting = run();
-    await ruleReached;
-    getSettingWithDefault.mockResolvedValueOnce({
-      extensionEnabled: false,
-      logLevel: 1,
-    });
-    await applyRuntimeSettingPatch();
-    releaseRule({ transOpen: "true", highlightWords: "-" });
-    await starting;
-
-    expect(TranslatorManager).not.toHaveBeenCalled();
-    expect(mockTranslatorManagerStart).not.toHaveBeenCalled();
-  });
-
   test("applies subtitle enablement to the active runtime", async () => {
     await run();
     runSubtitle.mockClear();
     stopSubtitle.mockClear();
 
     getSettingWithDefault.mockResolvedValueOnce({
-      extensionEnabled: true,
       subtitleSetting: { enabled: false },
     });
-    await applyRuntimeSettingPatch();
+    await expect(applyRuntimeSettingPatch()).resolves.toEqual({ active: true });
     expect(stopSubtitle).toHaveBeenCalledTimes(1);
     expect(runSubtitle).not.toHaveBeenCalled();
 
     getSettingWithDefault.mockResolvedValueOnce({
-      extensionEnabled: true,
       subtitleSetting: { enabled: true },
     });
-    await applyRuntimeSettingPatch();
+    await expect(applyRuntimeSettingPatch()).resolves.toEqual({ active: true });
     expect(runSubtitle).toHaveBeenCalledTimes(1);
   });
 
   test("does not start subtitles when runtime startup is blocked", async () => {
     getSettingWithDefault.mockResolvedValue({
-      extensionEnabled: true,
       blacklist: "blocked.example",
       subtitleSetting: { enabled: true },
       logLevel: 1,
@@ -360,7 +289,6 @@ describe("common iframe startup", () => {
     );
 
     await expect(applyRuntimeSettingPatch()).resolves.toEqual({
-      enabled: true,
       active: false,
     });
 

@@ -501,16 +501,6 @@ export default function Tranbox() {
                   </MenuItem>
                 </TextField>
               </Grid>
-              {/* 油猴脚本下触发调出主动查词输入框的热键录入 */}
-              {!isExt && (
-                <Grid item xs={12} sm={12} md={6} lg={3}>
-                  <ShortcutInput
-                    value={tranboxShortcut}
-                    onChange={handleShortcutInput}
-                    label={i18n("trigger_tranbox_shortcut")}
-                  />
-                </Grid>
-              )}
             </Grid>
           </Box>
 

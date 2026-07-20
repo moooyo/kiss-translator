@@ -42,11 +42,6 @@ function stopActiveRuntime() {
 
 export async function applyRuntimeSettingPatch() {
   const setting = await getSettingWithDefault();
-  if (setting.extensionEnabled === false) {
-    stopActiveRuntime();
-    return { enabled: false };
-  }
-
   if (!activeTranslatorManager) {
     const pendingStart = runtimeStartPromise;
     await run(activeRuntimeIsUserscript);
@@ -57,7 +52,7 @@ export async function applyRuntimeSettingPatch() {
 
   if (!activeTranslatorManager) {
     stopSubtitle();
-    return { enabled: true, active: false };
+    return { active: false };
   }
 
   if (setting.subtitleSetting?.enabled === false) {
@@ -66,7 +61,7 @@ export async function applyRuntimeSettingPatch() {
     runSubtitle({ href: document?.location?.href || "", setting });
   }
 
-  return { enabled: true, active: true };
+  return { active: true };
 }
 
 function ensureRuntimeControlListener(isUserscript) {
@@ -89,7 +84,7 @@ function ensureRuntimeControlListener(isUserscript) {
     return applyRuntimeSettingPatch().catch((error) => {
       if (!isExtensionContextInvalidatedError(error)) throw error;
       abandonInvalidatedRuntime();
-      return { enabled: false, invalidated: true };
+      return { active: false, invalidated: true };
     });
   };
   browser.runtime.onMessage.addListener(runtimeMessageListener);
@@ -365,12 +360,6 @@ async function runInternal(isUserscript = false, lifecycleVersion) {
 
     // 2. 初始化全局日志配置
     logger.setLevel(setting.logLevel);
-
-    if (setting.extensionEnabled === false) {
-      stopActiveRuntime();
-      logger.info("KISS Translator is disabled by the global setting.");
-      return;
-    }
 
     if (activeTranslatorManager) return;
 

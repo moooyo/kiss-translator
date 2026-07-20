@@ -158,14 +158,16 @@ export const OPTIONS_STYLES = String.raw`
 
 .kt-overview-top { display: grid; grid-template-columns: 1.35fr 1fr; gap: 14px; margin-bottom: 20px; }
 .kt-overview-hero { min-height: 200px; display: flex; flex-direction: column; position: relative; padding: 24px; border-radius: 26px; background: var(--kt-pric); color: var(--kt-onpric); overflow: hidden; }
-.kt-overview-hero__status { display: flex; align-items: center; gap: 13px; }
+.kt-overview-hero__header { display: flex; align-items: center; gap: 13px; }
 .kt-overview-hero__icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 17px; background: var(--kt-pri); color: var(--kt-onpri); }
 .kt-overview-hero__icon svg { width: 26px; height: 26px; }
 .kt-overview-hero__copy { min-width: 0; flex: 1; }
 .kt-overview-hero__title { display: block; font-size: 17px; font-weight: 700; }
 .kt-overview-hero__subtitle { display: block; margin-top: 3px; font-size: 11.5px; opacity: .75; }
-.kt-overview-hero__chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 18px; }
-.kt-overview-hero__chip { padding: 5px 10px; border-radius: 999px; background: color-mix(in srgb, var(--kt-sf0) 45%, transparent); font-size: 10.5px; font-weight: 650; }
+.kt-overview-hero__summary { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: auto; padding-top: 20px; }
+.kt-overview-hero__summary-item { min-width: 0; padding: 10px 12px; border-radius: 16px; background: color-mix(in srgb, var(--kt-sf0) 45%, transparent); }
+.kt-overview-hero__summary-item span { display: block; overflow: hidden; font-size: 9.5px; opacity: .75; text-overflow: ellipsis; white-space: nowrap; }
+.kt-overview-hero__summary-item strong { display: block; margin-top: 3px; overflow: hidden; font-size: 11.5px; text-overflow: ellipsis; white-space: nowrap; }
 .kt-overview-shortcuts { padding: 20px; border-radius: 24px; background: var(--kt-sf1); }
 .kt-overview-shortcuts h2 { margin: 0 0 12px; font-size: 13px; font-weight: 700; }
 .kt-overview-shortcut { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 25px; color: var(--kt-onv); font-size: 11.5px; }

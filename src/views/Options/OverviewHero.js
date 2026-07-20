@@ -1,25 +1,19 @@
 import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
-import Switch from "@mui/material/Switch";
 import { useI18n } from "../../hooks/I18n";
 import { useSetting } from "../../hooks/Setting";
 import { useRules } from "../../hooks/Rules";
 import { useOverviewShortcuts } from "../../hooks/Commands";
-import { isExt } from "../../libs/client";
-import { sendBgMsg } from "../../libs/msg";
-import { kissLog } from "../../libs/log";
 import {
   GLOBLA_RULE,
-  MSG_RUNTIME_SETTING_PATCH,
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
   OPT_LANGS_TO_REVERSED as OPT_LANGS_TO,
 } from "../../config";
 
 export default function OverviewHero() {
   const i18n = useI18n();
-  const { setting, updateSetting } = useSetting();
+  const { setting } = useSetting();
   const { list: rules } = useRules();
   const shortcutMap = useOverviewShortcuts(setting);
-  const enabled = setting.extensionEnabled !== false;
   const globalRule = rules.find((rule) => rule.pattern === "*") || GLOBLA_RULE;
   const activeApi = (setting.transApis || []).find(
     (api) => api.apiSlug === globalRule.apiSlug
@@ -43,48 +37,36 @@ export default function OverviewHero() {
     [i18n("setting"), shortcutMap.settings],
   ];
 
-  const handleExtensionEnabledChange = (event) => {
-    const extensionEnabled = event.target.checked;
-    if (isExt) {
-      void sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
-        scope: "all",
-        patch: { extensionEnabled },
-      }).catch((error) => kissLog("apply runtime extension setting", error));
-    } else {
-      updateSetting({ extensionEnabled });
-    }
-  };
-
   return (
     <section className="kt-overview-top">
       <div className="kt-overview-hero">
-        <div className="kt-overview-hero__status">
+        <div className="kt-overview-hero__header">
           <span className="kt-overview-hero__icon" aria-hidden="true">
             <TranslateRoundedIcon />
           </span>
           <span className="kt-overview-hero__copy">
             <span className="kt-overview-hero__title">
-              {i18n(
-                enabled
-                  ? "options_translation_enabled"
-                  : "options_translation_disabled"
-              )}
+              {i18n("options_overview")}
             </span>
             <span className="kt-overview-hero__subtitle">
-              {enabled ? i18n("popup_enabled") : i18n("popup_disabled")}
+              {i18n("options_overview_description")}
             </span>
           </span>
-          <Switch
-            checked={enabled}
-            onChange={handleExtensionEnabledChange}
-            inputProps={{ "aria-label": i18n("translate_switch") }}
-          />
         </div>
-        <div className="kt-overview-hero__chips">
-          <span className="kt-overview-hero__chip">{serviceName}</span>
-          <span className="kt-overview-hero__chip">
-            {sourceLanguage.split(" - ")[0]} → {targetLanguage.split(" - ")[0]}
-          </span>
+        <div className="kt-overview-hero__summary">
+          <div className="kt-overview-hero__summary-item">
+            <span>{i18n("translate_service")}</span>
+            <strong>{serviceName}</strong>
+          </div>
+          <div className="kt-overview-hero__summary-item">
+            <span>
+              {i18n("from_lang")} → {i18n("to_lang")}
+            </span>
+            <strong>
+              {sourceLanguage.split(" - ")[0]} →{" "}
+              {targetLanguage.split(" - ")[0]}
+            </strong>
+          </div>
         </div>
       </div>
       <div className="kt-overview-shortcuts">

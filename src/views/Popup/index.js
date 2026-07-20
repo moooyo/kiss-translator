@@ -91,7 +91,6 @@ export default function Popup() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("page");
   const [isSeparate, setIsSeparate] = useState(false);
-  const [globallyDisabled, setGloballyDisabled] = useState(false);
   const popupShellRef = useRef(null);
   const initialFocusGuardRef = useRef(true);
 
@@ -167,7 +166,6 @@ export default function Popup() {
               useMouseHover: true,
             },
           });
-          setGloballyDisabled(false);
           return;
         }
         const cleanHash = window.location.hash.slice(1);
@@ -179,7 +177,6 @@ export default function Popup() {
         if (active && response && !response.error) {
           setRule(response.rule);
           setSetting(response.setting);
-          setGloballyDisabled(response.disabled === true);
         }
       } catch (error) {
         kissLog("query rule", error);
@@ -268,18 +265,6 @@ export default function Popup() {
       >
         {activeTab === "text" ? (
           <TranslationTab />
-        ) : globallyDisabled ? (
-          <div className="kt-popup-disabled" role="status">
-            <strong>{i18n("popup_extension_disabled")}</strong>
-            <span>{i18n("popup_extension_disabled_description")}</span>
-            <Button
-              variant="contained"
-              color="secondary"
-              onClick={handleOpenSetting}
-            >
-              {i18n("setting")}
-            </Button>
-          </div>
         ) : rule && setting ? (
           <PopupCont
             rule={rule}

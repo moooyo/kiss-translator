@@ -1,3 +1,5 @@
+jest.mock("webextension-polyfill", () => ({}));
+
 import { KV_SETTING_KEY, MSG_RUNTIME_SETTING_PATCH } from "../config";
 import { applyRuntimeSettingPatch } from "./runtimeSettingPatch";
 
@@ -14,7 +16,7 @@ describe("applyRuntimeSettingPatch", () => {
     await expect(
       applyRuntimeSettingPatch({ patch, scope: "all" }, undefined, {
         getSetting: jest.fn().mockResolvedValue({
-          extensionEnabled: true,
+          injectRules: true,
           subtitleSetting: { enabled: true, apiSlug: "Microsoft" },
         }),
         setSetting,
@@ -27,7 +29,7 @@ describe("applyRuntimeSettingPatch", () => {
     ).resolves.toEqual({ delivered: 1, attempted: 2 });
 
     expect(setSetting).toHaveBeenCalledWith({
-      extensionEnabled: true,
+      injectRules: true,
       subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
     });
     expect(markSyncMeta).toHaveBeenCalledWith(KV_SETTING_KEY);
@@ -76,7 +78,7 @@ describe("applyRuntimeSettingPatch", () => {
 
   test("serializes concurrent patches so neither persisted update is lost", async () => {
     let storedSetting = {
-      extensionEnabled: true,
+      injectRules: true,
       subtitleSetting: { enabled: true, apiSlug: "Microsoft" },
     };
     const firstReadStarted = createDeferred();
@@ -98,8 +100,8 @@ describe("applyRuntimeSettingPatch", () => {
       queryTabs: jest.fn().mockResolvedValue([]),
     };
 
-    const masterPatch = applyRuntimeSettingPatch(
-      { patch: { extensionEnabled: false } },
+    const injectRulesPatch = applyRuntimeSettingPatch(
+      { patch: { injectRules: false } },
       undefined,
       dependencies
     );
@@ -113,10 +115,10 @@ describe("applyRuntimeSettingPatch", () => {
     await Promise.resolve();
     expect(getSetting).toHaveBeenCalledTimes(1);
     releaseFirstRead.resolve();
-    await Promise.all([masterPatch, subtitlePatch]);
+    await Promise.all([injectRulesPatch, subtitlePatch]);
 
     expect(storedSetting).toEqual({
-      extensionEnabled: false,
+      injectRules: false,
       subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
     });
     expect(dependencies.markSyncMeta).toHaveBeenNthCalledWith(
@@ -130,7 +132,7 @@ describe("applyRuntimeSettingPatch", () => {
   });
 
   test("delivers concurrent same-field patches in persistence order", async () => {
-    let storedSetting = { extensionEnabled: true };
+    let storedSetting = { injectRules: true };
     const firstDeliveryStarted = createDeferred();
     const releaseFirstDelivery = createDeferred();
     const deliveredValues = [];
@@ -139,7 +141,7 @@ describe("applyRuntimeSettingPatch", () => {
         firstDeliveryStarted.resolve();
         await releaseFirstDelivery.promise;
       }
-      deliveredValues.push(message.args.patch.extensionEnabled);
+      deliveredValues.push(message.args.patch.injectRules);
     });
     const dependencies = {
       getSetting: jest.fn(async () => storedSetting),
@@ -152,13 +154,13 @@ describe("applyRuntimeSettingPatch", () => {
     };
 
     const firstPatch = applyRuntimeSettingPatch(
-      { patch: { extensionEnabled: false } },
+      { patch: { injectRules: false } },
       undefined,
       dependencies
     );
     await firstDeliveryStarted.promise;
     const secondPatch = applyRuntimeSettingPatch(
-      { patch: { extensionEnabled: true } },
+      { patch: { injectRules: true } },
       undefined,
       dependencies
     );
@@ -169,11 +171,11 @@ describe("applyRuntimeSettingPatch", () => {
     await Promise.all([firstPatch, secondPatch]);
 
     expect(deliveredValues).toEqual([false, true]);
-    expect(storedSetting.extensionEnabled).toBe(true);
+    expect(storedSetting.injectRules).toBe(true);
   });
 
   test("continues processing patches after an earlier persistence failure", async () => {
-    let storedSetting = { extensionEnabled: true };
+    let storedSetting = { injectRules: true };
     const persistenceError = new Error("storage unavailable");
     const setSetting = jest
       .fn()
@@ -190,7 +192,7 @@ describe("applyRuntimeSettingPatch", () => {
 
     await expect(
       applyRuntimeSettingPatch(
-        { patch: { extensionEnabled: false } },
+        { patch: { injectRules: false } },
         undefined,
         dependencies
       )
@@ -204,7 +206,7 @@ describe("applyRuntimeSettingPatch", () => {
     ).resolves.toEqual({ delivered: 0, attempted: 0 });
 
     expect(storedSetting).toEqual({
-      extensionEnabled: true,
+      injectRules: true,
       subtitleSetting: { enabled: false },
     });
     expect(dependencies.markSyncMeta).toHaveBeenCalledTimes(1);

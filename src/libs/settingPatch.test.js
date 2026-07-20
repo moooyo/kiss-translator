@@ -5,13 +5,13 @@ describe("mergeSettingPatch", () => {
     expect(
       mergeSettingPatch(
         {
-          extensionEnabled: true,
+          injectRules: true,
           subtitleSetting: { enabled: true, apiSlug: "Microsoft" },
         },
         { subtitleSetting: { enabled: false } }
       )
     ).toEqual({
-      extensionEnabled: true,
+      injectRules: true,
       subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
     });
   });

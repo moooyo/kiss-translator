@@ -92,19 +92,9 @@ export class BilingualSubtitleManager {
     this.onSeek = this.onSeek.bind(this);
 
     // 对预翻译机制进行节流控制，以 (setting.throttleTrans 缺省 30秒) 为步长触发，防止频繁向服务端发送翻译请求
-    this.#throttledTriggerTranslations = throttle(
-      this.#triggerTranslations.bind(this),
-      (setting.throttleTrans ?? 30) * 1000
-    );
+    this.#resetTranslationThrottle();
 
-    // 如果启用了悬浮背词/查词翻译功能，将所需 CSS 样式表写入 head
-    if (this.#isHoverLookupEnabled()) {
-      addWordHoverStyles(this.#setting);
-      this.#wordTooltipController = new WordTooltipController({
-        getVideoContainer: () => this.#videoEl.parentElement?.parentElement,
-        getTimestamp: () => this.#getCurrentSubtitleStartTime(),
-      });
-    }
+    this.#syncWordTooltipController();
   }
 
   // 判定是否激活了悬浮查词翻译功能
@@ -113,6 +103,29 @@ export class BilingualSubtitleManager {
       this.#setting.hoverLookupMode,
       this.#setting.enhanceMode
     );
+  }
+
+  #resetTranslationThrottle() {
+    this.#throttledTriggerTranslations?.cancel();
+    this.#throttledTriggerTranslations = throttle(
+      this.#triggerTranslations.bind(this),
+      (this.#setting.throttleTrans ?? 30) * 1000
+    );
+  }
+
+  #syncWordTooltipController() {
+    if (!this.#isHoverLookupEnabled()) {
+      this.#wordTooltipController?.destroy();
+      this.#wordTooltipController = null;
+      return;
+    }
+
+    addWordHoverStyles(this.#setting);
+    if (this.#wordTooltipController) return;
+    this.#wordTooltipController = new WordTooltipController({
+      getVideoContainer: () => this.#videoEl.parentElement?.parentElement,
+      getTimestamp: () => this.#getCurrentSubtitleStartTime(),
+    });
   }
 
   /**
@@ -822,6 +835,16 @@ export class BilingualSubtitleManager {
   // 更新配置项
   updateSetting(obj) {
     this.#setting = { ...this.#setting, ...obj };
+    if (Object.prototype.hasOwnProperty.call(obj, "throttleTrans")) {
+      this.#resetTranslationThrottle();
+    }
+    if (
+      ["hoverLookupMode", "enhanceMode", "brandColor", "darkMode"].some(
+        (name) => Object.prototype.hasOwnProperty.call(obj, name)
+      )
+    ) {
+      this.#syncWordTooltipController();
+    }
     if (Object.prototype.hasOwnProperty.call(obj, "windowStyle")) {
       this.#applyCaptionWindowStyle();
     }

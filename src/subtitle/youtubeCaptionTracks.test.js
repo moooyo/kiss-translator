@@ -1,6 +1,7 @@
 import {
   buildTrackKey,
   findCaptionTrack,
+  getSubtitleEvents,
   isChatCaptionTrack,
   isSameLang,
 } from "./youtubeCaptionTracks.js";
@@ -61,5 +62,27 @@ describe("youtubeCaptionTracks", () => {
       languageCode: "de",
     });
     expect(tracks).toHaveLength(0);
+  });
+
+  test("fetches the selected track when no intercepted response is available", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({ events: [{ text: "hello" }] }),
+    });
+    const trackUrl = new URL(
+      "https://www.youtube.com/api/timedtext?v=video-1&lang=en&kind=asr"
+    );
+
+    try {
+      await expect(
+        getSubtitleEvents(trackUrl, new URL(trackUrl.href), null)
+      ).resolves.toEqual([{ text: "hello" }]);
+      expect(global.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("fmt=json3")
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });

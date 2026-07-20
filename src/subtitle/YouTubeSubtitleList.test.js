@@ -145,6 +145,89 @@ describe("YouTubeSubtitleList", () => {
     manager.destroy();
   });
 
+  test("updates presentation and visibility without losing panel state", async () => {
+    const videoEl = createVideoElement();
+    const initialI18n = (key) =>
+      ({
+        bilingual_subtitles: "Subtitles",
+        vocabulary_book: "Vocabulary",
+        download_subtitles_vtt: "Download VTT",
+        download_raw_subtitle_events_json: "Download JSON",
+        close: "Close panel",
+      })[key] || "";
+    const manager = new YouTubeSubtitleList(videoEl, initialI18n, {
+      enableHoverLookup: false,
+      theme: { darkMode: "light" },
+    });
+    manager.initialize([subtitle], [], 100);
+    renderVisibleSubtitleItems(manager);
+
+    const container = manager.container;
+    const scrollContainer = manager.subtitleScrollContainer;
+    scrollContainer.scrollTop = 96;
+    manager.vocabulary.push({ word: "hello", timestamp: 0 });
+    Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Vocabulary")
+      .click();
+
+    const i18n = (key) =>
+      ({
+        bilingual_subtitles: "Bilingual subtitles",
+        vocabulary_book: "Vocabulary",
+        download_subtitles_vtt: "Download VTT",
+        download_raw_subtitle_events_json: "Download JSON",
+        close: "Close panel",
+      })[key] || "";
+    manager.updateSetting({
+      i18n,
+      enableHoverLookup: true,
+      theme: { darkMode: "dark" },
+    });
+    Array.from(container.querySelectorAll("button"))
+      .find((button) => button.title === "Close panel")
+      .click();
+    expect(manager.container).toBe(container);
+    expect(container.style.display).toBe("none");
+    Object.defineProperty(videoEl, "paused", {
+      value: false,
+      configurable: true,
+    });
+    videoEl.dispatchEvent(new Event("play"));
+    expect(manager.loopAutoScroll).toBeNull();
+    manager.setVisible(true);
+    expect(manager.loopAutoScroll).not.toBeNull();
+
+    expect(manager.container).toBe(container);
+    expect(manager.subtitleScrollContainer).toBe(scrollContainer);
+    expect(manager.subtitleScrollContainer.scrollTop).toBe(96);
+    expect(manager.activeTab).toBe("vocabulary");
+    expect(manager.vocabulary).toEqual([
+      expect.objectContaining({ word: "hello" }),
+    ]);
+    expect(container.style.display).toBe("flex");
+    expect(container.style.getPropertyValue("--kt-bg")).toBe(
+      "rgba(18,18,18,0.85)"
+    );
+    expect(
+      Array.from(container.querySelectorAll("button")).map(
+        (button) => button.textContent
+      )
+    ).toEqual(
+      expect.arrayContaining(["Bilingual subtitles [100%]", "Vocabulary"])
+    );
+
+    Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent === "Bilingual subtitles [100%]")
+      .click();
+    renderVisibleSubtitleItems(manager);
+    expect(
+      Array.from(
+        document.querySelectorAll(".kiss-youtube-original .kiss-subtitle-word")
+      ).map((node) => node.textContent)
+    ).toEqual(["hello", "world"]);
+    manager.destroy();
+  });
+
   test("attaches lookup listeners to every row in a virtual range", async () => {
     apiMicrosoftDict.mockResolvedValue({ trs: [{ def: "definition" }] });
     const videoEl = createVideoElement();

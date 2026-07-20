@@ -163,6 +163,10 @@ describe("BilingualSubtitleManager", () => {
     });
 
     manager.start();
+    const paper = document.querySelector(".kiss-caption-paper");
+    const captionWindow = document.querySelector(".kiss-caption-window");
+    paper.style.left = "72px";
+    paper.style.bottom = "88px";
     let lines = document.querySelectorAll(".kiss-caption-window p");
     expect(lines[0].style.fontSize).toBe("30px");
     expect(lines[1].style.fontSize).toBe("15px");
@@ -171,6 +175,38 @@ describe("BilingualSubtitleManager", () => {
     lines = document.querySelectorAll(".kiss-caption-window p");
     expect(lines[0].style.fontSize).toBe("16px");
     expect(lines[1].style.fontSize).toBe("8px");
+    expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
+    expect(document.querySelector(".kiss-caption-window")).toBe(captionWindow);
+    expect(paper.style.left).toBe("72px");
+    expect(paper.style.bottom).toBe("88px");
+    manager.destroy();
+  });
+
+  test("enables and disables hover lookup without recreating the manager", async () => {
+    apiMicrosoftDict.mockResolvedValue({
+      trs: [{ pos: "n.", def: "a greeting" }],
+    });
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "translated hello" }],
+      setting,
+    });
+
+    manager.start();
+    const paper = document.querySelector(".kiss-caption-paper");
+    manager.updateSetting({ hoverLookupMode: "on" });
+
+    const word = document.querySelector(".kiss-subtitle-word");
+    expect(word).not.toBeNull();
+    word.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await Promise.resolve();
+    expect(apiMicrosoftDict).toHaveBeenCalledWith("hello");
+    expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
+
+    manager.updateSetting({ hoverLookupMode: "off" });
+    expect(document.querySelector(".kiss-subtitle-word")).toBeNull();
+    expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
     manager.destroy();
   });
 

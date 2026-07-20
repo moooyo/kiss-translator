@@ -13,6 +13,7 @@ import {
 
 const mockManagerInstances = [];
 const mockPlayerUiInstances = [];
+const mockSubtitleListInstances = [];
 const mockIsSameLang = jest.fn(() => false);
 
 jest.mock("../config", () => ({
@@ -55,7 +56,12 @@ jest.mock("./youtubePlayerUi.js", () => ({
 }));
 
 jest.mock("./youtubeCaptionTracks.js", () => ({
-  buildTrackKey: () => "track-1",
+  buildTrackKey: (url) =>
+    [
+      url.searchParams.get("v") || "",
+      url.searchParams.get("lang") || "",
+      url.searchParams.get("kind") || "",
+    ].join("|"),
   findCaptionTrack: (tracks) => tracks[0],
   getCaptionTracks: jest.fn(),
   getSubtitleEvents: jest.fn(),
@@ -83,15 +89,32 @@ jest.mock("./BilingualSubtitleManager.js", () => ({
 
     start = jest.fn();
     destroy = jest.fn();
+    updateSetting = jest.fn();
     repairChunkTranslations = jest.fn();
   },
 }));
 
 jest.mock("./YouTubeSubtitleList.js", () => ({
-  YouTubeSubtitleList: jest.fn(),
+  YouTubeSubtitleList: class {
+    constructor(videoEl, i18n, options) {
+      this.videoEl = videoEl;
+      this.i18n = i18n;
+      this.options = options;
+      mockSubtitleListInstances.push(this);
+    }
+
+    initialize = jest.fn();
+    destroy = jest.fn();
+    setVisible = jest.fn();
+    updateSetting = jest.fn();
+    updateSingleSubtitle = jest.fn();
+    turnOnAutoSub = jest.fn();
+  },
 }));
 
 const flushPromises = () => new Promise((resolve) => setTimeout(resolve, 0));
+const waitForCurrentTrackRecovery = () =>
+  new Promise((resolve) => setTimeout(resolve, 550));
 
 describe("YouTubeCaptionProvider manual translation", () => {
   beforeEach(() => {
@@ -99,6 +122,7 @@ describe("YouTubeCaptionProvider manual translation", () => {
     jest.clearAllMocks();
     mockManagerInstances.length = 0;
     mockPlayerUiInstances.length = 0;
+    mockSubtitleListInstances.length = 0;
     window.history.replaceState({}, "", "/watch?v=video-1");
     document.body.innerHTML =
       '<video></video><button class="captions" aria-pressed="true"></button>';
@@ -216,6 +240,97 @@ describe("YouTubeCaptionProvider manual translation", () => {
     expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
 
     await YouTubeInitializer({ autoTranslate: true });
+    expect(mockManagerInstances).toHaveLength(2);
+  });
+
+  test("loads the current track when initialized without an intercepted request", async () => {
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          languageCode: "en",
+        },
+      ],
+      fullDescription: "",
+    });
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      showList: "off",
+    });
+    await act(async () => {
+      await waitForCurrentTrackRecovery();
+      await flushPromises();
+    });
+
+    expect(getCaptionTracks).toHaveBeenCalledWith(
+      "video-1",
+      expect.objectContaining({ signal: expect.anything() })
+    );
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
+    expect(mockManagerInstances).toHaveLength(1);
+  });
+
+  test("loads the new video after navigation while suspended", async () => {
+    const initialApi = { apiSlug: "initial-api", apiType: "Microsoft" };
+    const nextApi = { apiSlug: "next-api", apiType: "Google" };
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      apiSlug: "initial-api",
+      apiSetting: initialApi,
+      transApis: [initialApi, nextApi],
+      showList: "off",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    YouTubeInitializer.suspend();
+    window.history.replaceState({}, "", "/watch?v=video-2");
+    window.dispatchEvent(new Event("yt-navigate-finish"));
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-2&lang=en",
+          languageCode: "en",
+        },
+      ],
+      fullDescription: "",
+    });
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      apiSlug: "next-api",
+      apiSetting: nextApi,
+      transApis: [initialApi, nextApi],
+      showList: "off",
+    });
+    await act(async () => {
+      await waitForCurrentTrackRecovery();
+      await flushPromises();
+    });
+
+    expect(getCaptionTracks).toHaveBeenLastCalledWith(
+      "video-2",
+      expect.objectContaining({ signal: expect.anything() })
+    );
+    expect(eventsToSubtitles).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        videoId: "video-2",
+        setting: expect.objectContaining({ apiSlug: "next-api" }),
+      })
+    );
     expect(mockManagerInstances).toHaveLength(2);
   });
 
@@ -386,7 +501,7 @@ describe("YouTubeCaptionProvider manual translation", () => {
     );
   });
 
-  test("rebuilds presentation managers without reprocessing subtitles", async () => {
+  test("updates presentation settings without recreating managers", async () => {
     const provider = await YouTubeInitializer({
       autoTranslate: true,
       aiContextSlug: "-",
@@ -415,11 +530,57 @@ describe("YouTubeCaptionProvider manual translation", () => {
 
     expect(sameProvider).toBe(provider);
     expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
-    expect(mockManagerInstances).toHaveLength(2);
-    expect(mockManagerInstances[1].options.setting.fontScale).toBe(125);
-    expect(mockPlayerUiInstances[0].showNotification).toHaveBeenLastCalledWith(
-      "en:subtitle_load_succeed"
+    expect(mockManagerInstances).toHaveLength(1);
+    expect(mockManagerInstances[0].destroy).not.toHaveBeenCalled();
+    expect(mockManagerInstances[0].updateSetting).toHaveBeenCalledWith(
+      expect.objectContaining({ fontScale: 125, uiLang: "en" })
     );
+  });
+
+  test("preserves the subtitle list while presentation settings change", async () => {
+    const provider = await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      fontScale: 100,
+      showList: "on",
+      enhanceMode: "on",
+      uiLang: "zh",
+    });
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    const manager = mockManagerInstances[0];
+    const subtitleList = mockSubtitleListInstances[0];
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      fontScale: 125,
+      showList: "on",
+      enhanceMode: "on",
+      uiLang: "en",
+    });
+
+    expect(mockManagerInstances).toEqual([manager]);
+    expect(mockSubtitleListInstances).toEqual([subtitleList]);
+    expect(manager.destroy).not.toHaveBeenCalled();
+    expect(subtitleList.destroy).not.toHaveBeenCalled();
+    expect(subtitleList.updateSetting).toHaveBeenCalled();
+
+    provider.updateSetting({ name: "showList", value: "off" });
+    provider.updateSetting({ name: "showList", value: "on" });
+
+    expect(mockSubtitleListInstances).toEqual([subtitleList]);
+    expect(subtitleList.destroy).not.toHaveBeenCalled();
+    expect(subtitleList.setVisible).toHaveBeenNthCalledWith(1, false);
+    expect(subtitleList.setVisible).toHaveBeenNthCalledWith(2, true);
   });
 
   test("uses the latest external auto-translate value after navigation", async () => {
@@ -480,8 +641,11 @@ describe("YouTubeCaptionProvider manual translation", () => {
     );
     await act(async () => flushPromises());
     expect(getCaptionTracks).toHaveBeenCalledTimes(1);
+    const interruptedSignal = getCaptionTracks.mock.calls[0][1].signal;
+    expect(interruptedSignal.aborted).toBe(false);
 
     YouTubeInitializer.suspend();
+    expect(interruptedSignal.aborted).toBe(true);
     await YouTubeInitializer({ autoTranslate: true });
     await act(async () => flushPromises());
 

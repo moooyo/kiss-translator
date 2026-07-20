@@ -127,15 +127,17 @@ export function findCaptionTrack(captionTracks, lang, kind) {
  * 请求 YouTube 播放页 HTML，并解析当前视频的字幕轨列表与原始描述。
  *
  * @param {string} videoId 当前视频 ID。
+ * @param {object} [options] Optional request controls.
+ * @param {AbortSignal} [options.signal] Signal used to cancel stale requests.
  * @returns {Promise<{captionTracks?: Array<object>, fullDescription?: string}>} 字幕轨配置与视频描述。
  */
-export async function getCaptionTracks(videoId) {
+export async function getCaptionTracks(videoId, { signal } = {}) {
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
     // REVIEW: 每次处理字幕都会重新 fetch 播放页并正则匹配 ytInitialPlayerResponse。
     // 这会造成二次网页下载，也可能在高频使用时被 YouTube 视为异常流量。
     // 后续可优先从当前页面全局对象或客户端内部 API 读取。
-    const html = await fetch(url).then((r) => r.text());
+    const html = await fetch(url, { signal }).then((r) => r.text());
     const match = html.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/s);
     if (!match) return {};
     const data = JSON.parse(match[1]);
@@ -156,11 +158,13 @@ export async function getCaptionTracks(videoId) {
  *
  * @param {URL} capUrl 最终选中的字幕轨 baseUrl。
  * @param {URL} potUrl 当前拦截到的 timedtext 请求 URL。
- * @param {string} responseText 当前拦截请求的响应文本。
+ * @param {string|null} responseText 当前拦截请求的响应文本。
  * @returns {Promise<Array<object>|null>} YouTube json3 events 数组。
  */
 export async function getSubtitleEvents(capUrl, potUrl, responseText) {
   if (
+    typeof responseText === "string" &&
+    responseText.length > 0 &&
     !potUrl.searchParams.get("tlang") &&
     potUrl.searchParams.get("kind") === capUrl.searchParams.get("kind") &&
     isSameLang(potUrl.searchParams.get("lang"), capUrl.searchParams.get("lang"))

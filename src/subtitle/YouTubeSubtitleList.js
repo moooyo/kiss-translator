@@ -30,6 +30,7 @@ export class YouTubeSubtitleList {
     this.videoEl = videoElement;
     this.i18n = i18n;
     this.enableHoverLookup = enableHoverLookup;
+    this.theme = { ...theme };
 
     // --- 数据源缓存 ---
     // 双语字幕主列表数组。结构：{ start: number, end: number, text: string, translation: string }
@@ -41,6 +42,10 @@ export class YouTubeSubtitleList {
     // --- DOM 节点引用缓存 ---
     this.container = null; // 右侧字幕/生词面板的最外层根容器节点
     this.subtitleTabEl = null; // 字幕 Tab 按钮引用，用于随处理进度刷新标题文案
+    this.vocabularyTabEl = null;
+    this.closeButtonEl = null;
+    this.downloadButtonEl = null;
+    this.downloadRawButtonEl = null;
     this.subtitleListEl = null; // 字幕列表面板的 DOM 引用
     this.vocabularyListEl = null; // 生词本面板的 DOM 引用
     this.subtitleScrollContainer = null; // 字幕列表的专用独立纵向滚动容器
@@ -87,13 +92,7 @@ export class YouTubeSubtitleList {
     // 监听来自扩展配置选项页面等第三方发送的消息，用以点击生词时同步跳转视频进度
     window.addEventListener("message", this.handleJumpMessage);
 
-    if (this.enableHoverLookup) {
-      addWordHoverStyles(theme);
-      this._wordTooltipController = new WordTooltipController({
-        getVideoContainer: () => this._getPlayerElement(),
-        getTimestamp: () => this.videoEl.currentTime * 1000,
-      });
-    }
+    this._syncWordTooltipController();
   }
 
   /**
@@ -172,6 +171,78 @@ export class YouTubeSubtitleList {
     }
   }
 
+  updateSetting({ i18n, enableHoverLookup, theme } = {}) {
+    const hoverLookupChanged =
+      typeof enableHoverLookup === "boolean" &&
+      enableHoverLookup !== this.enableHoverLookup;
+    if (typeof i18n === "function") this.i18n = i18n;
+    if (typeof enableHoverLookup === "boolean") {
+      this.enableHoverLookup = enableHoverLookup;
+    }
+    if (theme && typeof theme === "object") {
+      this.theme = { ...this.theme, ...theme };
+    }
+
+    this._refreshLabels();
+    this._syncWordTooltipController();
+    void this._applyTheme();
+    if (hoverLookupChanged) this._scheduleVirtualRender(true);
+  }
+
+  setVisible(visible) {
+    if (!this.container) return;
+    this.container.style.display = visible ? "flex" : "none";
+    if (!visible) {
+      this.turnOffAutoSub();
+      this._wordTooltipController?.clearHoverState();
+      return;
+    }
+
+    this._syncContainerHeightToPlayer();
+    this._scheduleVirtualRender(true);
+    this.turnOnAutoSub();
+  }
+
+  _syncWordTooltipController() {
+    if (!this.enableHoverLookup) {
+      this._wordTooltipController?.destroy();
+      this._wordTooltipController = null;
+      return;
+    }
+
+    addWordHoverStyles(this.theme);
+    if (this._wordTooltipController) return;
+    this._wordTooltipController = new WordTooltipController({
+      getVideoContainer: () => this._getPlayerElement(),
+      getTimestamp: () => this.videoEl.currentTime * 1000,
+    });
+  }
+
+  _refreshLabels() {
+    this._updateSubtitleTabLabel();
+    if (this.vocabularyTabEl) {
+      this.vocabularyTabEl.textContent = this._t(
+        "vocabulary_book",
+        "Vocabulary"
+      );
+    }
+    if (this.closeButtonEl) {
+      this.closeButtonEl.title = this._t("close", "Close");
+    }
+    if (this.downloadButtonEl) {
+      this.downloadButtonEl.textContent = this._t(
+        "download_subtitles_vtt",
+        "Download subtitles (VTT)"
+      );
+    }
+    if (this.downloadRawButtonEl) {
+      this.downloadRawButtonEl.textContent = this._t(
+        "download_raw_subtitle_events_json",
+        "Download source data (JSON)"
+      );
+    }
+  }
+
   /**
    * 外部更新数据源接口（如：AI 异步分块翻译追加完毕，或者切换了字幕语种）
    * 对面板应用 Diff 增量更新算法以最小化 DOM 操作代价。
@@ -242,6 +313,10 @@ export class YouTubeSubtitleList {
       this.container = null;
     }
     this.subtitleTabEl = null;
+    this.vocabularyTabEl = null;
+    this.closeButtonEl = null;
+    this.downloadButtonEl = null;
+    this.downloadRawButtonEl = null;
     this.subtitleListEl = null;
     this.vocabularyListEl = null;
     this.subtitleScrollContainer = null;
@@ -740,59 +815,62 @@ export class YouTubeSubtitleList {
       const secondary = document.getElementById("secondary-inner");
       if (secondary) secondary.prepend(this.container);
 
-      // 自适应主题：异步加载用户暗黑模式偏好，并嗅探原生系统的 prefers-color-scheme，写入对应的全局 CSS 变量系统
-      (async () => {
-        try {
-          const setting = await getSettingWithDefault();
-          const darkMode = setting?.darkMode;
-          const prefersDark =
-            typeof window.matchMedia === "function" &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches;
-          const isDark =
-            darkMode === "dark" || (darkMode === "auto" && prefersDark);
-
-          const lightVars = {
-            "--kt-bg": "rgba(255, 255, 255, 0.9)",
-            "--kt-border": "1px solid rgba(0, 0, 0, 0.1)",
-            "--kt-text": "#333",
-            "--kt-subtext": "#666",
-            "--kt-primary": "#1e88e5",
-            "--kt-time-bg": "rgba(30, 136, 229, 0.1)",
-            "--kt-divider": "rgba(240,240,240,0.6)",
-            "--kt-active-bg": "rgba(30, 136, 229, 0.1)",
-            "--kt-btn-bg": "var(--kt-primary)",
-            "--kt-btn-color": "white",
-            "--kt-btn-border": "none",
-            "--kt-btn-hover-bg": "rgba(30,136,229,0.85)",
-          };
-
-          const darkVars = {
-            "--kt-bg": "rgba(18,18,18,0.85)",
-            "--kt-border": "1px solid rgba(255, 255, 255, 0.06)",
-            "--kt-text": "#e6e6e6",
-            "--kt-subtext": "#bdbdbd",
-            "--kt-primary": "#90caf9",
-            "--kt-time-bg": "rgba(144,202,249,0.08)",
-            "--kt-divider": "rgba(255,255,255,0.06)",
-            "--kt-active-bg": "rgba(144,202,249,0.12)",
-            "--kt-btn-bg": "linear-gradient(180deg,#0f0f0f,#1b1b1b)",
-            "--kt-btn-color": "#e6e6e6",
-            "--kt-btn-border": "1px solid rgba(255,255,255,0.04)",
-            "--kt-btn-hover-bg": "linear-gradient(180deg,#141414,#262626)",
-          };
-
-          const vars = isDark ? darkVars : lightVars;
-          Object.keys(vars).forEach((k) =>
-            this.container.style.setProperty(k, vars[k])
-          );
-        } catch (err) {
-          logger.info("failed to apply subtitle list theme vars", err);
-        }
-      })();
+      void this._applyTheme();
     }
 
     this._syncContainerHeightToPlayer();
     this._observePlayerSize();
+  }
+
+  async _applyTheme() {
+    try {
+      let darkMode = this.theme.darkMode;
+      if (!darkMode) {
+        const setting = await getSettingWithDefault();
+        darkMode = this.theme.darkMode || setting?.darkMode;
+      }
+      if (!this.container) return;
+
+      const prefersDark =
+        typeof window.matchMedia === "function" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches;
+      const isDark =
+        darkMode === "dark" || (darkMode === "auto" && prefersDark);
+      const lightVars = {
+        "--kt-bg": "rgba(255, 255, 255, 0.9)",
+        "--kt-border": "1px solid rgba(0, 0, 0, 0.1)",
+        "--kt-text": "#333",
+        "--kt-subtext": "#666",
+        "--kt-primary": "#1e88e5",
+        "--kt-time-bg": "rgba(30, 136, 229, 0.1)",
+        "--kt-divider": "rgba(240,240,240,0.6)",
+        "--kt-active-bg": "rgba(30, 136, 229, 0.1)",
+        "--kt-btn-bg": "var(--kt-primary)",
+        "--kt-btn-color": "white",
+        "--kt-btn-border": "none",
+        "--kt-btn-hover-bg": "rgba(30,136,229,0.85)",
+      };
+      const darkVars = {
+        "--kt-bg": "rgba(18,18,18,0.85)",
+        "--kt-border": "1px solid rgba(255, 255, 255, 0.06)",
+        "--kt-text": "#e6e6e6",
+        "--kt-subtext": "#bdbdbd",
+        "--kt-primary": "#90caf9",
+        "--kt-time-bg": "rgba(144,202,249,0.08)",
+        "--kt-divider": "rgba(255,255,255,0.06)",
+        "--kt-active-bg": "rgba(144,202,249,0.12)",
+        "--kt-btn-bg": "linear-gradient(180deg,#0f0f0f,#1b1b1b)",
+        "--kt-btn-color": "#e6e6e6",
+        "--kt-btn-border": "1px solid rgba(255,255,255,0.04)",
+        "--kt-btn-hover-bg": "linear-gradient(180deg,#141414,#262626)",
+      };
+      const vars = isDark ? darkVars : lightVars;
+      Object.entries(vars).forEach(([name, value]) =>
+        this.container.style.setProperty(name, value)
+      );
+    } catch (err) {
+      logger.info("failed to apply subtitle list theme vars", err);
+    }
   }
 
   _getPlayerElement() {
@@ -837,6 +915,7 @@ export class YouTubeSubtitleList {
     this.subtitleTabEl = subtitleTab;
     this._updateSubtitleTabLabel();
     const vocabularyTab = document.createElement("button");
+    this.vocabularyTabEl = vocabularyTab;
     vocabularyTab.textContent = this._t("vocabulary_book", "生词本");
 
     // 动态控制 Tab 激活态与未激活态 CSS 的映射函数
@@ -846,6 +925,7 @@ export class YouTubeSubtitleList {
 
     // 关闭侧边列表栏的“×”小按钮
     const closeBtn = document.createElement("button");
+    this.closeButtonEl = closeBtn;
     closeBtn.textContent = "×"; // 直接使用纯文本的“×”号，不再需要 HTML 转义
     closeBtn.title = this._t("close", "Close");
     closeBtn.style.cssText = `
@@ -863,7 +943,7 @@ export class YouTubeSubtitleList {
     `;
 
     closeBtn.addEventListener("click", () => {
-      this.destroy(); // 卸载整个面板
+      this.setVisible(false);
     });
 
     closeBtn.addEventListener(
@@ -891,6 +971,7 @@ export class YouTubeSubtitleList {
     subActionBar.style.cssText = `padding: 10px 16px; border-bottom: 1px solid var(--kt-divider); display: flex; justify-content: center; gap: 8px; flex-shrink: 0;`;
 
     const downloadBtn = document.createElement("button");
+    this.downloadButtonEl = downloadBtn;
     downloadBtn.textContent = this._t(
       "download_subtitles_vtt",
       "下载字幕 (VTT)"
@@ -918,6 +999,7 @@ export class YouTubeSubtitleList {
     downloadBtn.addEventListener("click", this.downloadSubtitles.bind(this));
 
     const downloadRawBtn = document.createElement("button");
+    this.downloadRawButtonEl = downloadRawBtn;
     downloadRawBtn.textContent = this._t(
       "download_raw_subtitle_events_json",
       "下载源数据 (JSON)"
@@ -1510,7 +1592,12 @@ export class YouTubeSubtitleList {
    */
   turnOnAutoSub() {
     this.turnOffAutoSub();
-    if (this.videoEl.paused) return; // 暂停状态无需轮询
+    if (
+      !this.container ||
+      this.container.style.display === "none" ||
+      this.videoEl.paused
+    )
+      return; // Hidden or paused lists do not need polling.
 
     this.loopAutoScroll = setInterval(() => {
       if (

@@ -72,6 +72,8 @@ const PRESENTATION_SETTING_NAMES = new Set([
   "throttleTrans",
 ]);
 
+const CURRENT_TRACK_RECOVERY_DELAY_MS = 500;
+
 function areSettingValuesEqual(first, second) {
   if (Object.is(first, second)) return true;
   if (
@@ -141,6 +143,8 @@ export class YouTubeCaptionProvider {
   #playbackRateBeforeAd = null;
   #messageEventHandler = null;
   #navigationEventHandler = null;
+  #currentTrackRecoveryTimer = null;
+  #currentTrackRecoveryAbortController = null;
   #waitCleanups = [];
   #initialized = false;
 
@@ -256,6 +260,7 @@ export class YouTubeCaptionProvider {
       this.#subtitleAbortController = null;
       this.#setting.autoTranslate = this.#defaultAutoTranslate;
       this.#playerUi.updateMenuProps();
+      this.#scheduleCurrentTrackRecovery();
     };
     window.addEventListener("yt-navigate-finish", this.#navigationEventHandler);
 
@@ -289,6 +294,7 @@ export class YouTubeCaptionProvider {
     this.#subtitleAbortController?.abort();
     this.#subtitleAbortController = null;
     this.#aiChunkScheduler = null;
+    this.#cancelCurrentTrackRecovery();
     this.#restorePlaybackRate();
 
     if (this.#messageEventHandler) {
@@ -324,7 +330,7 @@ export class YouTubeCaptionProvider {
    */
   #resumeCurrentTrack() {
     const videoId = this.#videoId;
-    if (!videoId || !this.#setting.autoTranslate) return;
+    if (!videoId || !this.#setting.autoTranslate) return false;
 
     if (this.#activeTrackVideoId === videoId && this.#flatEvents.length) {
       if (this.#subtitles.length && this.#progressed >= 100) {
@@ -332,13 +338,90 @@ export class YouTubeCaptionProvider {
       } else {
         void this.#translateCachedEvents();
       }
-      return;
+      return true;
     }
 
     if (this.#lastInterceptedRequest?.videoId === videoId) {
       const { url, responseText } = this.#lastInterceptedRequest;
       void this.#handleInterceptedRequest(url, responseText);
+      return true;
     }
+
+    this.#scheduleCurrentTrackRecovery();
+    return false;
+  }
+
+  #cancelCurrentTrackRecovery() {
+    if (this.#currentTrackRecoveryTimer !== null) {
+      clearTimeout(this.#currentTrackRecoveryTimer);
+      this.#currentTrackRecoveryTimer = null;
+    }
+    this.#currentTrackRecoveryAbortController?.abort();
+    this.#currentTrackRecoveryAbortController = null;
+  }
+
+  #scheduleCurrentTrackRecovery() {
+    this.#cancelCurrentTrackRecovery();
+    if (!this.#initialized || !this.#setting.autoTranslate || !this.#videoId) {
+      return;
+    }
+
+    this.#currentTrackRecoveryTimer = setTimeout(() => {
+      this.#currentTrackRecoveryTimer = null;
+      const videoId = this.#videoId;
+      if (
+        !this.#initialized ||
+        !this.#setting.autoTranslate ||
+        !videoId ||
+        this.#activeTrackVideoId === videoId ||
+        this.#lastInterceptedRequest?.videoId === videoId
+      ) {
+        return;
+      }
+      void this.#loadCurrentTrack(videoId);
+    }, CURRENT_TRACK_RECOVERY_DELAY_MS);
+  }
+
+  async #loadCurrentTrack(videoId) {
+    const recoveryController = new AbortController();
+    this.#currentTrackRecoveryAbortController = recoveryController;
+    const trackData =
+      (await getCaptionTracks(videoId, {
+        signal: recoveryController.signal,
+      })) || {};
+    if (this.#currentTrackRecoveryAbortController === recoveryController) {
+      this.#currentTrackRecoveryAbortController = null;
+    }
+    if (
+      !this.#initialized ||
+      !this.#setting.autoTranslate ||
+      videoId !== this.#videoId ||
+      this.#activeTrackVideoId === videoId ||
+      this.#lastInterceptedRequest?.videoId === videoId
+    ) {
+      return;
+    }
+
+    const captionTracks = [...(trackData.captionTracks || [])];
+    const preferredTrack = captionTracks[0];
+    const captionTrack = findCaptionTrack(
+      captionTracks,
+      preferredTrack?.languageCode,
+      preferredTrack?.kind || null
+    );
+    if (!captionTrack?.baseUrl) return;
+
+    const trackUrl = new URL(captionTrack.baseUrl, window.location.origin);
+    const languageCode =
+      trackUrl.searchParams.get("lang") || captionTrack.languageCode;
+    if (!languageCode) return;
+
+    trackUrl.searchParams.set("v", videoId);
+    trackUrl.searchParams.set("lang", languageCode);
+    if (captionTrack.kind && !trackUrl.searchParams.has("kind")) {
+      trackUrl.searchParams.set("kind", captionTrack.kind);
+    }
+    await this.#handleInterceptedRequest(trackUrl.href, null, trackData);
   }
 
   /**
@@ -557,11 +640,52 @@ export class YouTubeCaptionProvider {
       this.#toggleTranslation();
       return true;
     }
-    if (hasPresentationChange && this.#subtitles.length) {
-      this.#destroyManager();
-      this.#startManager();
+    if (hasPresentationChange) {
+      this.#updatePresentationSettings(changedNames);
     }
     return false;
+  }
+
+  #updatePresentationSettings(changedNames) {
+    const settingPatch = Object.fromEntries(
+      Array.from(changedNames)
+        .filter((name) => PRESENTATION_SETTING_NAMES.has(name))
+        .map((name) => [name, this.#setting[name]])
+    );
+    this.#managerInstance?.updateSetting(settingPatch);
+
+    const showList = isSubtitleModeEnabled(
+      this.#setting.showList,
+      this.#setting.enhanceMode
+    );
+    if (changedNames.has("showList") || changedNames.has("enhanceMode")) {
+      if (showList && this.#managerInstance) {
+        this.#ensureSubtitleList();
+      }
+      this.#subtitleListManager?.setVisible(showList);
+    }
+
+    if (
+      [
+        "uiLang",
+        "hoverLookupMode",
+        "enhanceMode",
+        "brandColor",
+        "darkMode",
+      ].some((name) => changedNames.has(name))
+    ) {
+      this.#subtitleListManager?.updateSetting({
+        i18n: this.#i18n,
+        enableHoverLookup: isSubtitleModeEnabled(
+          this.#setting.hoverLookupMode,
+          this.#setting.enhanceMode
+        ),
+        theme: {
+          brandColor: this.#setting.brandColor,
+          darkMode: this.#setting.darkMode,
+        },
+      });
+    }
   }
 
   #invalidateDerivedOutput() {
@@ -582,7 +706,7 @@ export class YouTubeCaptionProvider {
       return;
     }
 
-    if (this.#flatEvents.length) {
+    if (this.#activeTrackVideoId === this.#videoId && this.#flatEvents.length) {
       void this.#translateCachedEvents();
       return;
     }
@@ -591,6 +715,8 @@ export class YouTubeCaptionProvider {
     if (this.#lastInterceptedRequest?.videoId === this.#videoId) {
       const { url, responseText } = this.#lastInterceptedRequest;
       void this.#handleInterceptedRequest(url, responseText);
+    } else {
+      this.#scheduleCurrentTrackRecovery();
     }
   }
 
@@ -750,10 +876,11 @@ export class YouTubeCaptionProvider {
    *
    * @private
    * @param {string} url 被拦截到的 timedtext 请求 URL。
-   * @param {string} responseText 被拦截请求的响应文本。
+   * @param {string|null} responseText 被拦截请求的响应文本。
+   * @param {object|null} trackData Optional metadata already loaded for recovery.
    * @returns {Promise<void>}
    */
-  async #handleInterceptedRequest(url, responseText) {
+  async #handleInterceptedRequest(url, responseText, trackData = null) {
     const videoId = this.#videoId;
     if (!videoId) {
       logger.debug("Youtube Provider: videoId not found.");
@@ -775,6 +902,7 @@ export class YouTubeCaptionProvider {
     const interceptedKind = potUrl.searchParams.get("kind") || null;
     const trackKey = buildTrackKey(potUrl);
     const fromLang = getFromLang(lang);
+    this.#cancelCurrentTrackRecovery();
     this.#lastInterceptedRequest = { videoId, url, responseText };
 
     if (this.#flatEvents.length && trackKey === this.#activeTrackKey) {
@@ -812,12 +940,15 @@ export class YouTubeCaptionProvider {
 
       const { toLang } = this.#setting;
       const { captionTracks, fullDescription } =
-        await getCaptionTracks(videoId);
+        trackData ||
+        (await getCaptionTracks(videoId, {
+          signal: this.#subtitleAbortController.signal,
+        }));
       if (this.#isStaleProcessing(processingVersion)) return;
 
       this.#fullDescription = fullDescription || "";
       const captionTrack = findCaptionTrack(
-        captionTracks,
+        [...(captionTracks || [])],
         lang,
         interceptedKind
       );
@@ -825,10 +956,7 @@ export class YouTubeCaptionProvider {
         logger.debug("Youtube Provider: CaptionTrack not found:", videoId);
         return;
       }
-      if (!captionTrack.baseUrl.startsWith("https")) {
-        captionTrack.baseUrl = window.location.origin + captionTrack.baseUrl;
-      }
-      const capUrl = new URL(captionTrack.baseUrl);
+      const capUrl = new URL(captionTrack.baseUrl, window.location.origin);
       const events = await getSubtitleEvents(capUrl, potUrl, responseText);
       if (this.#isStaleProcessing(processingVersion)) return;
 
@@ -1155,38 +1283,41 @@ export class YouTubeCaptionProvider {
       },
     });
 
-    const showList = isSubtitleModeEnabled(
-      this.#setting.showList,
-      this.#setting.enhanceMode
-    );
-
-    if (showList && !this.#subtitleListManager) {
-      this.#subtitleListManager = new YouTubeSubtitleList(videoEl, this.#i18n, {
-        enableHoverLookup: isSubtitleModeEnabled(
-          this.#setting.hoverLookupMode,
-          this.#setting.enhanceMode
-        ),
-        theme: {
-          brandColor: this.#setting.brandColor,
-          darkMode: this.#setting.darkMode,
-        },
-      });
-      this.#subtitleListManager.initialize(
-        this.#subtitles,
-        this.#rawSubtitleEvents,
-        this.#progressed
-      );
-
-      this.#managerInstance.onSubtitleUpdate = (subtitleUpdate) => {
-        this.#subtitleListManager.updateSingleSubtitle(subtitleUpdate);
-      };
-
-      this.#subtitleListManager.turnOnAutoSub();
+    if (
+      isSubtitleModeEnabled(this.#setting.showList, this.#setting.enhanceMode)
+    ) {
+      this.#ensureSubtitleList();
     }
 
     this.#managerInstance.start();
     this.#playerUi.showNotification(this.#i18n("subtitle_load_succeed"));
     this.#playerUi.hideYtCaption();
+  }
+
+  #ensureSubtitleList() {
+    if (!this.#managerInstance || this.#subtitleListManager) return;
+
+    const videoEl = this.#videoEl;
+    if (!videoEl) return;
+    this.#subtitleListManager = new YouTubeSubtitleList(videoEl, this.#i18n, {
+      enableHoverLookup: isSubtitleModeEnabled(
+        this.#setting.hoverLookupMode,
+        this.#setting.enhanceMode
+      ),
+      theme: {
+        brandColor: this.#setting.brandColor,
+        darkMode: this.#setting.darkMode,
+      },
+    });
+    this.#subtitleListManager.initialize(
+      this.#subtitles,
+      this.#rawSubtitleEvents,
+      this.#progressed
+    );
+    this.#managerInstance.onSubtitleUpdate = (subtitleUpdate) => {
+      this.#subtitleListManager?.updateSingleSubtitle(subtitleUpdate);
+    };
+    this.#subtitleListManager.turnOnAutoSub();
   }
 
   /**

@@ -130,7 +130,7 @@ function TranBoxHeader({
           </button>
           <button
             type="button"
-            aria-pressed={!followSelection}
+            aria-pressed={followSelection}
             onClick={() => setFollowSelection((previous) => !previous)}
           >
             {followSelection ? <PushPinOutlinedIcon /> : <PushPinIcon />}

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { objectToCss, parseCssToObject } from "./subtitleStyleUtils";
+import { patchCssProperty } from "./subtitleStyleUtils";
 
 const STYLE_NAMES = ["originStyle", "translationStyle", "windowStyle"];
 
@@ -15,9 +15,9 @@ export function useSubtitleStyleEditor({
     windowStyle,
   }));
   const cssRefs = useRef({
-    originStyle: parseCssToObject(originStyle),
-    translationStyle: parseCssToObject(translationStyle),
-    windowStyle: parseCssToObject(windowStyle),
+    originStyle,
+    translationStyle,
+    windowStyle,
   });
   const debounceTimers = useRef({});
   const pendingUpdates = useRef({});
@@ -52,7 +52,7 @@ export function useSubtitleStyleEditor({
     (name, value) => {
       if (!STYLE_NAMES.includes(name)) return;
       cancelPendingUpdate(name);
-      cssRefs.current[name] = parseCssToObject(value);
+      cssRefs.current[name] = value;
       setLocalStyles((current) =>
         current[name] === value ? current : { ...current, [name]: value }
       );
@@ -96,17 +96,8 @@ export function useSubtitleStyleEditor({
 
   const updateCssProperty = useCallback(
     (name, property, value) => {
-      cssRefs.current[name][property] = value;
-      const css = objectToCss(cssRefs.current[name]);
-      schedulePreview(name, css);
-      persistLater(name, css);
-    },
-    [persistLater, schedulePreview]
-  );
-
-  const replaceCss = useCallback(
-    (name, css) => {
-      cssRefs.current[name] = parseCssToObject(css);
+      const css = patchCssProperty(cssRefs.current[name], property, value);
+      cssRefs.current[name] = css;
       schedulePreview(name, css);
       persistLater(name, css);
     },
@@ -137,11 +128,6 @@ export function useSubtitleStyleEditor({
     (property, value) => updateCssProperty("windowStyle", property, value),
     [updateCssProperty]
   );
-  const updateWindowCssDirect = useCallback(
-    (css) => replaceCss("windowStyle", css),
-    [replaceCss]
-  );
-
   return {
     localOriginStyle: localStyles.originStyle,
     localTransStyle: localStyles.translationStyle,
@@ -150,6 +136,5 @@ export function useSubtitleStyleEditor({
     updateOriginCss,
     updateTranslationCss,
     updateWindowCss,
-    updateWindowCssDirect,
   };
 }

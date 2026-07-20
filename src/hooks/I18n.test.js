@@ -25,6 +25,13 @@ describe("getI18n", () => {
     expect(getI18n("en", "missing_key", "Fallback")).toBe("Fallback");
   });
 
+  test("registers the unsaved API warning", () => {
+    expect(I18N.discard_api_changes_confirm).toBeDefined();
+    expect(getI18n("en", "discard_api_changes_confirm")).toBe(
+      "This API has unsaved changes. Discard them?"
+    );
+  });
+
   test("covers every supported locale for every registered label", () => {
     const locales = UI_LANGS.map(([locale]) => locale);
     const missing = Object.entries(I18N).flatMap(([key, translations]) =>

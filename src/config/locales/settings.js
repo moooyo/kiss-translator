@@ -1,4 +1,12 @@
 export const SETTINGS_I18N = {
+  discard_api_changes_confirm: {
+    zh: `当前 API 有未保存的更改，确定放弃吗？`,
+    en: `This API has unsaved changes. Discard them?`,
+    zh_TW: `目前 API 有未儲存的變更，確定放棄嗎？`,
+    ja: `この API には未保存の変更があります。破棄しますか？`,
+    ko: `이 API에 저장되지 않은 변경 사항이 있습니다. 버릴까요?`,
+    tr: `Bu API'de kaydedilmemiş değişiklikler var. Değişiklikler silinsin mi?`,
+  },
   discard_prompt_changes_confirm: {
     zh: `当前提示词有未保存的更改，确定放弃吗？`,
     en: `This prompt has unsaved changes. Discard them?`,

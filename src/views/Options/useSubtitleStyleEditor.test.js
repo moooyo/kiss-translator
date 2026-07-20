@@ -94,4 +94,41 @@ describe("useSubtitleStyleEditor", () => {
     act(() => root.unmount());
     expect(writes).toHaveLength(1);
   });
+
+  test("preserves advanced CSS source during a visual property edit", () => {
+    const source = [
+      "/* fallback declaration */",
+      "color: red;",
+      "color : blue !important;",
+      "unknown ???;",
+      '--token: {"semi":";"};',
+    ].join("\n");
+    const expected = [
+      "/* fallback declaration */",
+      "color: red;",
+      "color : #123456 !important;",
+      "unknown ???;",
+      '--token: {"semi":";"};',
+    ].join("\n");
+    const writes = [];
+    let editor;
+    const root = createRoot(document.createElement("div"));
+    function Harness() {
+      editor = useSubtitleStyleEditor({
+        originStyle: source,
+        translationStyle: "color: blue;",
+        windowStyle: "background-color: black;",
+        updateSubtitle: (value) => writes.push(value),
+      });
+      return null;
+    }
+
+    act(() => root.render(<Harness />));
+    act(() => editor.updateOriginCss("color", "#123456"));
+    act(() => jest.advanceTimersByTime(200));
+
+    expect(writes).toEqual([{ originStyle: expected }]);
+    expect(editor.localOriginStyle).toBe(expected);
+    act(() => root.unmount());
+  });
 });

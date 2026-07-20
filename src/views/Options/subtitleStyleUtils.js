@@ -1,58 +1,267 @@
-function splitCssDeclarations(cssString) {
-  const declarations = [];
-  let current = "";
+function visitTopLevelCharacters(source, start, end, visitor) {
   let quote = "";
   let escaped = false;
+  let inComment = false;
   let parenthesesDepth = 0;
+  let bracketsDepth = 0;
+  let bracesDepth = 0;
 
-  for (const character of String(cssString || "")) {
+  for (let index = start; index < end; index += 1) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+
+    if (inComment) {
+      if (character === "*" && nextCharacter === "/") {
+        inComment = false;
+        index += 1;
+      }
+      continue;
+    }
     if (escaped) {
-      current += character;
       escaped = false;
       continue;
     }
     if (character === "\\") {
-      current += character;
       escaped = true;
       continue;
     }
     if (quote) {
-      current += character;
       if (character === quote) quote = "";
       continue;
     }
+    if (character === "/" && nextCharacter === "*") {
+      inComment = true;
+      index += 1;
+      continue;
+    }
     if (character === '"' || character === "'") {
-      current += character;
       quote = character;
       continue;
     }
     if (character === "(") parenthesesDepth += 1;
     if (character === ")") parenthesesDepth = Math.max(0, parenthesesDepth - 1);
-    if (character === ";" && parenthesesDepth === 0) {
-      if (current.trim()) declarations.push(current);
-      current = "";
-      continue;
+    if (character === "[") bracketsDepth += 1;
+    if (character === "]") bracketsDepth = Math.max(0, bracketsDepth - 1);
+    if (character === "{") bracesDepth += 1;
+    if (character === "}") bracesDepth = Math.max(0, bracesDepth - 1);
+    if (
+      parenthesesDepth === 0 &&
+      bracketsDepth === 0 &&
+      bracesDepth === 0 &&
+      visitor(character, index) === false
+    ) {
+      return;
     }
-    current += character;
   }
+}
 
-  if (current.trim()) declarations.push(current);
+function scanCssDeclarationRanges(cssString) {
+  const source = String(cssString || "");
+  const declarations = [];
+  let start = 0;
+
+  visitTopLevelCharacters(source, 0, source.length, (character, index) => {
+    if (character === ";") {
+      declarations.push({ start, end: index, separatorEnd: index + 1 });
+      start = index + 1;
+    }
+    return true;
+  });
+
+  declarations.push({ start, end: source.length, separatorEnd: source.length });
   return declarations;
 }
 
+function findTopLevelColon(source, start, end) {
+  let colonIndex = -1;
+  visitTopLevelCharacters(source, start, end, (character, index) => {
+    if (character === ":") {
+      colonIndex = index;
+      return false;
+    }
+    return true;
+  });
+  return colonIndex;
+}
+
+function removeCssComments(value) {
+  return value.replace(/\/\*[\s\S]*?\*\//g, "");
+}
+
+function extractCssComments(source, start, end) {
+  const comments = [];
+  let quote = "";
+  let escaped = false;
+
+  for (let index = start; index < end; index += 1) {
+    const character = source[index];
+    const nextCharacter = source[index + 1];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (character === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote) {
+      if (character === quote) quote = "";
+      continue;
+    }
+    if (character === '"' || character === "'") {
+      quote = character;
+      continue;
+    }
+    if (character !== "/" || nextCharacter !== "*") continue;
+
+    const commentEnd = source.indexOf("*/", index + 2);
+    const boundedEnd =
+      commentEnd < 0 || commentEnd >= end ? end : commentEnd + 2;
+    comments.push(source.slice(index, boundedEnd));
+    index = boundedEnd - 1;
+  }
+
+  return comments;
+}
+
+function findPropertyStart(source, start, end) {
+  let cursor = start;
+  while (cursor < end) {
+    while (cursor < end && /\s/.test(source[cursor])) cursor += 1;
+    if (source.slice(cursor, cursor + 2) !== "/*") break;
+    const commentEnd = source.indexOf("*/", cursor + 2);
+    if (commentEnd < 0 || commentEnd >= end) break;
+    cursor = commentEnd + 2;
+  }
+  return cursor;
+}
+
+function parseCssDeclaration(source, range) {
+  const colonIndex = findTopLevelColon(source, range.start, range.end);
+  if (colonIndex < 0) return null;
+
+  const propertySource = source.slice(range.start, colonIndex);
+  const property = removeCssComments(propertySource).trim();
+  if (!/^--[^\s:;]+$/.test(property) && !/^-?[_a-z][\w-]*$/i.test(property)) {
+    return null;
+  }
+
+  return {
+    ...range,
+    colonIndex,
+    property,
+    propertyStart: findPropertyStart(source, range.start, colonIndex),
+  };
+}
+
+function normalizeCssProperty(property) {
+  return property.startsWith("--") ? property : property.toLowerCase();
+}
+
+function findCssDeclarations(cssString, property) {
+  const source = String(cssString || "");
+  const normalizedProperty = normalizeCssProperty(property);
+  return scanCssDeclarationRanges(source)
+    .map((range) => parseCssDeclaration(source, range))
+    .filter(
+      (declaration) =>
+        declaration &&
+        normalizeCssProperty(declaration.property) === normalizedProperty
+    );
+}
+
+function findTrailingTriviaStart(source, start, end) {
+  let cursor = end;
+
+  while (cursor > start) {
+    const previousCursor = cursor;
+    while (cursor > start && /\s/.test(source[cursor - 1])) cursor -= 1;
+    if (cursor >= start + 2 && source.slice(cursor - 2, cursor) === "*/") {
+      const commentStart = source.lastIndexOf("/*", cursor - 2);
+      if (commentStart >= start) {
+        cursor = commentStart;
+        continue;
+      }
+    }
+    if (cursor === previousCursor) break;
+  }
+
+  return cursor;
+}
+
+function appendCssProperty(source, property, value) {
+  if (!source) return `${property}: ${value};`;
+
+  const ranges = scanCssDeclarationRanges(source);
+  const trailingRange = ranges[ranges.length - 1];
+  const trailingSource = source.slice(trailingRange.start, trailingRange.end);
+  const needsSemicolon = Boolean(removeCssComments(trailingSource).trim());
+  const lineBreak = source.includes("\r\n") ? "\r\n" : "\n";
+  const separator = /[\r\n]$/.test(source) ? "" : lineBreak;
+  return `${source}${needsSemicolon ? ";" : ""}${separator}${property}: ${value};`;
+}
+
 export function parseCssToObject(cssString) {
+  const source = String(cssString || "");
   return Object.fromEntries(
-    splitCssDeclarations(cssString).flatMap((declaration) => {
-      const colonIndex = declaration.indexOf(":");
-      if (colonIndex <= 0) return [];
-      return [
-        [
-          declaration.slice(0, colonIndex).trim(),
-          declaration.slice(colonIndex + 1).trim(),
-        ],
-      ];
+    scanCssDeclarationRanges(source).flatMap((range) => {
+      const declaration = parseCssDeclaration(source, range);
+      return declaration
+        ? [
+            [
+              declaration.property,
+              source.slice(declaration.colonIndex + 1, declaration.end).trim(),
+            ],
+          ]
+        : [];
     })
   );
+}
+
+export function patchCssProperty(cssString, property, value) {
+  const source = String(cssString || "");
+  const normalizedProperty = String(property || "").trim();
+  if (!normalizedProperty) return source;
+
+  const declarations = findCssDeclarations(source, normalizedProperty);
+  if (value === undefined || value === null || value === "") {
+    return declarations.reduceRight((css, declaration) => {
+      const preservedComments = extractCssComments(
+        css,
+        declaration.propertyStart,
+        declaration.end
+      ).join(" ");
+      return (
+        css.slice(0, declaration.propertyStart) +
+        preservedComments +
+        css.slice(declaration.separatorEnd)
+      );
+    }, source);
+  }
+
+  if (!declarations.length) {
+    return appendCssProperty(source, normalizedProperty, value);
+  }
+
+  const declaration = declarations[declarations.length - 1];
+  let valueStart = declaration.colonIndex + 1;
+  while (valueStart < declaration.end && /\s/.test(source[valueStart])) {
+    valueStart += 1;
+  }
+
+  let valueEnd = findTrailingTriviaStart(source, valueStart, declaration.end);
+  const priorityMatch = source
+    .slice(valueStart, valueEnd)
+    .match(/\s*!\s*important\s*$/i);
+  if (priorityMatch) {
+    valueEnd = findTrailingTriviaStart(
+      source,
+      valueStart,
+      valueStart + priorityMatch.index
+    );
+  }
+
+  return source.slice(0, valueStart) + value + source.slice(valueEnd);
 }
 
 export function cssObjectToReactStyle(cssObject) {

@@ -46,7 +46,6 @@ import {
   colorToHex,
   cssObjectToReactStyle,
   hexToRgb,
-  objectToCss,
   parseCssToObject,
   parseFontSize,
   parsePadding,
@@ -250,7 +249,6 @@ export default function SubtitleSetting() {
     updateOriginCss,
     updateTranslationCss,
     updateWindowCss,
-    updateWindowCssDirect,
   } = styleEditor;
 
   // 从本地计算生成的临时 CSS 键值对，用于给 Slider 及其余受控组件展示当前样式属性值
@@ -899,9 +897,7 @@ export default function SubtitleSetting() {
                                 "1px 1px 2px black"
                               );
                             } else {
-                              const newObj = { ...windowCssObj };
-                              delete newObj["text-shadow"];
-                              updateWindowCssDirect(objectToCss(newObj));
+                              updateWindowCss("text-shadow", "");
                             }
                           }}
                         />

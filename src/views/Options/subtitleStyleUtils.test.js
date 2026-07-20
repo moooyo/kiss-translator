@@ -1,6 +1,7 @@
 import {
   objectToCss,
   parseCssToObject,
+  patchCssProperty,
   resolveBackgroundRgba,
 } from "./subtitleStyleUtils";
 
@@ -22,6 +23,65 @@ describe("subtitleStyleUtils", () => {
         "background-image": "linear-gradient(#000, transparent)",
       })
     ).toContain("background-image: linear-gradient(#000, transparent)");
+  });
+
+  test("patches only the last matching declaration without rewriting source", () => {
+    const source = [
+      "/* keep: this comment; exactly */",
+      "color: red;",
+      "color : blue /* keep the priority note */ !important;",
+      "@future syntax(foo: bar) { nested: value; };",
+      '--raw-token: {"key":"value;still"};',
+    ].join("\n");
+
+    expect(patchCssProperty(source, "color", "#123456")).toBe(
+      [
+        "/* keep: this comment; exactly */",
+        "color: red;",
+        "color : #123456 /* keep the priority note */ !important;",
+        "@future syntax(foo: bar) { nested: value; };",
+        '--raw-token: {"key":"value;still"};',
+      ].join("\n")
+    );
+  });
+
+  test("appends a missing property without normalizing unknown syntax", () => {
+    const source = "color: red;\nunknown ???;\n/* untouched */";
+
+    expect(patchCssProperty(source, "font-size", "18px")).toBe(
+      `${source}\nfont-size: 18px;`
+    );
+  });
+
+  test("removes matching declarations while preserving surrounding source", () => {
+    const source = [
+      "/* first */ text-shadow: 1px 1px black;",
+      "color: red;",
+      "/* second */ text-shadow: 2px 2px black;",
+      "unknown ???;",
+    ].join("\n");
+
+    expect(patchCssProperty(source, "text-shadow", "")).toBe(
+      ["/* first */ ", "color: red;", "/* second */ ", "unknown ???;"].join(
+        "\n"
+      )
+    );
+  });
+
+  test("preserves declaration comments when removing a property", () => {
+    const source = [
+      'content: "/* not a comment */";',
+      "text-shadow: 1px 1px black /* keep this reason */;",
+      "color: red;",
+    ].join("\n");
+
+    expect(patchCssProperty(source, "text-shadow", "")).toBe(
+      [
+        'content: "/* not a comment */";',
+        "/* keep this reason */",
+        "color: red;",
+      ].join("\n")
+    );
   });
 
   test("reads both the canonical color and legacy background shorthand", () => {

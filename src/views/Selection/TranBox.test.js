@@ -196,4 +196,31 @@ describe("TranBox dictionary view", () => {
     ).toBe("translation");
     act(() => root.unmount());
   });
+
+  test("exposes the follow-selection state through aria-pressed", () => {
+    const initialProps = createTranBoxProps({ followSelection: true });
+    const { container, root } = renderTranBox(initialProps);
+
+    act(() => {
+      container
+        .querySelector('button[title="more"]')
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    const findFollowSelectionButton = () =>
+      Array.from(container.querySelectorAll("button")).find((button) =>
+        button.textContent.includes("btn_tip_follow_selection")
+      );
+
+    expect(findFollowSelectionButton().getAttribute("aria-pressed")).toBe(
+      "true"
+    );
+
+    act(() => {
+      root.render(<TranBox {...initialProps} followSelection={false} />);
+    });
+    expect(findFollowSelectionButton().getAttribute("aria-pressed")).toBe(
+      "false"
+    );
+    act(() => root.unmount());
+  });
 });

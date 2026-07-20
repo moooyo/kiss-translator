@@ -26,7 +26,7 @@ export const POPUP_STYLES = String.raw`
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 9px 14px 5px;
+  padding: 7px 14px;
   background: var(--kt-sf0);
 }
 
@@ -117,7 +117,15 @@ export const POPUP_STYLES = String.raw`
 }
 
 .kt-popup-language > span { display: block; color: var(--kt-onv); font-size: 10.5px; font-weight: 600; pointer-events: none; }
-.kt-popup-language select { width: 100%; margin-top: 1px; border: 0; outline: 0; background: transparent; color: var(--kt-on); font-size: 13px; font-weight: 600; cursor: pointer; }
+.kt-popup-language .kt-popup-language-select { width: 100%; margin-top: 1px; color: var(--kt-on); font-size: 13px; font-weight: 600; }
+.kt-popup-language-select .MuiSelect-select { min-height: 0; padding: 0 24px 0 0 !important; color: var(--kt-on); cursor: pointer; }
+.kt-popup-language-select .MuiSelect-icon { right: 0; color: var(--kt-onv); }
+.kt-popup-language-menu.MuiPaper-root { max-height: 280px; margin-top: 6px; overflow: hidden; border: 1px solid var(--kt-linev); border-radius: 16px; background: var(--kt-sf1); color: var(--kt-on); box-shadow: var(--kt-shadow-2); }
+.kt-popup-language-menu .MuiMenu-list { padding: 4px 0; }
+.kt-popup-language-menu .MuiMenuItem-root { min-height: 36px; margin: 2px 6px; padding: 6px 10px; border-radius: 10px; color: var(--kt-on); font-size: 12px; }
+.kt-popup-language-menu .MuiMenuItem-root:hover { background: var(--kt-sf3); }
+.kt-popup-language-menu .MuiMenuItem-root.Mui-selected { background: var(--kt-secc); color: var(--kt-onsecc); font-weight: 650; }
+.kt-popup-language-menu .MuiMenuItem-root.Mui-selected:hover { background: var(--kt-secc); }
 .kt-popup-swap:disabled { cursor: not-allowed; opacity: .35; }
 
 .kt-popup-section-label { margin: 0 4px 8px; color: var(--kt-onv); font-size: 11.5px; font-weight: 650; }
@@ -145,7 +153,7 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-service__name { min-width: 0; display: block; overflow: hidden; text-overflow: ellipsis; }
 .kt-service-logo { width: 22px; height: 22px; display: grid; flex: none; place-items: center; border: 1px solid var(--kt-linev); border-radius: 50%; background: #fff; }
 .kt-service-logo img { width: 14px; height: 14px; object-fit: contain; }
-.kt-popup-more-service { min-width: max-content; padding-inline: 11px 8px; border-color: transparent; background: var(--kt-sf2); color: var(--kt-onv); font-weight: 650; }
+.kt-popup-more-service { min-width: max-content; padding-inline: 10px; border-color: transparent; background: var(--kt-sf2); color: var(--kt-onv); font-weight: 650; }
 .kt-popup-more-service { flex: 0 0 auto; }
 .kt-popup-services--open .kt-popup-service { flex: 0 1 auto; }
 .kt-popup-more-service svg { width: 17px; height: 17px; }
@@ -220,11 +228,13 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-translation-input { overflow: hidden; border: 1px solid transparent; border-radius: 20px; background: var(--kt-sf1); transition: border-color .25s, background .25s; }
 .kt-popup-translation-input:focus-within { border-color: var(--kt-pri); background: var(--kt-sf0); }
 .kt-popup-translation-input textarea { width: 100%; min-height: 112px; display: block; resize: vertical; padding: 15px 15px 4px; border: 0; outline: 0; background: transparent; color: var(--kt-on); font-size: 13px; line-height: 1.55; }
-.kt-popup-translation-input__footer { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 5px 10px 9px 15px; color: var(--kt-onv); font-size: 10.5px; }
+.kt-popup-translation-input__footer { min-height: 52px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 10px 7px 15px; color: var(--kt-onv); font-size: 10.5px; }
 .kt-popup-translation-input__footer .MuiButton-root { min-height: 38px; padding-inline: 15px; }
 .kt-popup-translation-input__footer svg { width: 18px; height: 18px; }
 .kt-popup-translation-direction { display: flex; align-items: center; justify-content: center; gap: 8px; color: var(--kt-pri); font-size: 12px; font-weight: 650; }
-.kt-popup-translation-direction select { max-width: 130px; min-width: 0; padding: 7px 24px 7px 10px; border: 0; border-radius: 999px; outline: 0; background: var(--kt-sf2); color: var(--kt-on); font-size: 11.5px; font-weight: 650; text-align: center; }
+.kt-popup-translation-direction .kt-popup-language-select { width: 130px; max-width: calc(50% - 16px); min-width: 0; border-radius: 999px; background: var(--kt-sf2); color: var(--kt-on); font-size: 11.5px; font-weight: 650; }
+.kt-popup-translation-direction .kt-popup-language-select .MuiSelect-select { padding: 7px 28px !important; text-align: center; }
+.kt-popup-translation-direction .kt-popup-language-select .MuiSelect-icon { right: 6px; }
 .kt-popup-translation-services { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; border-radius: 17px; background: var(--kt-sf1); animation: kt-m3-rise .3s var(--kt-spring); }
 .kt-popup-translation-services button { min-height: 34px; padding: 0 12px; border: 1px solid var(--kt-linev); border-radius: 999px; background: var(--kt-sf0); color: var(--kt-onv); cursor: pointer; font-size: 11px; }
 .kt-popup-translation-services button[aria-pressed="true"] { border-color: var(--kt-pri); background: var(--kt-pric); color: var(--kt-onpric); font-weight: 700; }

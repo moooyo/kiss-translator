@@ -45,6 +45,7 @@ import ApiProviderIcon from "../../components/ApiProviderIcon";
 import { COLLAPSED_SERVICE_LIMIT, getVisibleServices } from "./services";
 import { css } from "@emotion/css";
 import { usePopupFeatureToggles } from "./usePopupFeatureToggles";
+import CompactLanguageSelect from "./CompactLanguageSelect";
 
 export function resolvePopupTextStyles(
   allTextStyles,
@@ -430,19 +431,15 @@ export default function PopupCont({
       </div>
 
       <div className="kt-popup-language-row">
-        <label className="kt-popup-language">
+        <div className="kt-popup-language">
           <span>{i18n("from_lang")}</span>
-          <select
+          <CompactLanguageSelect
             value={fromLang}
+            ariaLabel={i18n("from_lang")}
+            options={OPT_LANGS_FROM}
             onChange={(event) => putRuleValue("fromLang", event.target.value)}
-          >
-            {OPT_LANGS_FROM.map(([key, name]) => (
-              <option key={key} value={key}>
-                {name.split(" - ")[0]}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
         <IconButton
           className="kt-popup-swap"
           disabled={isAutoSource}
@@ -454,19 +451,15 @@ export default function PopupCont({
         >
           <SwapHorizRoundedIcon />
         </IconButton>
-        <label className="kt-popup-language">
+        <div className="kt-popup-language">
           <span>{i18n("to_lang")}</span>
-          <select
+          <CompactLanguageSelect
             value={toLang}
+            ariaLabel={i18n("to_lang")}
+            options={OPT_LANGS_TO}
             onChange={(event) => putRuleValue("toLang", event.target.value)}
-          >
-            {OPT_LANGS_TO.map(([key, name]) => (
-              <option key={key} value={key}>
-                {name.split(" - ")[0]}
-              </option>
-            ))}
-          </select>
-        </label>
+          />
+        </div>
       </div>
 
       <div className="kt-popup-services-block">

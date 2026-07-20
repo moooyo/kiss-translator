@@ -465,4 +465,31 @@ describe("TranForm popup input", () => {
 
     act(() => root.unmount());
   });
+
+  test("shows service choices below the results and compare control", () => {
+    const { container, root } = renderTranForm({
+      apiSlugs: ["openai"],
+      popupStyle: true,
+    });
+    const form = container.querySelector(".kt-popup-translation-form");
+    const results = form.querySelector(".kt-popup-translation-results");
+    const compareButton = form.querySelector(".kt-popup-translation-compare");
+
+    expect(form.querySelector(".kt-popup-translation-services")).toBeNull();
+
+    act(() => {
+      compareButton.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    const services = form.querySelector(".kt-popup-translation-services");
+    const children = [...form.children];
+    expect(children.indexOf(results)).toBeLessThan(
+      children.indexOf(compareButton)
+    );
+    expect(children.indexOf(compareButton)).toBeLessThan(
+      children.indexOf(services)
+    );
+
+    act(() => root.unmount());
+  });
 });

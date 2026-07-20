@@ -44,10 +44,44 @@ describe("popup keyboard focus", () => {
   test("does not suppress the compatible global focus outline", () => {
     expect(POPUP_STYLES).not.toMatch(/:focus\s*\{\s*outline:\s*(?:0|none)/);
     expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-language select\s*\{[^}]*outline:\s*0;/
-    );
-    expect(POPUP_STYLES).toMatch(
       /\.kt-popup-translation-input textarea\s*\{[^}]*outline:\s*0;/
     );
+  });
+});
+
+describe("popup translation controls", () => {
+  test("centers the header and compact controls with symmetric padding", () => {
+    const headerRule = POPUP_STYLES.match(
+      /\.kt-popup-header\s*\{([^}]*)\}/
+    )?.[1];
+    const moreServiceRule = POPUP_STYLES.match(
+      /\.kt-popup-more-service\s*\{([^}]*)\}/
+    )?.[1];
+    const languageSelectRule = POPUP_STYLES.match(
+      /\.kt-popup-translation-direction \.kt-popup-language-select \.MuiSelect-select\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(headerRule).toContain("padding: 7px 14px");
+    expect(moreServiceRule).toContain("padding-inline: 10px");
+    expect(languageSelectRule).toContain("padding: 7px 28px !important");
+  });
+
+  test("uses a rounded, theme-aware language menu", () => {
+    const menuRule = POPUP_STYLES.match(
+      /\.kt-popup-language-menu\.MuiPaper-root\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(menuRule).toContain("border-radius: 16px");
+    expect(menuRule).toContain("background: var(--kt-sf1)");
+    expect(menuRule).toContain("color: var(--kt-on)");
+  });
+
+  test("centers the translate action with symmetric vertical padding", () => {
+    const footerRule = POPUP_STYLES.match(
+      /\.kt-popup-translation-input__footer\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(footerRule).toContain("align-items: center");
+    expect(footerRule).toContain("padding: 7px 10px 7px 15px");
   });
 });

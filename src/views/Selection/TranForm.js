@@ -36,6 +36,7 @@ import {
   normalizeDictionaryTab,
   resolveDictionaryCapabilities,
 } from "./dictionaryCapabilities";
+import CompactLanguageSelect from "../Popup/CompactLanguageSelect";
 
 /**
  * 翻译交互核心表单组件 (集成源/目标语言选择、多引擎翻译、词典展示、汉典展示、语言检测与文本输入)
@@ -349,54 +350,29 @@ export default function TranForm({
             <Button
               variant="contained"
               disabled={!editText.trim()}
+              startIcon={<TranslateRoundedIcon />}
               onClick={commitText}
             >
-              <TranslateRoundedIcon />
               {i18n("translate")}
             </Button>
           </div>
         </div>
 
         <div className="kt-popup-translation-direction">
-          <select
+          <CompactLanguageSelect
             value={fromLang}
-            aria-label={i18n("from_lang")}
+            ariaLabel={i18n("from_lang")}
+            options={OPT_LANGS_FROM}
             onChange={(event) => setFromLang(event.target.value)}
-          >
-            {OPT_LANGS_FROM.map(([lang, name]) => (
-              <option key={lang} value={lang}>
-                {name.split(" - ")[0]}
-              </option>
-            ))}
-          </select>
+          />
           <span aria-hidden="true">→</span>
-          <select
+          <CompactLanguageSelect
             value={toLang}
-            aria-label={i18n("to_lang")}
+            ariaLabel={i18n("to_lang")}
+            options={OPT_LANGS_TO}
             onChange={(event) => setToLang(event.target.value)}
-          >
-            {OPT_LANGS_TO.map(([lang, name]) => (
-              <option key={lang} value={lang}>
-                {name.split(" - ")[0]}
-              </option>
-            ))}
-          </select>
+          />
         </div>
-
-        {showPopupServices && (
-          <div className="kt-popup-translation-services">
-            {optApis.map((api) => (
-              <button
-                type="button"
-                aria-pressed={activeApiSlugs.includes(api.key)}
-                onClick={() => togglePopupService(api.key)}
-                key={api.key}
-              >
-                {api.name}
-              </button>
-            ))}
-          </div>
-        )}
 
         <div className="kt-popup-translation-results">
           {activeApiSlugs.map((slug) => (
@@ -421,6 +397,21 @@ export default function TranForm({
           {i18n("popup_compare_services")}
           <ExpandMoreRoundedIcon />
         </button>
+
+        {showPopupServices && (
+          <div className="kt-popup-translation-services">
+            {optApis.map((api) => (
+              <button
+                type="button"
+                aria-pressed={activeApiSlugs.includes(api.key)}
+                onClick={() => togglePopupService(api.key)}
+                key={api.key}
+              >
+                {api.name}
+              </button>
+            ))}
+          </div>
+        )}
 
         {dictionaryPanels}
       </div>

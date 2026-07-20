@@ -136,6 +136,15 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build and verify all targets
         run: pnpm build:ci
+      - name: Upload pull request review build
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: review-build-pr-${{ github.event.pull_request.number }}-${{ github.sha }}
+          path: build
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 3
       - name: Upload smoke-build artifacts
         if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -145,3 +154,30 @@ jobs:
           include-hidden-files: true
           if-no-files-found: error
           retention-days: 7
+
+  ci-gate:
+    name: CI gate
+    if: always()
+    needs:
+      - workflow-lint
+      - quality
+      - test
+      - safari-conversion
+      - build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Reject unsuccessful required jobs
+        if: >-
+          ${{
+            needs.workflow-lint.result != 'success' ||
+            needs.quality.result != 'success' ||
+            needs.test.result != 'success' ||
+            needs.safari-conversion.result != 'success' ||
+            needs.build.result != 'success'
+          }}
+        shell: pwsh
+        run: exit 1
+      - name: Confirm all required jobs succeeded
+        shell: pwsh
+        run: Write-Output "All required CI jobs succeeded."

@@ -29,14 +29,18 @@ push to `dev`, and manual dispatches. It provides these independent gates:
 3. The complete unit-test suite on Ubuntu and Windows.
 4. A native Safari Web Extension conversion on macOS.
 5. A full multi-target build after all earlier gates pass.
+6. An always-running aggregate `CI gate` that fails unless every required job
+   above completed successfully.
 
 Superseded runs on the same branch or pull request are cancelled automatically.
+Successful pull requests retain reviewer-installable builds for three days.
 Successful non-PR builds are retained as short-lived smoke-build artifacts.
 
 Repository administrators should protect `dev` and require the
-`Build all distribution targets` check before merging. That job depends on the
-workflow lint, quality, complete Ubuntu/Windows test matrix, and the macOS
-Safari conversion, so requiring it also enforces every earlier gate.
+`CI gate` check before merging. That job always runs and verifies that the
+workflow lint, quality, complete Ubuntu/Windows test matrix, macOS Safari
+conversion, and multi-target build all completed successfully. Requiring this
+aggregate check prevents a skipped dependency from bypassing branch protection.
 
 ## Version source of truth
 

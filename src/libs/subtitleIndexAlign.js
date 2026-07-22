@@ -62,7 +62,11 @@ export const createSubtitleIndexAligner = (events = []) => {
 
     // 快路径：声称范围的词序列与 o 完全一致，无需纠正。
     const claimed = [];
-    for (let p = eventStartPos[cs]; p < table.length && table[p].ei <= ce; p++) {
+    for (
+      let p = eventStartPos[cs];
+      p < table.length && table[p].ei <= ce;
+      p++
+    ) {
       claimed.push(table[p].w);
     }
     if (claimed.length === L && claimed.every((w, i) => w === oTokens[i])) {
@@ -133,12 +137,10 @@ export const createSubtitleIndexAligner = (events = []) => {
         (a, b) => (a.offset > 0) - (b.offset > 0) || a.dist - b.dist
       );
       const [top, second] = tailCands;
+      const hasSameOffsetGroup =
+        second && Boolean(top.offset > 0) === Boolean(second.offset > 0);
       // 同组同距视为歧义，宁可不纠正。
-      if (
-        second &&
-        (top.offset > 0) === (second.offset > 0) &&
-        top.dist === second.dist
-      ) {
+      if (hasSameOffsetGroup && top.dist === second.dist) {
         return null;
       }
       pick = top;

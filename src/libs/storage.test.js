@@ -1,11 +1,15 @@
-jest.mock("webextension-polyfill", () => ({}));
-
 import {
   STOKEY_SETTING,
   STOKEY_SETTING_BACKUP_V1_BEFORE_V2,
   SETTINGS_VERSION_V2,
+  DEFAULT_SUBTITLE_SETTING,
 } from "../config";
 import { getSettingWithDefault, runDataMigration } from "./storage";
+
+// Storage tests do not use streaming parsing, so isolate the ESM-only dependency from Jest 27.
+jest.mock("@streamparser/json", () => ({ JSONParser: jest.fn() }));
+// jsdom is not an extension page, so prevent webextension-polyfill from throwing during initialization.
+jest.mock("webextension-polyfill", () => ({}));
 
 const readStoredJson = (key) => JSON.parse(window.localStorage.getItem(key));
 
@@ -147,11 +151,27 @@ describe("settings storage migration", () => {
     unsubscribe();
   });
 
+  test("keeps an explicitly stored subtitle chunk length", async () => {
+    // The new default only affects new settings; preserve an explicitly stored value of 2000.
+    expect(DEFAULT_SUBTITLE_SETTING.chunkLength).toBe(1000);
+    window.localStorage.setItem(
+      STOKEY_SETTING,
+      JSON.stringify({
+        version: SETTINGS_VERSION_V2,
+        subtitleSetting: { chunkLength: 2000 },
+      })
+    );
+
+    const setting = await getSettingWithDefault();
+
+    expect(setting.subtitleSetting.chunkLength).toBe(2000);
+  });
+
   test("GM storage reports a clear error when GM APIs are unavailable", async () => {
     const { storage } = loadGmStorageModule();
 
     await expect(storage.get("missing-gm")).rejects.toThrow(
-      "GM storage API is not available"
+      "GM API is not available"
     );
   });
 

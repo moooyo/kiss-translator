@@ -6,10 +6,7 @@ import {
 } from "./YouTubeCaptionProvider.js";
 import { getCaptionTracks, getSubtitleEvents } from "./youtubeCaptionTracks.js";
 import { eventsToSubtitles } from "./youtubeAiSegmentation.js";
-import {
-  genFlatEvents,
-  normalizeTimedTextEvents,
-} from "./youtubeSubtitleProcessing.js";
+import { prepareTimedTextEvents } from "./youtubeSubtitleProcessing.js";
 
 const mockManagerInstances = [];
 const mockPlayerUiInstances = [];
@@ -71,9 +68,8 @@ jest.mock("./youtubeCaptionTracks.js", () => ({
 jest.mock("./youtubeSubtitleProcessing.js", () => ({
   builtinSegment: jest.fn(),
   formatSubtitles: jest.fn(),
-  genFlatEvents: jest.fn(),
   getFromLang: () => "en",
-  normalizeTimedTextEvents: jest.fn(),
+  prepareTimedTextEvents: jest.fn(),
 }));
 
 jest.mock("./youtubeAiSegmentation.js", () => ({
@@ -131,8 +127,11 @@ describe("YouTubeCaptionProvider manual translation", () => {
       fullDescription: "",
     });
     getSubtitleEvents.mockResolvedValue([{ text: "hello" }]);
-    normalizeTimedTextEvents.mockReturnValue([{ text: "hello" }]);
-    genFlatEvents.mockReturnValue([{ start: 0, end: 1000, text: "hello" }]);
+    // Prepare normalized and flattened events through the shared contract.
+    prepareTimedTextEvents.mockReturnValue({
+      events: [{ text: "hello" }],
+      flatEvents: [{ start: 0, end: 1000, text: "hello" }],
+    });
     eventsToSubtitles.mockResolvedValue([
       [{ start: 0, end: 1000, text: "hello", translation: "你好" }],
       100,
@@ -171,8 +170,7 @@ describe("YouTubeCaptionProvider manual translation", () => {
     await act(async () => flushPromises());
 
     expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
-    expect(normalizeTimedTextEvents).toHaveBeenCalledTimes(1);
-    expect(genFlatEvents).toHaveBeenCalledTimes(1);
+    expect(prepareTimedTextEvents).toHaveBeenCalledTimes(1);
     expect(apiSubtitle).not.toHaveBeenCalled();
     expect(eventsToSubtitles).not.toHaveBeenCalled();
 

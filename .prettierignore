@@ -2,6 +2,4 @@ node_modules
 build
 public
 package.json
-src/libs/rules.test.js
-src/libs/subtitleIndexAlign.js
-src/libs/trustedTypes.test.js
+testdata/subtitle-samples

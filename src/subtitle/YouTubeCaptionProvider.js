@@ -25,9 +25,8 @@ import { eventsToSubtitles } from "./youtubeAiSegmentation.js";
 import {
   builtinSegment,
   formatSubtitles,
-  genFlatEvents,
   getFromLang,
-  normalizeTimedTextEvents,
+  prepareTimedTextEvents,
 } from "./youtubeSubtitleProcessing.js";
 import {
   CONTROLS_SELECTOR,
@@ -975,8 +974,8 @@ export class YouTubeCaptionProvider {
         return;
       }
 
-      const subtitleEvents = normalizeTimedTextEvents(events);
-      const flatEvents = genFlatEvents(subtitleEvents);
+      const { events: subtitleEvents, flatEvents } =
+        prepareTimedTextEvents(events);
       if (!flatEvents?.length) {
         logger.debug("Youtube Provider: flatEvents not got:", videoId);
         return;

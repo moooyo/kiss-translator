@@ -5,11 +5,6 @@
   "releaseContract": "canonical-archives-v1",
   "author": "Gabe<yugang2002@gmail.com>",
   "private": true,
-  "packageManager": "pnpm@9.14.4",
-  "engines": {
-    "node": ">=24",
-    "pnpm": ">=9.14.4 <11"
-  },
   "dependencies": {
     "@emotion/cache": "^11.11.0",
     "@emotion/css": "^11.13.5",

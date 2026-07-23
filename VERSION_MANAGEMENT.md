@@ -1,46 +1,16 @@
-# Versioning, CI, and Release Guide
+# Versioning and Release Guide
 
 ## Runtime baseline
 
 - Node.js 24 or newer
-- pnpm 9.14.4 (declared in `package.json` and `.pnpm-version`)
+- pnpm 9.14.4 (pinned in `.pnpm-version`)
 - The committed `pnpm-lock.yaml` must be installed with `--frozen-lockfile`
 
-Run the same quality gates as CI before opening a pull request:
+Install dependencies before running the release checks described below:
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm check
-pnpm test:ci
-pnpm build:ci
 ```
-
-`pnpm check` verifies formatting and confirms that all version-bearing files are
-synchronized. `pnpm build:ci` builds every distribution target without modifying
-tracked source files and validates the generated artifacts.
-
-## Continuous integration
-
-`.github/workflows/ci.yml` runs for every pull request targeting `dev`, every
-push to `dev`, and manual dispatches. It provides these independent gates:
-
-1. GitHub Actions workflow validation with `actionlint`.
-2. Version and formatting checks on Ubuntu.
-3. The complete unit-test suite on Ubuntu and Windows.
-4. A native Safari Web Extension conversion on macOS.
-5. A full multi-target build after all earlier gates pass.
-6. An always-running aggregate `CI gate` that fails unless every required job
-   above completed successfully.
-
-Superseded runs on the same branch or pull request are cancelled automatically.
-Successful pull requests retain reviewer-installable builds for three days.
-Successful non-PR builds are retained as short-lived smoke-build artifacts.
-
-Repository administrators should protect `dev` and require the
-`CI gate` check before merging. That job always runs and verifies that the
-workflow lint, quality, complete Ubuntu/Windows test matrix, macOS Safari
-conversion, and multi-target build all completed successfully. Requiring this
-aggregate check prevents a skipped dependency from bypassing branch protection.
 
 ## Version source of truth
 
@@ -66,7 +36,7 @@ To synchronize after a manual `package.json` edit, run:
 pnpm sync-version
 ```
 
-CI uses `pnpm check:version`, which is read-only and fails when metadata differs.
+`pnpm check:version` is read-only and fails when version metadata differs.
 
 ## Release preparation
 
@@ -77,14 +47,14 @@ that branch through a reviewed pull request:
 2. Add the new release as the first `## vX.Y.Z` section in `CHANGELOG.md`.
 3. Run `pnpm check`, `pnpm test:ci`, and `pnpm build+zip`.
 4. Commit the version, changelog, and related product changes.
-5. Merge the pull request into `dev` after CI passes.
+5. Merge the pull request into `dev` after review and the local release checks pass.
 
 `pnpm build+zip` is the local end-to-end release rehearsal. It builds Chrome,
 Edge, Safari Web Extension output, Firefox, Thunderbird, web, and userscript
 outputs; creates the iOS userscript variant and static rule files; generates
 release ZIP files named `kiss-translator_vX.Y.Z_<target>.zip`; and verifies
-their contents and versions. The native Safari Xcode conversion is verified by
-the macOS CI job.
+their contents and versions. Native Safari Xcode conversion requires macOS and
+can be checked separately with `pnpm build:safari`.
 
 ## Publishing a release
 
@@ -124,9 +94,7 @@ workflow.
 
 ## Relevant files
 
-- `.github/workflows/ci.yml`
 - `.github/workflows/release.yml`
-- `.github/dependabot.yml`
 - `src/scripts/sync-version.mjs`
 - `src/scripts/build-task.mjs`
 - `src/scripts/archive.mjs`

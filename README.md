@@ -2,8 +2,6 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
-[![CI](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml/badge.svg?branch=dev)](https://github.com/fishjar/kiss-translator/actions/workflows/ci.yml)
-
 一个简约、开源的 [双语对照翻译扩展 & 油猴脚本](https://github.com/fishjar/kiss-translator)。
 
 [kiss-translator.webm](https://github.com/fishjar/kiss-translator/assets/1157624/f7ba8a5c-e4a8-4d5a-823a-5c5c67a0a47f)
@@ -162,11 +160,9 @@
 ```sh
 git clone https://github.com/fishjar/kiss-translator.git
 cd kiss-translator
-git checkout dev
-pnpm install --frozen-lockfile
-pnpm check
-pnpm test:ci
-pnpm build:ci
+git checkout dev # 提交PR建议推送到dev分支
+pnpm install
+pnpm build
 ```
 
 ### 外部触发示例

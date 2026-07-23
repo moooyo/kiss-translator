@@ -16,6 +16,8 @@ describe("gm userscript bridge", () => {
     delete globalThis.GM_setValue;
     delete globalThis.GM_getValue;
     delete globalThis.GM_deleteValue;
+    delete globalThis.GM_addValueChangeListener;
+    delete globalThis.GM_removeValueChangeListener;
     utils.genEventName.mockReturnValue("pong-adapt");
     mockFetchGM.mockReset();
   });
@@ -27,6 +29,8 @@ describe("gm userscript bridge", () => {
     delete globalThis.GM_setValue;
     delete globalThis.GM_getValue;
     delete globalThis.GM_deleteValue;
+    delete globalThis.GM_addValueChangeListener;
+    delete globalThis.GM_removeValueChangeListener;
   });
 
   test("adaptScript exposes xmlHttpRequest through CustomEvent bridge", () => {
@@ -98,6 +102,107 @@ describe("gm userscript bridge", () => {
     );
 
     expect(onabort).toHaveBeenCalledWith({ type: "abort" });
+  });
+
+  test("bridges persistent value changes and cleans up an early cancellation", async () => {
+    let nativeListener;
+    let resolveRegistration;
+    const registration = new Promise((resolve) => {
+      resolveRegistration = resolve;
+    });
+    globalThis.GM = {
+      addValueChangeListener: jest.fn((_key, listener) => {
+        nativeListener = listener;
+        return registration;
+      }),
+      removeValueChangeListener: jest.fn(async () => {}),
+    };
+    utils.genEventName
+      .mockReturnValueOnce("value-change-listener")
+      .mockReturnValueOnce("value-change-remove-pong");
+    const pingHandler = (event) => {
+      void handlePing(event);
+    };
+    window.addEventListener("kiss-value-change-ping", pingHandler);
+
+    adaptScript("kiss-value-change-ping");
+    const listener = jest.fn();
+    const listenerId = window.KISS_GM.addValueChangeListener(
+      "setting",
+      listener
+    );
+
+    expect(listenerId).toBe("value-change-listener");
+    expect(globalThis.GM.addValueChangeListener).toHaveBeenCalledWith(
+      "setting",
+      expect.any(Function)
+    );
+
+    nativeListener("setting", "old", "new", true);
+    expect(listener).toHaveBeenCalledWith("setting", "old", "new", true);
+
+    const removal = window.KISS_GM.removeValueChangeListener(listenerId);
+    nativeListener("setting", "new", "newer", true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    resolveRegistration(73);
+    await removal;
+    await registration;
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(globalThis.GM.removeValueChangeListener).toHaveBeenCalledTimes(1);
+    expect(globalThis.GM.removeValueChangeListener).toHaveBeenCalledWith(73);
+    nativeListener("setting", "newer", "latest", true);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    window.removeEventListener("kiss-value-change-ping", pingHandler);
+  });
+
+  test("cleans the persistent channel when native registration fails", async () => {
+    const registrationError = new Error("registration failed");
+    globalThis.GM = {
+      addValueChangeListener: jest.fn(() => Promise.reject(registrationError)),
+    };
+    utils.genEventName.mockReturnValueOnce("failed-value-change-listener");
+    const pingHandler = (event) => {
+      void handlePing(event);
+    };
+    const consoleError = jest
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    window.addEventListener("kiss-failed-value-change-ping", pingHandler);
+
+    adaptScript("kiss-failed-value-change-ping");
+    const listener = jest.fn();
+    const listenerId = window.KISS_GM.addValueChangeListener(
+      "setting",
+      listener
+    );
+    await Promise.resolve();
+    await Promise.resolve();
+
+    window.dispatchEvent(
+      new CustomEvent(listenerId, {
+        detail: {
+          data: {
+            name: "setting",
+            oldValue: "old",
+            newValue: "new",
+            remote: true,
+          },
+        },
+      })
+    );
+
+    expect(listener).not.toHaveBeenCalled();
+    expect(consoleError).toHaveBeenCalledWith(
+      "GM value change listener bridge error:",
+      registrationError.message
+    );
+
+    consoleError.mockRestore();
+    window.removeEventListener("kiss-failed-value-change-ping", pingHandler);
   });
 
   test("handlePing keeps fetch-shaped xmlHttpRequest requests on fetchGM", async () => {

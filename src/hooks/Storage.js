@@ -51,18 +51,39 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState(defaultVal);
   const skipRemoteSyncValueRef = useRef();
+  const externalStorageValueRef = useRef();
 
-  // 首次挂载时从本地存储异步加载初始数据
+  // Subscribe before reading so a late initial read cannot overwrite a newer
+  // value delivered by the storage change channel.
   useEffect(() => {
     let isMounted = true;
+    let storageRevision = 0;
+    externalStorageValueRef.current = undefined;
+    skipRemoteSyncValueRef.current = undefined;
+
+    const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
+      if (!isMounted) return;
+      storageRevision += 1;
+
+      const nextValue = storedValue ?? defaultVal;
+      setData((currentValue) => {
+        if (isSameStorageValue(currentValue, nextValue)) return currentValue;
+        externalStorageValueRef.current = nextValue;
+        skipRemoteSyncValueRef.current = { value: nextValue };
+        return nextValue;
+      });
+    });
 
     const loadInitialData = async () => {
+      const revisionAtStart = storageRevision;
       try {
         const storedVal = await storage.getObj(key);
+        if (!isMounted || storageRevision !== revisionAtStart) return;
+
         if (storedVal === undefined || storedVal === null) {
           // 如果存储中没有该值，写入初始默认值
           await storage.setObj(key, defaultVal);
-        } else if (isMounted) {
+        } else {
           setData(storedVal);
         }
       } catch (err) {
@@ -78,6 +99,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
 
     return () => {
       isMounted = false;
+      unsubscribe?.();
     };
   }, [key, defaultVal]);
 
@@ -106,6 +128,12 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       return;
     }
 
+    if (isSameStorageValue(externalStorageValueRef.current, data)) {
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
+      return;
+    }
+
     storage.setObj(key, data).catch((err) => {
       kissLog(`storage save error for key: ${key}`, err);
     });
@@ -129,9 +157,13 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
    * @param {any | ((prevData: any) => any)} valueOrFn 新的值或一个返回新值的函数。
    */
   const save = useCallback((valueOrFn) => {
-    setData((prevData) =>
-      typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn
-    );
+    setData((prevData) => {
+      const nextData =
+        typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn;
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
+      return nextData;
+    });
   }, []);
 
   /**
@@ -147,7 +179,10 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       // 确保 preData 是一个对象，避免展开 null 或 undefined
       const baseObj =
         typeof prevData === "object" && prevData !== null ? prevData : {};
-      return { ...baseObj, ...partialData };
+      const nextData = { ...baseObj, ...partialData };
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
+      return nextData;
     });
   }, []);
 
@@ -155,8 +190,12 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
    * 从 Storage 中删除该值，并将状态重置为 null。
    */
   const remove = useCallback(async () => {
+    externalStorageValueRef.current = undefined;
+    skipRemoteSyncValueRef.current = undefined;
     try {
       await storage.del(key);
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
       setData(null);
     } catch (err) {
       kissLog(`storage remove error for key: ${key}`, err);

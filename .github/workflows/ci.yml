@@ -81,6 +81,9 @@ jobs:
         run: pnpm install --frozen-lockfile --prefer-offline
       - name: Run unit tests
         run: pnpm test:ci
+      - name: Run subtitle segmentation golden samples
+        if: runner.os == 'Linux'
+        run: pnpm test:subtitle-segmentation
 
   safari-conversion:
     name: Convert Safari Web Extension

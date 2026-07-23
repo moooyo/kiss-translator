@@ -39,6 +39,7 @@ const requiredFiles = [
   "web/kiss-translator.user.js",
   "web/kiss-translator-ios-safari.user.js",
   "web/kiss-translator-rules.json",
+  "web/subtitle-samples/index.json",
   "web/version.txt",
   "userscript/kiss-translator.user.js",
   "userscript/kiss-translator-ios-safari.user.js",

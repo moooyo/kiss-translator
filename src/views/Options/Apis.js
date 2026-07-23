@@ -104,6 +104,7 @@ import {
 } from "../../config";
 import ValidationInput from "../../hooks/ValidationInput";
 import { usePromptList } from "../../hooks/Prompt";
+import { usePersistedEntityDraft } from "./usePersistedEntityDraft";
 
 const API_ICON_SIZE = 22;
 const API_LIST_CONTROL_SIZE = 24;
@@ -310,7 +311,12 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
   const { api, update, reset } = useApiItem(apiSlug);
   const { prompts } = usePromptList();
   const i18n = useI18n();
-  const [formData, setFormData] = useState(() => api || {});
+  const {
+    draft: formData,
+    setDraft: setFormData,
+    discardDraft,
+    isDirty: hasDraftChanges,
+  } = usePersistedEntityDraft(api || {}, apiSlug);
   const [showMore, setShowMore] = useState(false);
   const [modelOptions, setModelOptions] = useState([]);
   const [modelThinkingCapabilities, setModelThinkingCapabilities] = useState(
@@ -320,10 +326,6 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
   const [modelListError, setModelListError] = useState("");
   const requestedModelListKeyRef = useRef("");
   const confirm = useConfirm();
-
-  useLayoutEffect(() => {
-    setFormData(api || {});
-  }, [api]);
 
   useLayoutEffect(() => {
     setShowMore(false);
@@ -344,8 +346,8 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
       return false;
     }
 
-    return JSON.stringify(api) !== JSON.stringify(activeFormData);
-  }, [api, apiSlug, activeFormData]);
+    return hasDraftChanges;
+  }, [api, apiSlug, activeFormData, hasDraftChanges]);
 
   const handleChange = (e) => {
     e?.preventDefault();
@@ -430,6 +432,7 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
       nextFormData.thinkingEffort = "_default";
     }
     update(nextFormData);
+    setFormData(nextFormData);
     if (activeFormData.isDisabled || activeFormData.sortOrder === -1) {
       onCollapse?.();
     }
@@ -437,6 +440,7 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
 
   const handleReset = () => {
     reset();
+    discardDraft();
   };
 
   const handleCopy = () => {
@@ -643,7 +647,16 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse }) {
       setModelListStatus("error");
       setModelListError(err?.message || String(err));
     }
-  }, [api, apiSlug, apiType, httpTimeout, key, modelListStatus, modelListUrl]);
+  }, [
+    api,
+    apiSlug,
+    apiType,
+    httpTimeout,
+    key,
+    modelListStatus,
+    modelListUrl,
+    setFormData,
+  ]);
 
   return (
     <Stack spacing={3}>

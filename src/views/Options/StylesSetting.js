@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import Stack from "@mui/material/Stack";
 import TextField from "@mui/material/TextField";
 import CodeField from "./CodeField";
@@ -16,6 +16,7 @@ import { useAllTextStyles, useStyleList } from "../../hooks/CustomStyles";
 import { css } from "@emotion/css";
 import { getRandomQuote } from "../../config/quotes";
 import { useSetting } from "../../hooks/Setting";
+import { usePersistedEntityDraft } from "./usePersistedEntityDraft";
 
 /**
  * 单个自定义 CSS 样式编辑表单区域
@@ -31,25 +32,12 @@ function StyleFields({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
   const {
     setting: { uiLang },
   } = useSetting();
-  // 暂存表单输入值的状态
-  const [formData, setFormData] = useState({});
-  // 用于判定当前输入是否发生改变以控制保存按钮
-  const [isModified, setIsModified] = useState(false);
+  const {
+    draft: formData,
+    setDraft: setFormData,
+    isDirty: isModified,
+  } = usePersistedEntityDraft(customStyle || {}, customStyle?.styleSlug || "");
   const confirm = useConfirm();
-
-  // 监听外部样式更新，重置表单
-  useEffect(() => {
-    if (customStyle) {
-      setFormData(customStyle);
-    }
-  }, [customStyle]);
-
-  // 比对是否发生过修改以激活保存按钮
-  useEffect(() => {
-    if (!customStyle) return;
-    const hasChanged = JSON.stringify(customStyle) !== JSON.stringify(formData);
-    setIsModified(hasChanged);
-  }, [customStyle, formData]);
 
   // 表单字段输入改变处理
   const handleChange = (e) => {
@@ -161,7 +149,12 @@ function StyleFields({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
 /**
  * 样式的折叠手风琴壳组件
  */
-function StyleAccordion({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
+export function StyleAccordion({
+  customStyle,
+  deleteStyle,
+  updateStyle,
+  isBuiltin,
+}) {
   const [expanded, setExpanded] = useState(false);
 
   const handleChange = (e) => {

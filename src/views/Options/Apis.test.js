@@ -104,12 +104,12 @@ async function flushEffects() {
 }
 
 async function renderApis(api = createApi(), update = jest.fn()) {
+  let currentApi = api;
+  const reset = jest.fn();
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-
-  useApiList.mockReturnValue({
-    transApis: [api],
+  const apiListValue = {
     addApi: jest.fn(),
     deleteApi: jest.fn(),
     deleteApis: jest.fn(),
@@ -119,12 +119,22 @@ async function renderApis(api = createApi(), update = jest.fn()) {
     copyApi: jest.fn(),
     alphaSortApis: jest.fn(),
     reorderApis: jest.fn(),
-  });
-  useApiItem.mockReturnValue({
-    api,
-    update,
-    reset: jest.fn(),
-  });
+  };
+
+  const setApi = (nextApi) => {
+    currentApi = nextApi;
+    useApiList.mockReturnValue({
+      transApis: [currentApi],
+      ...apiListValue,
+    });
+    useApiItem.mockReturnValue({
+      api: currentApi,
+      update,
+      reset,
+    });
+  };
+
+  setApi(currentApi);
 
   await act(async () => {
     root.render(<Apis />);
@@ -133,7 +143,15 @@ async function renderApis(api = createApi(), update = jest.fn()) {
 
   return {
     container,
+    reset,
     update,
+    rerender: async (nextApi) => {
+      setApi(nextApi);
+      await act(async () => {
+        root.render(<Apis />);
+      });
+      await flushEffects();
+    },
     unmount: () => {
       act(() => root.unmount());
       container.remove();
@@ -154,6 +172,86 @@ function getSaveButton(container) {
     (button) => button.textContent === "save"
   );
 }
+
+describe("Apis persisted updates", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("follows clean updates without discarding a dirty API draft", async () => {
+    const initialApi = createApi();
+    const view = await renderApis(initialApi);
+    const cleanUpdate = { ...initialApi, model: "remote-clean-model" };
+
+    await view.rerender(cleanUpdate);
+    expect(getInput(view.container, "model").value).toBe("remote-clean-model");
+
+    await act(async () => {
+      Simulate.change(getInput(view.container, "model"), {
+        target: { name: "model", value: "local-model-draft" },
+      });
+    });
+    await view.rerender({ ...cleanUpdate });
+    expect(getInput(view.container, "model").value).toBe("local-model-draft");
+
+    await view.rerender({ ...cleanUpdate, model: "remote-conflict" });
+    expect(getInput(view.container, "model").value).toBe("local-model-draft");
+    expect(getSaveButton(view.container).disabled).toBe(false);
+
+    view.unmount();
+  });
+
+  test("rebases a dirty field onto unrelated persisted updates", async () => {
+    const initialApi = createApi();
+    const view = await renderApis(initialApi);
+
+    await act(async () => {
+      Simulate.change(getInput(view.container, "url"), {
+        target: { name: "url", value: "https://draft.example/v1" },
+      });
+    });
+    await view.rerender({ ...initialApi, model: "remote-model" });
+    await act(async () => {
+      Simulate.click(getSaveButton(view.container));
+    });
+
+    expect(view.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://draft.example/v1",
+        model: "remote-model",
+      })
+    );
+    view.unmount();
+  });
+
+  test("follows persisted defaults after resetting a dirty draft", async () => {
+    const initialApi = createApi();
+    const view = await renderApis(initialApi);
+
+    await act(async () => {
+      Simulate.change(getInput(view.container, "url"), {
+        target: { name: "url", value: "https://draft.example/v1" },
+      });
+      Simulate.click(
+        Array.from(view.container.querySelectorAll("button")).find(
+          (button) => button.textContent === "restore_default"
+        )
+      );
+    });
+    expect(view.reset).toHaveBeenCalledTimes(1);
+
+    await view.rerender({
+      ...initialApi,
+      url: "https://reset.example/v1",
+    });
+    expect(getInput(view.container, "url").value).toBe(
+      "https://reset.example/v1"
+    );
+    expect(getSaveButton(view.container).disabled).toBe(true);
+    view.unmount();
+  });
+});
 
 describe("Apis model list", () => {
   afterEach(() => {
@@ -411,6 +509,37 @@ describe("Apis Gemini thinking efforts", () => {
     const effortInput = getInput(view.container, "thinkingEffort");
     expect(effortInput.value).toBe("_default");
 
+    view.unmount();
+  });
+
+  test("accepts a normalized effort as the new clean draft", async () => {
+    const initialApi = createApi({
+      apiSlug: OPT_TRANS_GEMINI,
+      apiType: OPT_TRANS_GEMINI,
+      model: "gemini-3-pro-preview",
+      thinkingMode: "enabled",
+      thinkingEffort: "medium",
+    });
+    const view = await renderApis(initialApi);
+
+    await act(async () => {
+      Simulate.change(getInput(view.container, "url"), {
+        target: { name: "url", value: "https://draft.example/v1" },
+      });
+    });
+    await act(async () => {
+      Simulate.click(getSaveButton(view.container));
+    });
+
+    expect(view.update).toHaveBeenCalledWith(
+      expect.objectContaining({ thinkingEffort: "_default" })
+    );
+    await view.rerender({
+      ...initialApi,
+      url: "https://draft.example/v1",
+      thinkingEffort: "_default",
+    });
+    expect(getSaveButton(view.container).disabled).toBe(true);
     view.unmount();
   });
 });

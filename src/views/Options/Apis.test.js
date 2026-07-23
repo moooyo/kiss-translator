@@ -101,14 +101,12 @@ async function flushEffects() {
 }
 
 async function renderApis(api = createApi(), update = jest.fn()) {
-  const apis = Array.isArray(api) ? api : [api];
+  let apis = Array.isArray(api) ? api : [api];
   const reset = jest.fn();
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-
-  useApiList.mockReturnValue({
-    transApis: apis,
+  const apiListValue = {
     addApi: jest.fn(),
     deleteApi: jest.fn(),
     deleteApis: jest.fn(),
@@ -118,12 +116,19 @@ async function renderApis(api = createApi(), update = jest.fn()) {
     copyApi: jest.fn(),
     alphaSortApis: jest.fn(),
     reorderApis: jest.fn(),
-  });
-  useApiItem.mockImplementation((apiSlug) => ({
-    api: apis.find((item) => item.apiSlug === apiSlug),
-    update,
-    reset,
-  }));
+  };
+
+  const setApis = (nextApi) => {
+    apis = Array.isArray(nextApi) ? nextApi : [nextApi];
+    useApiList.mockReturnValue({ transApis: apis, ...apiListValue });
+    useApiItem.mockImplementation((apiSlug) => ({
+      api: apis.find((item) => item.apiSlug === apiSlug),
+      update,
+      reset,
+    }));
+  };
+
+  setApis(api);
 
   await act(async () => {
     root.render(<Apis />);
@@ -134,6 +139,13 @@ async function renderApis(api = createApi(), update = jest.fn()) {
     container,
     reset,
     update,
+    rerender: async (nextApi) => {
+      setApis(nextApi);
+      await act(async () => {
+        root.render(<Apis />);
+      });
+      await flushEffects();
+    },
     unmount: () => {
       act(() => root.unmount());
       container.remove();
@@ -220,6 +232,40 @@ describe("Apis conditional option groups", () => {
     expect(
       view.container.querySelector(".kt-api-runtime-options")
     ).not.toBeNull();
+
+    view.unmount();
+  });
+});
+
+describe("Apis persisted updates", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("accepts clean updates without discarding a dirty API draft", async () => {
+    const initialApi = createApi();
+    const view = await renderApis(initialApi);
+    const cleanUpdate = {
+      ...initialApi,
+      model: "remote-clean-model",
+    };
+
+    await view.rerender(cleanUpdate);
+    expect(getInput(view.container, "model").value).toBe("remote-clean-model");
+
+    const urlInput = await editUrlDraft(view.container);
+    await view.rerender({ ...cleanUpdate });
+    expect(urlInput.value).toBe("https://draft.example/v1");
+
+    await view.rerender({
+      ...cleanUpdate,
+      model: "remote-conflicting-model",
+    });
+    expect(getInput(view.container, "url").value).toBe(
+      "https://draft.example/v1"
+    );
+    expect(getSaveButton(view.container).disabled).toBe(false);
 
     view.unmount();
   });

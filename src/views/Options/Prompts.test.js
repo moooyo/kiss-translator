@@ -40,16 +40,24 @@ function renderPrompts(category) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-  const prompt = createPrompt(category);
-
-  mockUsePromptList.mockReturnValue({
-    prompts: [prompt],
+  let prompt = createPrompt(category);
+  const promptListValue = {
     addPrompt: jest.fn(),
     updatePrompt: jest.fn(),
     deletePrompt: jest.fn(),
     copyPrompt: jest.fn(),
     isPresetPromptSlug: () => false,
-  });
+  };
+
+  const setPrompt = (nextPrompt) => {
+    prompt = nextPrompt;
+    mockUsePromptList.mockReturnValue({
+      prompts: [prompt],
+      ...promptListValue,
+    });
+  };
+
+  setPrompt(prompt);
 
   act(() => {
     root.render(<Prompts />);
@@ -57,6 +65,13 @@ function renderPrompts(category) {
 
   return {
     container,
+    prompt,
+    rerender(nextPrompt) {
+      setPrompt(nextPrompt);
+      act(() => {
+        root.render(<Prompts />);
+      });
+    },
     unmount: () => {
       act(() => root.unmount());
       container.remove();
@@ -146,5 +161,47 @@ describe("Prompts", () => {
     await act(async () => backButton.click());
     expect(container.querySelector('input[name="name"]')).toBeNull();
     unmount();
+  });
+
+  test("accepts clean updates without discarding a dirty prompt draft", async () => {
+    const view = renderPrompts(PROMPT_CATEGORY_USER);
+    await openPromptEditor(view.container);
+    const cleanUpdate = {
+      ...view.prompt,
+      name: "Remote clean prompt",
+    };
+
+    view.rerender(cleanUpdate);
+    expect(view.container.querySelector('input[name="name"]').value).toBe(
+      "Remote clean prompt"
+    );
+
+    const nameInput = view.container.querySelector('input[name="name"]');
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      ).set.call(nameInput, "Local prompt draft");
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    view.rerender({ ...cleanUpdate });
+    expect(view.container.querySelector('input[name="name"]').value).toBe(
+      "Local prompt draft"
+    );
+
+    view.rerender({
+      ...cleanUpdate,
+      systemPrompt: "remote conflicting system prompt",
+    });
+    expect(view.container.querySelector('input[name="name"]').value).toBe(
+      "Local prompt draft"
+    );
+    const saveButton = Array.from(
+      view.container.querySelectorAll("button")
+    ).find((button) => button.textContent === "save");
+    expect(saveButton.disabled).toBe(false);
+
+    view.unmount();
   });
 });

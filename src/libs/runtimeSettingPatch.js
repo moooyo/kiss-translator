@@ -21,6 +21,10 @@ export async function applyRuntimeSettingPatch(
   sender,
   dependencies = {}
 ) {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    throw new TypeError("Runtime setting patch must be an object");
+  }
+
   const getSetting = dependencies.getSetting || getSettingWithDefault;
   const setSetting = dependencies.setSetting || persistSetting;
   const markSyncMeta = dependencies.markSyncMeta || putSyncMeta;
@@ -42,7 +46,9 @@ export async function applyRuntimeSettingPatch(
     await dependencies.onPersisted?.(mergedSetting, patch);
 
     let tabs;
-    if (scope === "current") {
+    if (scope === "none") {
+      tabs = [];
+    } else if (scope === "current") {
       const tabId = sender?.tab?.id ?? (await getActiveTabId());
       tabs = Number.isInteger(tabId) ? [{ id: tabId }] : [];
     } else {
@@ -62,6 +68,7 @@ export async function applyRuntimeSettingPatch(
       delivered: results.filter((result) => result.status === "fulfilled")
         .length,
       attempted: results.length,
+      setting: mergedSetting,
     };
   });
 }

@@ -78,6 +78,7 @@ import {
 import ValidationInput from "../../hooks/ValidationInput";
 import { usePromptList } from "../../hooks/Prompt";
 import ApiProviderIcon from "../../components/ApiProviderIcon";
+import { usePersistedEntityDraft } from "./usePersistedEntityDraft";
 
 const API_LIST_CONTROL_SIZE = 24;
 const API_LIST_CONTROL_GAP = 0.5;
@@ -208,17 +209,17 @@ function ApiFields({
   const { api, update, reset } = useApiItem(apiSlug);
   const { prompts } = usePromptList();
   const i18n = useI18n();
-  const [formData, setFormData] = useState(() => api || {});
+  const {
+    draft: formData,
+    setDraft: setFormData,
+    isDirty: hasDraftChanges,
+  } = usePersistedEntityDraft(api || {}, apiSlug);
   const [showMore, setShowMore] = useState(false);
   const [modelOptions, setModelOptions] = useState([]);
   const [modelListStatus, setModelListStatus] = useState("idle");
   const [modelListError, setModelListError] = useState("");
   const requestedModelListKeyRef = useRef("");
   const confirm = useConfirm();
-
-  useLayoutEffect(() => {
-    setFormData(api || {});
-  }, [api]);
 
   useLayoutEffect(() => {
     setShowMore(false);
@@ -238,8 +239,8 @@ function ApiFields({
       return false;
     }
 
-    return JSON.stringify(api) !== JSON.stringify(activeFormData);
-  }, [api, apiSlug, activeFormData]);
+    return hasDraftChanges;
+  }, [api, apiSlug, activeFormData, hasDraftChanges]);
 
   useEffect(() => {
     onDirtyChange?.(isModified);

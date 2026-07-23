@@ -4,6 +4,9 @@ import { useStorage } from "./Storage";
 import { storage } from "../libs/storage";
 import { syncData } from "../libs/sync";
 import { isOptions } from "../libs/browser";
+import { sendBgMsg } from "../libs/msg";
+import { MSG_RUNTIME_SETTING_PATCH, STOKEY_SETTING } from "../config";
+import { mergeSettingPatch } from "../libs/settingPatch";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -18,6 +21,16 @@ jest.mock("../libs/storage", () => ({
 
 jest.mock("../libs/sync", () => ({
   syncData: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock("../libs/client", () => ({
+  get isExt() {
+    return globalThis.__TEST_STORAGE_IS_EXT__ !== false;
+  },
+}));
+
+jest.mock("../libs/msg", () => ({
+  sendBgMsg: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock("../libs/browser", () => ({
@@ -38,17 +51,18 @@ jest.mock("../libs/log", () => ({
 
 const DEFAULT_LOCAL_SETTING = { local: true };
 
-function createHookHost() {
+function createHookHost({
+  key = "local-setting",
+  defaultVal = DEFAULT_LOCAL_SETTING,
+  syncKey = "kiss-setting_v2.json",
+} = {}) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   const hookResult = {};
 
   function TestComponent() {
-    Object.assign(
-      hookResult,
-      useStorage("local-setting", DEFAULT_LOCAL_SETTING, "kiss-setting_v2.json")
-    );
+    Object.assign(hookResult, useStorage(key, defaultVal, syncKey));
     return null;
   }
 
@@ -98,11 +112,14 @@ describe("useStorage remote sync", () => {
       return () => storageListeners.delete(listener);
     });
     syncData.mockResolvedValue(undefined);
+    sendBgMsg.mockResolvedValue(undefined);
     isOptions.mockReturnValue(true);
+    globalThis.__TEST_STORAGE_IS_EXT__ = true;
   });
 
   afterEach(() => {
     delete globalThis.__KISS_CONTEXT__;
+    delete globalThis.__TEST_STORAGE_IS_EXT__;
     jest.useRealTimers();
   });
 
@@ -267,6 +284,248 @@ describe("useStorage remote sync", () => {
     const expected = { remote: true, localEdit: true };
     expect(storage.setObj).toHaveBeenCalledWith("local-setting", expected);
     expect(syncData).toHaveBeenCalledWith("kiss-setting_v2.json", expected);
+
+    host.unmount();
+  });
+
+  test("sends a minimal deep setting patch to the background writer", async () => {
+    let storedSetting = {
+      darkMode: "auto",
+      injectRules: true,
+      subtitleSetting: { enabled: true, apiSlug: "Microsoft" },
+    };
+    storage.getObj.mockResolvedValue(storedSetting);
+    sendBgMsg.mockImplementation(async (_action, { patch }) => {
+      storedSetting = mergeSettingPatch(storedSetting, patch);
+      return { setting: storedSetting, delivered: 0, attempted: 0 };
+    });
+    const host = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: storedSetting,
+    });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    sendBgMsg.mockClear();
+    await act(async () => {
+      host.hookResult.save((current) => ({
+        ...current,
+        subtitleSetting: {
+          ...current.subtitleSetting,
+          enabled: false,
+        },
+      }));
+    });
+    await flushEffects();
+
+    expect(sendBgMsg).toHaveBeenCalledWith(MSG_RUNTIME_SETTING_PATCH, {
+      patch: { subtitleSetting: { enabled: false } },
+      scope: "none",
+    });
+    expect(storage.setObj).not.toHaveBeenCalledWith(
+      STOKEY_SETTING,
+      expect.anything()
+    );
+    expect(storedSetting).toEqual({
+      darkMode: "auto",
+      injectRules: true,
+      subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
+    });
+
+    host.unmount();
+  });
+
+  test("initializes a missing extension setting through the background writer", async () => {
+    const defaultSetting = {
+      darkMode: "auto",
+      subtitleSetting: { enabled: true },
+    };
+    let storedSetting = defaultSetting;
+    storage.getObj.mockResolvedValue(null);
+    sendBgMsg.mockImplementation(async (_action, { patch }) => {
+      storedSetting = mergeSettingPatch(storedSetting, patch);
+      return { setting: storedSetting, delivered: 0, attempted: 0 };
+    });
+    const host = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: defaultSetting,
+    });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    expect(sendBgMsg).toHaveBeenCalledWith(MSG_RUNTIME_SETTING_PATCH, {
+      patch: {},
+      scope: "none",
+    });
+    expect(storage.setObj).not.toHaveBeenCalledWith(
+      STOKEY_SETTING,
+      expect.anything()
+    );
+    expect(storedSetting).toEqual(defaultSetting);
+
+    host.unmount();
+  });
+
+  test("preserves different fields changed by concurrent extension contexts", async () => {
+    let storedSetting = {
+      darkMode: "auto",
+      subtitleSetting: { enabled: true, apiSlug: "Microsoft" },
+    };
+    const sentPatches = [];
+    storage.getObj.mockResolvedValue(storedSetting);
+    sendBgMsg.mockImplementation(async (_action, { patch }) => {
+      sentPatches.push(patch);
+      storedSetting = mergeSettingPatch(storedSetting, patch);
+      return { setting: storedSetting, delivered: 0, attempted: 0 };
+    });
+    const firstHost = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: storedSetting,
+    });
+    const secondHost = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: storedSetting,
+    });
+    firstHost.render();
+    secondHost.render();
+    await waitForLoaded(firstHost.hookResult);
+    await waitForLoaded(secondHost.hookResult);
+    await flushEffects();
+
+    await act(async () => {
+      firstHost.hookResult.save((current) => ({
+        ...current,
+        darkMode: "dark",
+      }));
+      secondHost.hookResult.save((current) => ({
+        ...current,
+        subtitleSetting: {
+          ...current.subtitleSetting,
+          enabled: false,
+        },
+      }));
+    });
+    await flushEffects();
+    await flushEffects();
+
+    expect(sentPatches).toEqual(
+      expect.arrayContaining([
+        { darkMode: "dark" },
+        { subtitleSetting: { enabled: false } },
+      ])
+    );
+    expect(storedSetting).toEqual({
+      darkMode: "dark",
+      subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
+    });
+
+    firstHost.unmount();
+    secondHost.unmount();
+  });
+
+  test("does not write or sync a background setting storage event again", async () => {
+    let storedSetting = {
+      darkMode: "auto",
+      subtitleSetting: { enabled: true },
+    };
+    storage.getObj.mockResolvedValue(storedSetting);
+    sendBgMsg.mockImplementation(async (_action, { patch }) => {
+      storedSetting = mergeSettingPatch(storedSetting, patch);
+      act(() => {
+        storageListeners.forEach((listener) => listener(storedSetting));
+      });
+      return { setting: storedSetting, delivered: 0, attempted: 0 };
+    });
+    const host = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: storedSetting,
+    });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    sendBgMsg.mockClear();
+    syncData.mockClear();
+    await act(async () => {
+      host.hookResult.save((current) => ({ ...current, darkMode: "dark" }));
+    });
+    await flushEffects();
+    await flushEffects();
+
+    expect(sendBgMsg).toHaveBeenCalledTimes(1);
+    expect(syncData).toHaveBeenCalledTimes(1);
+    expect(syncData).toHaveBeenCalledWith(
+      "kiss-setting_v2.json",
+      storedSetting
+    );
+
+    host.unmount();
+  });
+
+  test("persists a newer remote setting without syncing it back again", async () => {
+    let storedSetting = { darkMode: "auto", injectRules: true };
+    storage.getObj.mockResolvedValue(storedSetting);
+    sendBgMsg.mockImplementation(async (_action, { patch }) => {
+      storedSetting = mergeSettingPatch(storedSetting, patch);
+      return { setting: storedSetting, delivered: 0, attempted: 0 };
+    });
+    syncData.mockResolvedValueOnce({
+      isNew: true,
+      value: { darkMode: "light", injectRules: false },
+    });
+    const host = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: storedSetting,
+    });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    sendBgMsg.mockClear();
+    syncData.mockClear();
+    syncData.mockResolvedValueOnce({
+      isNew: true,
+      value: { darkMode: "light", injectRules: false },
+    });
+    await act(async () => {
+      host.hookResult.save((current) => ({ ...current, darkMode: "dark" }));
+    });
+    await flushEffects();
+    await flushEffects();
+    await flushEffects();
+
+    expect(syncData).toHaveBeenCalledTimes(1);
+    expect(sendBgMsg).toHaveBeenCalledTimes(2);
+    expect(storedSetting).toEqual({ darkMode: "light", injectRules: false });
+
+    host.unmount();
+  });
+
+  test("keeps direct storage writes for non-extension settings", async () => {
+    globalThis.__TEST_STORAGE_IS_EXT__ = false;
+    storage.getObj.mockResolvedValue({ darkMode: "auto" });
+    const host = createHookHost({
+      key: STOKEY_SETTING,
+      defaultVal: { darkMode: "auto" },
+    });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    sendBgMsg.mockClear();
+    await act(async () => {
+      host.hookResult.save({ darkMode: "dark" });
+    });
+    await flushEffects();
+
+    expect(storage.setObj).toHaveBeenCalledWith(STOKEY_SETTING, {
+      darkMode: "dark",
+    });
+    expect(sendBgMsg).not.toHaveBeenCalled();
 
     host.unmount();
   });

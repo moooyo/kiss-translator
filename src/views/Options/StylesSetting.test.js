@@ -50,18 +50,27 @@ function renderStyleAccordion(customStyle) {
   document.body.appendChild(container);
   const root = createRoot(container);
 
-  act(() => {
+  const render = (nextStyle) => {
     root.render(
       <StyleAccordion
-        customStyle={customStyle}
+        customStyle={nextStyle}
         deleteStyle={jest.fn()}
         updateStyle={jest.fn()}
       />
     );
+  };
+
+  act(() => {
+    render(customStyle);
   });
 
   return {
     container,
+    rerender(nextStyle) {
+      act(() => {
+        render(nextStyle);
+      });
+    },
     cleanup() {
       act(() => root.unmount());
       container.remove();
@@ -117,6 +126,50 @@ describe("StylesSetting style previews", () => {
     expect(runtimeCss).toContain("position:fixed");
     expect(runtimeCss).toContain("inset:0");
     expect(runtimeCss).toContain("z-index:2147483647");
+    view.cleanup();
+  });
+
+  test("accepts clean updates without discarding a dirty style draft", () => {
+    const view = renderStyleAccordion(CUSTOM_STYLE);
+    act(() => {
+      view.container.querySelector(".MuiAccordionSummary-root").click();
+    });
+    const cleanUpdate = {
+      ...CUSTOM_STYLE,
+      styleName: "Remote clean style",
+    };
+
+    view.rerender(cleanUpdate);
+    expect(view.container.querySelector('input[name="styleName"]').value).toBe(
+      "Remote clean style"
+    );
+
+    const nameInput = view.container.querySelector('input[name="styleName"]');
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      ).set.call(nameInput, "Local style draft");
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    view.rerender({ ...cleanUpdate });
+    expect(view.container.querySelector('input[name="styleName"]').value).toBe(
+      "Local style draft"
+    );
+
+    view.rerender({
+      ...cleanUpdate,
+      styleCode: "color: rebeccapurple;",
+    });
+    expect(view.container.querySelector('input[name="styleName"]').value).toBe(
+      "Local style draft"
+    );
+    const saveButton = Array.from(
+      view.container.querySelectorAll("button")
+    ).find((button) => button.textContent === "save");
+    expect(saveButton.disabled).toBe(false);
+
     view.cleanup();
   });
 });

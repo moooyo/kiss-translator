@@ -26,7 +26,14 @@ describe("applyRuntimeSettingPatch", () => {
           .mockResolvedValue([{ id: 1 }, { id: 2 }, { id: undefined }]),
         sendTabMessage,
       })
-    ).resolves.toEqual({ delivered: 1, attempted: 2 });
+    ).resolves.toEqual({
+      delivered: 1,
+      attempted: 2,
+      setting: {
+        injectRules: true,
+        subtitleSetting: { enabled: false, apiSlug: "Microsoft" },
+      },
+    });
 
     expect(setSetting).toHaveBeenCalledWith({
       injectRules: true,
@@ -74,6 +81,32 @@ describe("applyRuntimeSettingPatch", () => {
       42,
       expect.objectContaining({ action: MSG_RUNTIME_SETTING_PATCH })
     );
+  });
+
+  test("persists an options patch without broadcasting it", async () => {
+    const queryTabs = jest.fn();
+    const sendTabMessage = jest.fn();
+
+    await expect(
+      applyRuntimeSettingPatch(
+        { patch: { darkMode: "dark" }, scope: "none" },
+        undefined,
+        {
+          getSetting: jest.fn().mockResolvedValue({ darkMode: "auto" }),
+          setSetting: jest.fn(),
+          markSyncMeta: jest.fn(),
+          queryTabs,
+          sendTabMessage,
+        }
+      )
+    ).resolves.toEqual({
+      delivered: 0,
+      attempted: 0,
+      setting: { darkMode: "dark" },
+    });
+
+    expect(queryTabs).not.toHaveBeenCalled();
+    expect(sendTabMessage).not.toHaveBeenCalled();
   });
 
   test("serializes concurrent patches so neither persisted update is lost", async () => {
@@ -203,13 +236,31 @@ describe("applyRuntimeSettingPatch", () => {
         undefined,
         dependencies
       )
-    ).resolves.toEqual({ delivered: 0, attempted: 0 });
+    ).resolves.toEqual({
+      delivered: 0,
+      attempted: 0,
+      setting: {
+        injectRules: true,
+        subtitleSetting: { enabled: false },
+      },
+    });
 
     expect(storedSetting).toEqual({
       injectRules: true,
       subtitleSetting: { enabled: false },
     });
     expect(dependencies.markSyncMeta).toHaveBeenCalledTimes(1);
+  });
+
+  test("rejects non-object patches before reading storage", async () => {
+    const getSetting = jest.fn();
+
+    await expect(
+      applyRuntimeSettingPatch({ patch: ["invalid"] }, undefined, {
+        getSetting,
+      })
+    ).rejects.toThrow("Runtime setting patch must be an object");
+    expect(getSetting).not.toHaveBeenCalled();
   });
 });
 

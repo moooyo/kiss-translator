@@ -229,6 +229,7 @@ describe("YouTubeSubtitleList", () => {
   });
 
   test("attaches lookup listeners to every row in a virtual range", async () => {
+    jest.useFakeTimers();
     apiMicrosoftDict.mockResolvedValue({ trs: [{ def: "definition" }] });
     const videoEl = createVideoElement();
     const manager = new YouTubeSubtitleList(videoEl, () => "", {
@@ -248,9 +249,13 @@ describe("YouTubeSubtitleList", () => {
     const words = document.querySelectorAll(
       ".kiss-youtube-original .kiss-subtitle-word:first-child"
     );
-    words.forEach((word) =>
-      word.dispatchEvent(new MouseEvent("click", { bubbles: true }))
-    );
+    for (const word of words) {
+      word.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+      jest.advanceTimersByTime(300);
+      await Promise.resolve();
+      word.dispatchEvent(new Event("pointerleave", { bubbles: true }));
+      jest.advanceTimersByTime(100);
+    }
 
     expect(apiMicrosoftDict.mock.calls.map(([word]) => word)).toEqual([
       "first",
@@ -260,11 +265,13 @@ describe("YouTubeSubtitleList", () => {
 
     manager.setBilingualSubtitles([], 100);
     manager._renderVirtualSubtitles(true);
-    words[0].dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    words[0].dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
 
     expect(apiMicrosoftDict).toHaveBeenCalledTimes(3);
     expect(words[0].hasAttribute("role")).toBe(false);
     manager.destroy();
+    jest.useRealTimers();
   });
 
   test("looks up hovered list words and records the subtitle start timestamp", async () => {

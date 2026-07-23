@@ -39,11 +39,6 @@ export const addWordHoverStyles = ({
       text-decoration: none;
     }
 
-    .kiss-subtitle-word:focus-visible {
-      outline: 2px solid ${baseColors.primary};
-      outline-offset: 2px;
-    }
-
     /* 查词气泡弹窗主体样式 */
     .kiss-word-tooltip {
       ${baseVariables}
@@ -61,7 +56,7 @@ export const addWordHoverStyles = ({
       font-family: "Google Sans Flex", "Noto Sans SC", system-ui, sans-serif;
     }
 
-    /* 气泡弹窗头部（包含单词名和关闭按钮） */
+    /* Tooltip header */
     .kiss-word-tooltip-header {
       display: flex;
       justify-content: space-between;
@@ -72,26 +67,25 @@ export const addWordHoverStyles = ({
       color: var(--kt-on);
     }
 
-    /* 关闭气泡弹窗的 X 按钮 */
     .kiss-word-tooltip-close {
-      background: none;
-      border: none;
-      color: var(--kt-onv);
-      cursor: pointer;
-      font-size: 18px;
-      padding: 0;
-      margin-left: 10px;
-      width: 24px;
-      height: 24px;
       display: flex;
       align-items: center;
       justify-content: center;
+      width: 24px;
+      height: 24px;
+      padding: 0;
+      margin-left: 10px;
+      border: none;
+      border-radius: 50%;
+      background: none;
+      color: var(--kt-onv);
+      font-size: 18px;
+      cursor: pointer;
     }
 
     .kiss-word-tooltip-close:hover {
-      color: var(--kt-on);
       background: var(--kt-sf2);
-      border-radius: 50%;
+      color: var(--kt-on);
     }
 
     /* 释义加载中状态文案 */
@@ -170,7 +164,6 @@ export class WordTooltipController {
     this.tooltipEl = null;
     this.hoverTimeout = null;
     this.activeWordEl = null;
-    this.isPinned = false;
     this.lookupRequestId = 0;
     this.spanListeners = new Map();
   }
@@ -190,39 +183,18 @@ export class WordTooltipController {
       const record = {
         getTimestamp,
         root,
-        originalAttributes: new Map(
-          ["role", "tabindex", "aria-pressed"].map((name) => [
-            name,
-            span.getAttribute(name),
-          ])
-        ),
       };
       const enterHandler = (event) =>
         this.#handleWordHover(event, record.getTimestamp);
       const leaveHandler = (event) => this.#handleWordHoverOut(event);
-      const clickHandler = (event) =>
-        this.#handleWordClick(event, record.getTimestamp, record.root);
-      const keydownHandler = (event) => this.#handleWordKeyDown(event, record);
       record.handlers = {
         enterHandler,
         leaveHandler,
-        clickHandler,
-        keydownHandler,
       };
 
-      span.setAttribute("role", "button");
-      span.setAttribute("aria-pressed", "false");
       span.addEventListener("pointerenter", enterHandler);
       span.addEventListener("pointerleave", leaveHandler);
-      span.addEventListener("click", clickHandler);
-      span.addEventListener("keydown", keydownHandler);
       this.spanListeners.set(span, record);
-    });
-
-    const tabStop =
-      spans.find((span) => span.getAttribute("tabindex") === "0") || spans[0];
-    spans.forEach((span) => {
-      span.tabIndex = span === tabStop ? 0 : -1;
     });
   }
 
@@ -250,87 +222,19 @@ export class WordTooltipController {
     this.hideWordTooltip();
   }
 
-  #handleWordClick(event, getTimestamp, root) {
-    const target = event.target;
-    if (!target.classList.contains("kiss-subtitle-word")) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-    if (this.hoverTimeout) {
-      clearTimeout(this.hoverTimeout);
-      this.hoverTimeout = null;
-    }
-
-    this.activeWordEl?.classList.remove("kiss-word-hover");
-    this.activeWordEl?.setAttribute("aria-pressed", "false");
-    this.#setRovingTabStop(root, target);
-    target.classList.add("kiss-word-hover");
-    target.setAttribute("aria-pressed", "true");
-    this.activeWordEl = target;
-    this.isPinned = true;
-    this.showWordTooltip(target.dataset.word, {
-      timestamp: getTimestamp?.() ?? 0,
-    });
-  }
-
-  #handleWordKeyDown(event, record) {
-    if (event.key === "Enter" || event.key === " ") {
-      this.#handleWordClick(event, record.getTimestamp, record.root);
-      return;
-    }
-
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-      return;
-    }
-
-    const spans = Array.from(
-      record.root.querySelectorAll(".kiss-subtitle-word")
-    );
-    const currentIndex = spans.indexOf(event.target);
-    if (currentIndex < 0 || spans.length === 0) return;
-
-    event.preventDefault();
-    let nextIndex;
-    if (event.key === "Home") nextIndex = 0;
-    else if (event.key === "End") nextIndex = spans.length - 1;
-    else if (event.key === "ArrowRight") {
-      nextIndex = (currentIndex + 1) % spans.length;
-    } else {
-      nextIndex = (currentIndex - 1 + spans.length) % spans.length;
-    }
-
-    this.#setRovingTabStop(record.root, spans[nextIndex]);
-    spans[nextIndex].focus();
-  }
-
-  #setRovingTabStop(root, activeSpan) {
-    if (!root) return;
-    root.querySelectorAll(".kiss-subtitle-word").forEach((span) => {
-      span.tabIndex = span === activeSpan ? 0 : -1;
-    });
-  }
-
   #detachSpanListeners(span, record) {
     if (span === this.activeWordEl) {
       this.clearHoverState();
     }
-    const { enterHandler, leaveHandler, clickHandler, keydownHandler } =
-      record.handlers;
+    const { enterHandler, leaveHandler } = record.handlers;
     span.removeEventListener("pointerenter", enterHandler);
     span.removeEventListener("pointerleave", leaveHandler);
-    span.removeEventListener("click", clickHandler);
-    span.removeEventListener("keydown", keydownHandler);
-    record.originalAttributes.forEach((value, name) => {
-      if (value === null) span.removeAttribute(name);
-      else span.setAttribute(name, value);
-    });
     this.spanListeners.delete(span);
   }
 
   #handleWordHover(event, getTimestamp) {
     const target = event.target;
     if (!target.classList.contains("kiss-subtitle-word")) return;
-    if (this.isPinned) return;
 
     if (this.hoverTimeout) {
       clearTimeout(this.hoverTimeout);
@@ -350,7 +254,6 @@ export class WordTooltipController {
   #handleWordHoverOut(event) {
     const target = event.target;
     if (!target.classList.contains("kiss-subtitle-word")) return;
-    if (this.isPinned) return;
 
     target.classList.remove("kiss-word-hover");
     if (this.activeWordEl === target) {
@@ -379,6 +282,11 @@ export class WordTooltipController {
     tooltipEl.innerHTML = trustedTypesHelper.createHTML(
       '<div class="kiss-word-loading">Looking up...</div>'
     );
+    tooltipEl.addEventListener("click", (event) => {
+      if (event.target.closest?.(".kiss-word-tooltip-close")) {
+        this.hideWordTooltip();
+      }
+    });
 
     const videoContainer = this.getVideoContainer?.();
     if (videoContainer) {
@@ -432,10 +340,9 @@ export class WordTooltipController {
         this.tooltipEl.innerHTML =
           trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
         <span>${word}</span>
-        <button type="button" class="kiss-word-tooltip-close" data-kiss-close aria-label="Close">×</button>
+        <button type="button" class="kiss-word-tooltip-close">×</button>
       </div>
       <div class="kiss-word-definition">Failed to load definition</div>`);
-        this.#bindTooltipCloseButton();
       }
     }
   }
@@ -447,19 +354,7 @@ export class WordTooltipController {
       this.tooltipEl = null;
     }
     this.activeWordEl?.classList.remove("kiss-word-hover");
-    this.activeWordEl?.setAttribute("aria-pressed", "false");
     this.activeWordEl = null;
-    this.isPinned = false;
-  }
-
-  #bindTooltipCloseButton() {
-    const closeButton = this.tooltipEl?.querySelector("[data-kiss-close]");
-    closeButton?.addEventListener("click", () => {
-      this.activeWordEl?.classList.remove("kiss-word-hover");
-      this.activeWordEl?.setAttribute("aria-pressed", "false");
-      this.activeWordEl = null;
-      this.hideWordTooltip();
-    });
   }
 
   #extractDictionaryData(dictResult) {
@@ -503,7 +398,7 @@ export class WordTooltipController {
     ) {
       let content = `<div class="kiss-word-tooltip-header">
           <span>${word}</span>
-          <button type="button" class="kiss-word-tooltip-close" data-kiss-close aria-label="Close">×</button>
+          <button type="button" class="kiss-word-tooltip-close">×</button>
         </div>`;
 
       if (dictResult.aus && dictResult.aus.length > 0) {
@@ -534,7 +429,6 @@ export class WordTooltipController {
 
       if (this.tooltipEl) {
         this.tooltipEl.innerHTML = trustedTypesHelper.createHTML(content);
-        this.#bindTooltipCloseButton();
       }
       return;
     }
@@ -543,10 +437,9 @@ export class WordTooltipController {
       this.tooltipEl.innerHTML =
         trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
           <span>${word}</span>
-          <button type="button" class="kiss-word-tooltip-close" data-kiss-close aria-label="Close">×</button>
+          <button type="button" class="kiss-word-tooltip-close">×</button>
         </div>
         <div class="kiss-word-definition">No definition found</div>`);
-      this.#bindTooltipCloseButton();
     }
   }
 }

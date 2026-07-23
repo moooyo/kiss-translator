@@ -366,13 +366,9 @@ export class BilingualSubtitleManager {
   ) {
     let isDragging = false;
     let hasDragged = false;
-    let startX;
     let startY;
     let initialBottom;
-    let initialLeft;
     let dragElementHeight;
-    let dragElementWidth;
-    let boundaryRect;
 
     const onDragStart = (e) => {
       // 限制仅允许鼠标左键拖拽
@@ -384,9 +380,7 @@ export class BilingualSubtitleManager {
       hasDragged = false;
       handleElement.style.cursor = "grabbing";
       // 兼容触屏端拖拽
-      const point = e.type === "touchstart" ? e.touches[0] : e;
-      startX = point.clientX;
-      startY = point.clientY;
+      startY = e.type === "touchstart" ? e.touches[0].clientY : e.clientY;
 
       // 记录开始拖动时，字幕框底部与包裹容器底部的绝对间距数值 (bottom)
       initialBottom =
@@ -394,10 +388,6 @@ export class BilingualSubtitleManager {
         dragElement.getBoundingClientRect().bottom;
 
       dragElementHeight = dragElement.offsetHeight;
-      dragElementWidth = dragElement.offsetWidth;
-      boundaryRect = boundaryContainer.getBoundingClientRect();
-      initialLeft =
-        dragElement.getBoundingClientRect().left - boundaryRect.left;
 
       // 全局捕获鼠标与触控事件，防止拖拽过快导致指针移出把手时拖拽中断
       document.addEventListener("mousemove", onDragMove, { capture: true });
@@ -414,30 +404,17 @@ export class BilingualSubtitleManager {
 
       e.preventDefault();
 
-      const point = e.type === "touchmove" ? e.touches[0] : e;
-      const currentX = point.clientX;
-      const currentY = point.clientY;
-      const deltaX = currentX - startX;
+      const currentY =
+        e.type === "touchmove" ? e.touches[0].clientY : e.clientY;
       const deltaY = currentY - startY; // 垂直位移差值
-      if (!hasDragged && Math.hypot(deltaX, deltaY) <= 3) return;
       let newBottom = initialBottom - deltaY;
 
       // 进行物理视口边界约束计算，防止将字幕框拉出视频范围之外
       const containerHeight = boundaryContainer.clientHeight;
-      newBottom = Math.max(10, newBottom);
-      newBottom = Math.min(containerHeight - dragElementHeight - 10, newBottom);
+      newBottom = Math.max(0, newBottom);
+      newBottom = Math.min(containerHeight - dragElementHeight, newBottom);
       if (dragElementHeight > containerHeight) {
         newBottom = Math.max(0, newBottom);
-      }
-
-      if (boundaryRect.width && dragElementWidth) {
-        const maxLeft = Math.max(
-          10,
-          boundaryRect.width - dragElementWidth - 10
-        );
-        const newLeft = Math.max(10, Math.min(maxLeft, initialLeft + deltaX));
-        dragElement.style.left = `${newLeft}px`;
-        dragElement.style.transform = "none";
       }
 
       hasDragged = true;
@@ -473,13 +450,6 @@ export class BilingualSubtitleManager {
     handleElement.addEventListener("mousedown", onDragStart);
     handleElement.addEventListener("touchstart", onDragStart, {
       passive: false,
-    });
-    handleElement.addEventListener("dblclick", () => {
-      dragElement.style.left = "50%";
-      dragElement.style.transform = "translateX(-50%)";
-      dragElement.style.bottom = `${boundaryContainer.clientHeight * 0.05}px`;
-      dragEndCallback?.();
-      this.#setting.onCaptionPositionReset?.();
     });
   }
 

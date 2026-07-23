@@ -1270,10 +1270,6 @@ export class YouTubeCaptionProvider {
         // 由渲染管理器按 timeupdate/seeked 上报播放窗口，provider 再决定是否触发后续 AI chunk。
         onSubtitleTimeWindow: ({ currentTimeMs, preTrans }) =>
           this.#scheduleAiChunks(currentTimeMs, preTrans),
-        onCaptionPositionReset: () =>
-          this.#playerUi.showNotification(
-            this.#i18n("subtitle_position_reset")
-          ),
       },
     });
 

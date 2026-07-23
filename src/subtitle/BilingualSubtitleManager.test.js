@@ -130,6 +130,10 @@ describe("BilingualSubtitleManager", () => {
     apiMicrosoftDict.mockReset();
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   test("renders original subtitle before translation by default", () => {
     const videoEl = createVideoElement();
     const manager = new BilingualSubtitleManager({
@@ -198,6 +202,7 @@ describe("BilingualSubtitleManager", () => {
   });
 
   test("enables and disables hover lookup without recreating the manager", async () => {
+    jest.useFakeTimers();
     apiMicrosoftDict.mockResolvedValue({
       trs: [{ pos: "n.", def: "a greeting" }],
     });
@@ -214,7 +219,8 @@ describe("BilingualSubtitleManager", () => {
 
     const word = document.querySelector(".kiss-subtitle-word");
     expect(word).not.toBeNull();
-    word.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    word.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
     await Promise.resolve();
     expect(apiMicrosoftDict).toHaveBeenCalledWith("hello");
     expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
@@ -294,24 +300,6 @@ describe("BilingualSubtitleManager", () => {
     expect(videoEl.play).not.toHaveBeenCalled();
   });
 
-  test("reports when the subtitle position is reset", () => {
-    const onCaptionPositionReset = jest.fn();
-    const videoEl = createVideoElement();
-    const manager = new BilingualSubtitleManager({
-      videoEl,
-      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
-      setting: { ...setting, onCaptionPositionReset },
-    });
-
-    manager.start();
-    document
-      .querySelector(".kiss-caption-window")
-      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-
-    expect(onCaptionPositionReset).toHaveBeenCalledTimes(1);
-    manager.destroy();
-  });
-
   test("renders hover lookup word spans when enabled", () => {
     const videoEl = createVideoElement();
     const manager = new BilingualSubtitleManager({
@@ -330,7 +318,8 @@ describe("BilingualSubtitleManager", () => {
     manager.destroy();
   });
 
-  test("opens subtitle word lookup immediately on click", async () => {
+  test("opens subtitle word lookup after the hover delay", async () => {
+    jest.useFakeTimers();
     apiMicrosoftDict.mockResolvedValue({
       trs: [{ pos: "n.", def: "a greeting" }],
     });
@@ -344,7 +333,9 @@ describe("BilingualSubtitleManager", () => {
     manager.start();
     document
       .querySelector(".kiss-subtitle-word")
-      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      .dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
+    jest.useRealTimers();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(apiMicrosoftDict).toHaveBeenCalledWith("hello");
@@ -355,6 +346,7 @@ describe("BilingualSubtitleManager", () => {
   });
 
   test("reconciles word listeners after replacing the caption rows", () => {
+    jest.useFakeTimers();
     apiMicrosoftDict.mockResolvedValue({ trs: [{ def: "definition" }] });
     const videoEl = createVideoElement();
     const manager = new BilingualSubtitleManager({
@@ -382,8 +374,9 @@ describe("BilingualSubtitleManager", () => {
     videoEl.dispatchEvent(new Event("timeupdate"));
     const currentWord = document.querySelector(".kiss-subtitle-word");
 
-    detachedWord.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    currentWord.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    detachedWord.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    currentWord.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
 
     expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
     expect(apiMicrosoftDict).toHaveBeenCalledWith("second");
@@ -689,6 +682,51 @@ describe("BilingualSubtitleManager", () => {
 
     expect(getCaptionBottom()).toBe(60);
 
+    manager.destroy();
+  });
+
+  test("keeps the caption horizontally centered while dragging vertically", () => {
+    const videoEl = createVideoElement({ playerHeight: 400 });
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting,
+    });
+
+    manager.start();
+    const paper = document.querySelector(".kiss-caption-paper");
+    const container = document.querySelector(".kiss-caption-container");
+    const handle = document.querySelector(".kiss-caption-window");
+
+    Object.defineProperty(container, "clientHeight", {
+      value: 400,
+      configurable: true,
+    });
+    Object.defineProperty(paper, "offsetHeight", {
+      value: 40,
+      configurable: true,
+    });
+    container.getBoundingClientRect = () => ({ bottom: 400 });
+    paper.getBoundingClientRect = () => ({ bottom: 380 });
+
+    handle.dispatchEvent(
+      new MouseEvent("mousedown", {
+        button: 0,
+        clientX: 100,
+        clientY: 100,
+      })
+    );
+    document.dispatchEvent(
+      new MouseEvent("mousemove", { clientX: 180, clientY: 130 })
+    );
+
+    expect(paper.style.left).toBe("50%");
+    expect(paper.style.transform).toBe("translateX(-50%)");
+    expect(getCaptionBottom()).toBe(0);
+
+    document.dispatchEvent(
+      new MouseEvent("mouseup", { clientX: 180, clientY: 130 })
+    );
     manager.destroy();
   });
 

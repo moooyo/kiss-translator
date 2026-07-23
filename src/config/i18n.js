@@ -4176,14 +4176,6 @@ export const I18N = {
     ko: `모든 자막 설정`,
     tr: `Tüm altyazı ayarları`,
   },
-  subtitle_position_reset: {
-    zh: `字幕位置已复位`,
-    en: `Subtitle position reset`,
-    zh_TW: `字幕位置已重設`,
-    ja: `字幕位置をリセットしました`,
-    ko: `자막 위치가 초기화되었습니다`,
-    tr: `Altyazı konumu sıfırlandı`,
-  },
   swap_languages: {
     zh: `互换语言`,
     en: `Swap languages`,

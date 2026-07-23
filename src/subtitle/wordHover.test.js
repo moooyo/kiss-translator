@@ -4,7 +4,7 @@ import { addWordHoverStyles, WordTooltipController } from "./wordHover";
 jest.mock("../apis", () => ({ apiMicrosoftDict: jest.fn() }));
 jest.mock("../libs/log", () => ({ logger: { info: jest.fn() } }));
 
-describe("WordTooltipController pinned state", () => {
+describe("WordTooltipController hover behavior", () => {
   beforeEach(() => {
     document.body.innerHTML = `
       <div id="captions">
@@ -17,120 +17,80 @@ describe("WordTooltipController pinned state", () => {
     apiMicrosoftDict.mockImplementation(() => new Promise(() => {}));
   });
 
-  test("ignores hover changes while a clicked word is pinned", () => {
-    jest.useFakeTimers();
-    const controller = new WordTooltipController({});
-    const root = document.getElementById("captions");
-    const [first, second] = root.querySelectorAll(".kiss-subtitle-word");
-    controller.attachSpanListeners(root);
-
-    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    second.dispatchEvent(new Event("pointerenter", { bubbles: true }));
-    second.dispatchEvent(new Event("pointerleave", { bubbles: true }));
-    jest.advanceTimersByTime(150);
-
-    expect(controller.activeWordEl).toBe(first);
-    expect(controller.isPinned).toBe(true);
-    expect(controller.tooltipEl).not.toBeNull();
-    expect(first.classList.contains("kiss-word-hover")).toBe(true);
-    expect(second.classList.contains("kiss-word-hover")).toBe(false);
-
-    controller.destroy();
+  afterEach(() => {
     jest.useRealTimers();
   });
 
-  test("adds button semantics and provides roving keyboard focus", () => {
-    const controller = new WordTooltipController({});
-    const root = document.getElementById("captions");
-    const [first, second] = root.querySelectorAll(".kiss-subtitle-word");
-    first.setAttribute("aria-label", "Existing accessible name");
-    controller.attachSpanListeners(root);
-
-    expect(first.getAttribute("role")).toBe("button");
-    expect(first.getAttribute("aria-label")).toBe("Existing accessible name");
-    expect(first.getAttribute("aria-pressed")).toBe("false");
-    expect(first.getAttribute("tabindex")).toBe("0");
-    expect(second.getAttribute("tabindex")).toBe("-1");
-
-    first.focus();
-    first.dispatchEvent(
-      new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })
-    );
-
-    expect(document.activeElement).toBe(second);
-    expect(first.getAttribute("tabindex")).toBe("-1");
-    expect(second.getAttribute("tabindex")).toBe("0");
-    controller.destroy();
-    expect(first.getAttribute("aria-label")).toBe("Existing accessible name");
-  });
-
-  test.each(["Enter", " "])("pins a word with the %p key", (key) => {
+  test("looks up a word after hovering and hides the tooltip after leaving", () => {
+    jest.useFakeTimers();
     const getTimestamp = jest.fn(() => 42);
     const controller = new WordTooltipController({});
     const root = document.getElementById("captions");
     const first = root.querySelector(".kiss-subtitle-word");
     controller.attachSpanListeners(root, getTimestamp);
-    const event = new KeyboardEvent("keydown", {
-      key,
-      bubbles: true,
-      cancelable: true,
-    });
 
-    first.dispatchEvent(event);
+    first.dispatchEvent(new Event("pointerenter", { bubbles: true }));
 
-    expect(event.defaultPrevented).toBe(true);
-    expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
+    expect(first.classList.contains("kiss-word-hover")).toBe(true);
+    expect(controller.activeWordEl).toBe(first);
+    jest.advanceTimersByTime(299);
+    expect(apiMicrosoftDict).not.toHaveBeenCalled();
+
+    jest.advanceTimersByTime(1);
     expect(apiMicrosoftDict).toHaveBeenCalledWith("first");
     expect(getTimestamp).toHaveBeenCalledTimes(1);
-    expect(first.getAttribute("aria-pressed")).toBe("true");
-    expect(controller.activeWordEl).toBe(first);
-    expect(controller.isPinned).toBe(true);
+    expect(controller.tooltipEl).not.toBeNull();
+
+    first.dispatchEvent(new Event("pointerleave", { bubbles: true }));
+    expect(first.classList.contains("kiss-word-hover")).toBe(false);
+    expect(controller.activeWordEl).toBeNull();
+
+    jest.advanceTimersByTime(100);
+    expect(controller.tooltipEl).toBeNull();
     controller.destroy();
   });
 
   test("does not duplicate listeners and removes them on destroy", () => {
+    jest.useFakeTimers();
     const controller = new WordTooltipController({});
     const root = document.getElementById("captions");
     const first = root.querySelector(".kiss-subtitle-word");
     controller.attachSpanListeners(root);
     controller.attachSpanListeners(root);
 
-    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    first.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
     expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
 
     controller.destroy();
-    expect(first.hasAttribute("role")).toBe(false);
-    expect(first.hasAttribute("tabindex")).toBe(false);
-    expect(first.hasAttribute("aria-pressed")).toBe(false);
-
-    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    first.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
     expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
   });
 
   test("keeps listeners for detached batches until pruning is requested", () => {
+    jest.useFakeTimers();
     const controller = new WordTooltipController({});
-    const firstRoot = document.createElement("div");
-    const secondRoot = document.createElement("div");
-    firstRoot.innerHTML =
+    const detachedRoot = document.createElement("div");
+    const connectedRoot = document.createElement("div");
+    detachedRoot.innerHTML =
       '<span class="kiss-subtitle-word" data-word="first">first</span>';
-    secondRoot.innerHTML =
+    connectedRoot.innerHTML =
       '<span class="kiss-subtitle-word" data-word="second">second</span>';
-    const first = firstRoot.firstElementChild;
-    const second = secondRoot.firstElementChild;
+    const first = detachedRoot.firstElementChild;
+    const second = connectedRoot.firstElementChild;
+    document.body.appendChild(connectedRoot);
 
-    controller.attachSpanListeners(firstRoot);
-    controller.attachSpanListeners(secondRoot);
-    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-
-    expect(apiMicrosoftDict).toHaveBeenCalledTimes(2);
-
-    document.body.appendChild(secondRoot);
+    controller.attachSpanListeners(detachedRoot);
+    controller.attachSpanListeners(connectedRoot);
     controller.pruneDetachedSpanListeners();
-    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-    expect(apiMicrosoftDict).toHaveBeenCalledTimes(3);
+    first.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    second.dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
+
+    expect(apiMicrosoftDict).toHaveBeenCalledTimes(1);
+    expect(apiMicrosoftDict).toHaveBeenCalledWith("second");
     controller.destroy();
   });
 
@@ -152,7 +112,6 @@ describe("WordTooltipController pinned state", () => {
     expect(controller.tooltipEl).toBeNull();
     expect(apiMicrosoftDict).not.toHaveBeenCalled();
     controller.destroy();
-    jest.useRealTimers();
   });
 
   test("ignores a stale dictionary response after another lookup starts", async () => {
@@ -164,23 +123,44 @@ describe("WordTooltipController pinned state", () => {
         })
     );
     const controller = new WordTooltipController({});
-    const root = document.getElementById("captions");
-    const [first, second] = root.querySelectorAll(".kiss-subtitle-word");
-    controller.attachSpanListeners(root);
 
-    first.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-    second.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    const firstLookup = controller.showWordTooltip("first");
+    const secondLookup = controller.showWordTooltip("second");
     pending[0]({ trs: [{ def: "first definition" }] });
-    await Promise.resolve();
+    await firstLookup;
 
     expect(controller.tooltipEl.textContent).toBe("Looking up...");
 
     pending[1]({ trs: [{ def: "second definition" }] });
-    await Promise.resolve();
+    await secondLookup;
 
     expect(controller.tooltipEl.textContent).toContain("second");
     expect(controller.tooltipEl.textContent).toContain("second definition");
     expect(controller.tooltipEl.textContent).not.toContain("first definition");
+    controller.destroy();
+  });
+
+  test.each([
+    ["a dictionary result", { trs: [{ def: "definition" }] }],
+    ["an empty dictionary result", {}],
+    ["a failed dictionary request", new Error("lookup failed")],
+  ])("closes the tooltip after %s", async (_case, result) => {
+    if (result instanceof Error) {
+      apiMicrosoftDict.mockRejectedValue(result);
+    } else {
+      apiMicrosoftDict.mockResolvedValue(result);
+    }
+    const controller = new WordTooltipController({});
+
+    await controller.showWordTooltip("first");
+    const tooltip = controller.tooltipEl;
+    const closeButton = tooltip.querySelector(".kiss-word-tooltip-close");
+
+    expect(closeButton).not.toBeNull();
+    expect(closeButton.hasAttribute("onclick")).toBe(false);
+    closeButton.click();
+    expect(controller.tooltipEl).toBeNull();
+    expect(tooltip.isConnected).toBe(false);
     controller.destroy();
   });
 
@@ -190,6 +170,7 @@ describe("WordTooltipController pinned state", () => {
 
     expect(css).toContain("--kt-pri: #D0BCFF;");
     expect(css).toContain("--kt-bg: #131314;");
+    expect(css).toContain(".kiss-word-tooltip-close");
     expect(css).not.toContain("@media (prefers-color-scheme: dark)");
   });
 });

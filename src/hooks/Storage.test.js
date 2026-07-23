@@ -12,6 +12,7 @@ jest.mock("../libs/storage", () => ({
     getObj: jest.fn(),
     setObj: jest.fn(() => Promise.resolve()),
     del: jest.fn(() => Promise.resolve()),
+    subscribeObj: jest.fn(),
   },
 }));
 
@@ -35,17 +36,18 @@ jest.mock("../libs/log", () => ({
   kissLog: jest.fn(),
 }));
 
-function createHookHost() {
+function createHookHost({
+  key = "local-setting",
+  defaultVal = { local: true },
+  syncKey = "kiss-setting_v2.json",
+} = {}) {
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
   const hookResult = {};
 
   function TestComponent() {
-    Object.assign(
-      hookResult,
-      useStorage("local-setting", { local: true }, "kiss-setting_v2.json")
-    );
+    Object.assign(hookResult, useStorage(key, defaultVal, syncKey));
     return null;
   }
 
@@ -80,6 +82,8 @@ async function waitForLoaded(hookResult) {
 }
 
 describe("useStorage remote sync", () => {
+  let storageListeners;
+
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
@@ -87,6 +91,11 @@ describe("useStorage remote sync", () => {
     storage.getObj.mockResolvedValue({ local: true });
     storage.setObj.mockResolvedValue(undefined);
     storage.del.mockResolvedValue(undefined);
+    storageListeners = new Set();
+    storage.subscribeObj.mockImplementation((_key, listener) => {
+      storageListeners.add(listener);
+      return () => storageListeners.delete(listener);
+    });
     syncData.mockResolvedValue(undefined);
     isOptions.mockReturnValue(true);
   });
@@ -169,6 +178,91 @@ describe("useStorage remote sync", () => {
     await flushEffects();
 
     expect(storage.setObj).not.toHaveBeenCalled();
+
+    host.unmount();
+  });
+
+  test("applies external storage changes without writing them back", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    act(() => {
+      storageListeners.forEach((listener) => listener({ remote: true }));
+    });
+    await flushEffects();
+
+    expect(host.hookResult.data).toEqual({ remote: true });
+    expect(storage.setObj).not.toHaveBeenCalledWith("local-setting", {
+      remote: true,
+    });
+    expect(syncData).not.toHaveBeenCalled();
+
+    host.unmount();
+  });
+
+  test("does not let a late initial read overwrite a newer event", async () => {
+    let resolveInitialRead;
+    storage.getObj.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveInitialRead = resolve;
+        })
+    );
+    const host = createHookHost();
+    host.render();
+    await flushEffects();
+
+    act(() => {
+      storageListeners.forEach((listener) => listener({ remote: "new" }));
+    });
+    await act(async () => {
+      resolveInitialRead({ local: "stale" });
+      await Promise.resolve();
+    });
+    await waitForLoaded(host.hookResult);
+
+    expect(host.hookResult.data).toEqual({ remote: "new" });
+    host.unmount();
+  });
+
+  test("does not retain an external marker after a batched local overwrite", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    act(() => {
+      storageListeners.forEach((listener) => listener({ source: "remote" }));
+      host.hookResult.save({ source: "local" });
+    });
+    await flushEffects();
+
+    expect(storage.setObj).toHaveBeenCalledWith("local-setting", {
+      source: "local",
+    });
+    expect(syncData).toHaveBeenCalledWith("kiss-setting_v2.json", {
+      source: "local",
+    });
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    await act(async () => {
+      host.hookResult.save({ source: "remote" });
+    });
+    await flushEffects();
+
+    expect(storage.setObj).toHaveBeenCalledWith("local-setting", {
+      source: "remote",
+    });
+    expect(syncData).toHaveBeenCalledWith("kiss-setting_v2.json", {
+      source: "remote",
+    });
 
     host.unmount();
   });

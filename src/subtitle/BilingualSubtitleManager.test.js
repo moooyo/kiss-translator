@@ -63,6 +63,21 @@ function createVideoElement({ playerHeight = 400 } = {}) {
   return video;
 }
 
+function mockVideoPlayback(videoEl, { paused }) {
+  let isPaused = paused;
+  Object.defineProperty(videoEl, "paused", {
+    configurable: true,
+    get: () => isPaused,
+  });
+  videoEl.pause = jest.fn(() => {
+    isPaused = true;
+  });
+  videoEl.play = jest.fn(() => {
+    isPaused = false;
+    return Promise.resolve();
+  });
+}
+
 const subtitle = {
   start: 0,
   end: 1000,
@@ -208,6 +223,75 @@ describe("BilingualSubtitleManager", () => {
     expect(document.querySelector(".kiss-subtitle-word")).toBeNull();
     expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
     manager.destroy();
+  });
+
+  test("applies hover playback changes without recreating the caption window", () => {
+    const videoEl = createVideoElement();
+    mockVideoPlayback(videoEl, { paused: false });
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "translated hello" }],
+      setting,
+    });
+
+    manager.start();
+    const captionWindow = document.querySelector(".kiss-caption-window");
+    captionWindow.dispatchEvent(new Event("pointerenter"));
+    expect(videoEl.pause).not.toHaveBeenCalled();
+
+    manager.updateSetting({ hoverLookupMode: "on" });
+    captionWindow.dispatchEvent(new Event("pointerenter"));
+    expect(videoEl.pause).toHaveBeenCalledTimes(1);
+    captionWindow.dispatchEvent(new Event("pointerleave"));
+    expect(videoEl.play).toHaveBeenCalledTimes(1);
+
+    captionWindow.dispatchEvent(new Event("pointerenter"));
+    expect(videoEl.pause).toHaveBeenCalledTimes(2);
+    manager.updateSetting({ hoverLookupMode: "off" });
+    expect(videoEl.play).toHaveBeenCalledTimes(2);
+    captionWindow.dispatchEvent(new Event("pointerenter"));
+    expect(videoEl.pause).toHaveBeenCalledTimes(2);
+    expect(document.querySelector(".kiss-caption-window")).toBe(captionWindow);
+    manager.destroy();
+  });
+
+  test("resumes video on destroy when hover lookup paused it", () => {
+    const videoEl = createVideoElement();
+    mockVideoPlayback(videoEl, { paused: false });
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "translated hello" }],
+      setting: { ...setting, hoverLookupMode: "on" },
+    });
+
+    manager.start();
+    document
+      .querySelector(".kiss-caption-window")
+      .dispatchEvent(new Event("pointerenter"));
+    expect(videoEl.pause).toHaveBeenCalledTimes(1);
+
+    manager.destroy();
+    expect(videoEl.play).toHaveBeenCalledTimes(1);
+  });
+
+  test("does not play a video that was already paused before hover", () => {
+    const videoEl = createVideoElement();
+    mockVideoPlayback(videoEl, { paused: true });
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "translated hello" }],
+      setting: { ...setting, hoverLookupMode: "on" },
+    });
+
+    manager.start();
+    document
+      .querySelector(".kiss-caption-window")
+      .dispatchEvent(new Event("pointerenter"));
+    manager.updateSetting({ hoverLookupMode: "off" });
+    manager.destroy();
+
+    expect(videoEl.pause).not.toHaveBeenCalled();
+    expect(videoEl.play).not.toHaveBeenCalled();
   });
 
   test("reports when the subtitle position is reset", () => {

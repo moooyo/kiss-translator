@@ -5,7 +5,12 @@ import {
   OPT_TRANS_OPENAI,
   SUBTITLE_BACKGROUND_STYLES,
 } from "../config";
-import { MENU_STYLES, Menus, resolveSubtitleBackgroundMode } from "./Menus";
+import {
+  MENU_STYLES,
+  Menus,
+  patchSubtitleBackgroundStyle,
+  resolveSubtitleBackgroundMode,
+} from "./Menus";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,6 +36,39 @@ describe("subtitle control alignment", () => {
     expect(resolveSubtitleBackgroundMode(SUBTITLE_BACKGROUND_STYLES.none)).toBe(
       "none"
     );
+  });
+
+  test("patches only background properties when selecting a preset", () => {
+    const source = [
+      "/* keep the layout and custom tokens */",
+      "--caption-padding: 12px;",
+      "--caption-line-height: 1.6;",
+      "padding: var(--caption-padding) 20px;",
+      "line-height: var(--caption-line-height);",
+      "background: var(--caption-background);",
+      "background-color: #123456 /* keep the color note */;",
+      "background-image: url(custom.png);",
+      "backdrop-filter: saturate(1.2);",
+      "border-radius: 24px;",
+    ].join("\n");
+
+    const patched = patchSubtitleBackgroundStyle(
+      source,
+      SUBTITLE_BACKGROUND_STYLES.gradient
+    );
+
+    expect(patched).toContain("/* keep the layout and custom tokens */");
+    expect(patched).toContain("--caption-padding: 12px;");
+    expect(patched).toContain("padding: var(--caption-padding) 20px;");
+    expect(patched).toContain("line-height: var(--caption-line-height);");
+    expect(patched).toContain("border-radius: 24px;");
+    expect(patched).toContain("/* keep the color note */");
+    expect(patched).not.toContain("background: var(--caption-background)");
+    expect(patched).toContain("background-color: rgba(10, 12, 16, 0.62)");
+    expect(patched).toContain(
+      "background-image: linear-gradient(180deg, rgba(10, 12, 16, 0.08), rgba(10, 12, 16, 0.78))"
+    );
+    expect(patched).toContain("backdrop-filter: none");
   });
 });
 

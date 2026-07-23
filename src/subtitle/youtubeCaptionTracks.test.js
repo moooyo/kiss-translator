@@ -1,6 +1,8 @@
 import {
   buildTrackKey,
   findCaptionTrack,
+  findDefaultCaptionTrack,
+  getCaptionTracks,
   getSubtitleEvents,
   isChatCaptionTrack,
   isSameLang,
@@ -62,6 +64,68 @@ describe("youtubeCaptionTracks", () => {
       languageCode: "de",
     });
     expect(tracks).toHaveLength(0);
+  });
+
+  test("selects the second caption track from reliable audio metadata", () => {
+    const captionTracks = [{ languageCode: "en" }, { languageCode: "fr" }];
+
+    expect(
+      findDefaultCaptionTrack({
+        captionTracks,
+        audioTracks: [
+          {
+            defaultCaptionTrackIndex: 1,
+            hasDefaultTrack: true,
+          },
+        ],
+      })
+    ).toBe(captionTracks[1]);
+  });
+
+  test("does not guess a default when multiple caption tracks are ambiguous", () => {
+    expect(
+      findDefaultCaptionTrack({
+        captionTracks: [{ languageCode: "en" }, { languageCode: "fr" }],
+      })
+    ).toBeNull();
+  });
+
+  test("uses the only caption track when no default metadata is available", () => {
+    const onlyTrack = { languageCode: "en" };
+
+    expect(findDefaultCaptionTrack({ captionTracks: [onlyTrack] })).toBe(
+      onlyTrack
+    );
+  });
+
+  test("returns default-track metadata from the player response", async () => {
+    const originalFetch = global.fetch;
+    const tracklistRenderer = {
+      captionTracks: [{ languageCode: "en" }, { languageCode: "fr" }],
+      audioTracks: [{ defaultCaptionTrackIndex: 1, hasDefaultTrack: true }],
+      defaultAudioTrackIndex: 0,
+    };
+    const playerResponse = {
+      captions: { playerCaptionsTracklistRenderer: tracklistRenderer },
+      videoDetails: { shortDescription: "Description" },
+    };
+    global.fetch = jest.fn().mockResolvedValue({
+      text: jest
+        .fn()
+        .mockResolvedValue(
+          `ytInitialPlayerResponse = ${JSON.stringify(playerResponse)};`
+        ),
+    });
+
+    try {
+      await expect(getCaptionTracks("video-1")).resolves.toEqual({
+        ...tracklistRenderer,
+        defaultCaptionTrackIndex: undefined,
+        fullDescription: "Description",
+      });
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 
   test("fetches the selected track when no intercepted response is available", async () => {

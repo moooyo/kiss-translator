@@ -47,6 +47,70 @@ export function buildTrackKey(potUrl) {
 }
 
 /**
+ * Selects a caption track only when YouTube exposes unambiguous default-track
+ * metadata. A single available caption track is also safe to recover.
+ *
+ * @param {object} trackData Parsed player caption metadata.
+ * @param {Array<object>} trackData.captionTracks Available caption tracks.
+ * @param {Array<object>} [trackData.audioTracks] Available audio-track metadata.
+ * @param {number} [trackData.defaultAudioTrackIndex] Default audio-track index.
+ * @param {number} [trackData.defaultCaptionTrackIndex] Direct default caption index.
+ * @returns {object|null} The reliable default track, or null when ambiguous.
+ */
+export function findDefaultCaptionTrack({
+  captionTracks,
+  audioTracks,
+  defaultAudioTrackIndex,
+  defaultCaptionTrackIndex,
+} = {}) {
+  if (!Array.isArray(captionTracks) || captionTracks.length === 0) {
+    return null;
+  }
+
+  const isValidCaptionIndex = (index) =>
+    Number.isInteger(index) && index >= 0 && index < captionTracks.length;
+
+  if (isValidCaptionIndex(defaultCaptionTrackIndex)) {
+    return captionTracks[defaultCaptionTrackIndex];
+  }
+
+  const availableAudioTracks = Array.isArray(audioTracks) ? audioTracks : [];
+  let selectedAudioTrack = null;
+  if (
+    Number.isInteger(defaultAudioTrackIndex) &&
+    defaultAudioTrackIndex >= 0 &&
+    defaultAudioTrackIndex < availableAudioTracks.length
+  ) {
+    selectedAudioTrack = availableAudioTracks[defaultAudioTrackIndex];
+  } else {
+    const defaultAudioTracks = availableAudioTracks.filter(
+      (audioTrack) => audioTrack?.hasDefaultTrack === true
+    );
+    if (defaultAudioTracks.length === 1) {
+      selectedAudioTrack = defaultAudioTracks[0];
+    } else if (availableAudioTracks.length === 1) {
+      selectedAudioTrack = availableAudioTracks[0];
+    }
+  }
+
+  if (isValidCaptionIndex(selectedAudioTrack?.defaultCaptionTrackIndex)) {
+    return captionTracks[selectedAudioTrack.defaultCaptionTrackIndex];
+  }
+
+  const audioDefaultIndices = new Set(
+    availableAudioTracks
+      .map((audioTrack) => audioTrack?.defaultCaptionTrackIndex)
+      .filter(isValidCaptionIndex)
+  );
+  if (audioDefaultIndices.size === 1) {
+    const [sharedDefaultIndex] = audioDefaultIndices;
+    return captionTracks[sharedDefaultIndex];
+  }
+
+  return captionTracks.length === 1 ? captionTracks[0] : null;
+}
+
+/**
  * 寻找与当前拦截请求最匹配的 YouTube 字幕轨。
  *
  * @param {Array<object>} captionTracks YouTube 页面提供的字幕轨配置列表。
@@ -129,7 +193,7 @@ export function findCaptionTrack(captionTracks, lang, kind) {
  * @param {string} videoId 当前视频 ID。
  * @param {object} [options] Optional request controls.
  * @param {AbortSignal} [options.signal] Signal used to cancel stale requests.
- * @returns {Promise<{captionTracks?: Array<object>, fullDescription?: string}>} 字幕轨配置与视频描述。
+ * @returns {Promise<{captionTracks?: Array<object>, audioTracks?: Array<object>, defaultAudioTrackIndex?: number, defaultCaptionTrackIndex?: number, fullDescription?: string}>} Parsed caption metadata and video description.
  */
 export async function getCaptionTracks(videoId, { signal } = {}) {
   try {
@@ -141,9 +205,13 @@ export async function getCaptionTracks(videoId, { signal } = {}) {
     const match = html.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/s);
     if (!match) return {};
     const data = JSON.parse(match[1]);
+    const tracklistRenderer =
+      data.captions?.playerCaptionsTracklistRenderer || {};
     return {
-      captionTracks:
-        data.captions?.playerCaptionsTracklistRenderer?.captionTracks,
+      captionTracks: tracklistRenderer.captionTracks,
+      audioTracks: tracklistRenderer.audioTracks,
+      defaultAudioTrackIndex: tracklistRenderer.defaultAudioTrackIndex,
+      defaultCaptionTrackIndex: tracklistRenderer.defaultCaptionTrackIndex,
       fullDescription: data.videoDetails?.shortDescription || "",
     };
   } catch (err) {

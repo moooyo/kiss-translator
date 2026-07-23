@@ -289,17 +289,53 @@ export function objectToCss(cssObject) {
 }
 
 export function parseRgba(value) {
-  const match = value?.match(
-    /rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*(?:,\s*([\d.]+))?\s*\)/
+  const match = String(value || "").match(
+    /^\s*rgba?\s*\(\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*,\s*(\d+(?:\.\d+)?)\s*(?:,\s*((?:\d+(?:\.\d+)?)|(?:\.\d+)))?\s*\)\s*$/i
   );
-  return match
-    ? {
-        r: Number.parseInt(match[1], 10),
-        g: Number.parseInt(match[2], 10),
-        b: Number.parseInt(match[3], 10),
-        a: match[4] === undefined ? 1 : Number.parseFloat(match[4]),
-      }
+  if (!match) return null;
+
+  const color = {
+    r: Number.parseFloat(match[1]),
+    g: Number.parseFloat(match[2]),
+    b: Number.parseFloat(match[3]),
+    a: match[4] === undefined ? 1 : Number.parseFloat(match[4]),
+  };
+  return color.r <= 255 && color.g <= 255 && color.b <= 255 && color.a <= 1
+    ? color
     : null;
+}
+
+export function parseCssColor(value) {
+  const normalized = String(value || "")
+    .trim()
+    .toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "transparent") return { r: 0, g: 0, b: 0, a: 0 };
+
+  const hexMatch = normalized.match(
+    /^#([a-f\d]{3}|[a-f\d]{4}|[a-f\d]{6}|[a-f\d]{8})$/i
+  );
+  if (hexMatch) {
+    const compact = hexMatch[1];
+    const expanded =
+      compact.length <= 4
+        ? compact
+            .split("")
+            .map((character) => character.repeat(2))
+            .join("")
+        : compact;
+    return {
+      r: Number.parseInt(expanded.slice(0, 2), 16),
+      g: Number.parseInt(expanded.slice(2, 4), 16),
+      b: Number.parseInt(expanded.slice(4, 6), 16),
+      a:
+        expanded.length === 8
+          ? Number.parseInt(expanded.slice(6, 8), 16) / 255
+          : 1,
+    };
+  }
+
+  return parseRgba(normalized);
 }
 
 export function resolveBackgroundRgba(
@@ -313,8 +349,22 @@ export function resolveBackgroundRgba(
       ? legacyBackground
       : "";
   return (
-    parseRgba(explicitColor || legacyColor || fallback) || parseRgba(fallback)
+    parseCssColor(explicitColor || legacyColor || fallback) ||
+    parseCssColor(fallback)
   );
+}
+
+export function resolveEditableBackgroundRgba(
+  cssObject,
+  fallback = "rgba(0, 0, 0, 0.5)"
+) {
+  if (cssObject["background-color"] !== undefined) {
+    return parseCssColor(cssObject["background-color"]);
+  }
+  if (cssObject.background !== undefined) {
+    return parseCssColor(cssObject.background);
+  }
+  return parseCssColor(fallback);
 }
 
 export function rgbToHex(r, g, b) {
@@ -333,20 +383,30 @@ export function rgbToHex(r, g, b) {
 }
 
 export function hexToRgb(hex) {
-  const match = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  return match
-    ? {
-        r: Number.parseInt(match[1], 16),
-        g: Number.parseInt(match[2], 16),
-        b: Number.parseInt(match[3], 16),
-      }
-    : { r: 0, g: 0, b: 0 };
+  const color = parseCssColor(hex);
+  return color ? { r: color.r, g: color.g, b: color.b } : { r: 0, g: 0, b: 0 };
 }
 
 export function parseFontSize(fontSize) {
-  if (!fontSize) return { min: 1, preferred: 2, max: 3, unit: "rem" };
-  const clampMatch = fontSize.match(
-    /clamp\s*\(\s*([\d.]+)(\w+)\s*,\s*([\d.]+)(\w+)\s*,\s*([\d.]+)(\w+)\s*\)/
+  const fallback = {
+    min: 1,
+    preferred: 2,
+    max: 3,
+    unit: "rem",
+    minUnit: "rem",
+    preferredUnit: "rem",
+    maxUnit: "rem",
+    kind: "simple",
+    isEditable: true,
+  };
+  if (!fontSize) return fallback;
+
+  const lengthPattern = "((?:\\d+(?:\\.\\d+)?)|(?:\\.\\d+))([a-z]+|%)";
+  const clampMatch = String(fontSize).match(
+    new RegExp(
+      `^\\s*clamp\\s*\\(\\s*${lengthPattern}\\s*,\\s*${lengthPattern}\\s*,\\s*${lengthPattern}\\s*\\)\\s*$`,
+      "i"
+    )
   );
   if (clampMatch) {
     return {
@@ -354,52 +414,120 @@ export function parseFontSize(fontSize) {
       preferred: Number.parseFloat(clampMatch[3]),
       max: Number.parseFloat(clampMatch[5]),
       unit: clampMatch[2],
+      minUnit: clampMatch[2],
+      preferredUnit: clampMatch[4],
+      maxUnit: clampMatch[6],
+      kind: "clamp",
+      isEditable: true,
     };
   }
-  const simpleMatch = fontSize.match(/([\d.]+)(\w+)/);
-  if (!simpleMatch) return { min: 1, preferred: 2, max: 3, unit: "rem" };
+
+  const simpleMatch = String(fontSize).match(
+    /^\s*((?:\d+(?:\.\d+)?)|(?:\.\d+))([a-z]+|%)\s*$/i
+  );
+  if (!simpleMatch) return { ...fallback, isEditable: false };
   const value = Number.parseFloat(simpleMatch[1]);
   return {
     min: value * 0.5,
     preferred: value,
     max: value * 1.5,
     unit: simpleMatch[2],
+    minUnit: simpleMatch[2],
+    preferredUnit: simpleMatch[2],
+    maxUnit: simpleMatch[2],
+    kind: "simple",
+    isEditable: true,
   };
+}
+
+export function serializeFontSize(fontSize, preferred) {
+  if (!fontSize?.isEditable) return null;
+  if (fontSize.kind === "clamp") {
+    return `clamp(${fontSize.min}${fontSize.minUnit}, ${preferred}${fontSize.preferredUnit}, ${fontSize.max}${fontSize.maxUnit})`;
+  }
+  return `${preferred}${fontSize.preferredUnit}`;
+}
+
+export function getCssLengthSliderRange(value, unit) {
+  const normalizedUnit = String(unit || "").toLowerCase();
+  const presets = {
+    px: { max: 64, step: 1 },
+    em: { max: 5, step: 0.1 },
+    rem: { max: 5, step: 0.1 },
+    "%": { max: 100, step: 1 },
+    cqw: { max: 10, step: 0.1 },
+    cqh: { max: 10, step: 0.1 },
+    cqi: { max: 10, step: 0.1 },
+    cqb: { max: 10, step: 0.1 },
+    vw: { max: 10, step: 0.1 },
+    vh: { max: 10, step: 0.1 },
+    vmin: { max: 10, step: 0.1 },
+    vmax: { max: 10, step: 0.1 },
+  };
+  const preset = presets[normalizedUnit] || { max: 10, step: 0.1 };
+  const numericValue = Math.max(0, Number(value) || 0);
+  const requiredMax = Math.ceil((numericValue * 2) / preset.step) * preset.step;
+  return {
+    min: 0,
+    max: Math.max(preset.max, requiredMax),
+    step: preset.step,
+  };
+}
+
+export function parseLineHeight(lineHeight) {
+  const fallback = { value: 1.3, isEditable: true };
+  if (!lineHeight) return fallback;
+
+  const match = String(lineHeight).match(
+    /^\s*((?:\d+(?:\.\d+)?)|(?:\.\d+))\s*$/
+  );
+  return match
+    ? { value: Number.parseFloat(match[1]), isEditable: true }
+    : { ...fallback, isEditable: false };
 }
 
 export function parsePadding(padding) {
-  if (!padding) return { vertical: 0.5, horizontal: 1, unit: "em" };
-  const parts = padding.trim().split(/\s+/);
-  const verticalMatch = parts[0]?.match(/([\d.]+)(\w+)/);
-  const horizontalMatch = (parts[1] || parts[0])?.match(/([\d.]+)(\w+)/);
-  return verticalMatch && horizontalMatch
-    ? {
-        vertical: Number.parseFloat(verticalMatch[1]),
-        horizontal: Number.parseFloat(horizontalMatch[1]),
-        unit: verticalMatch[2],
-      }
-    : { vertical: 0.5, horizontal: 1, unit: "em" };
+  const fallback = {
+    vertical: 0.5,
+    horizontal: 1,
+    unit: "em",
+    isEditable: false,
+  };
+  if (!padding) return { ...fallback, isEditable: true };
+
+  const parts = String(padding).trim().split(/\s+/);
+  if (parts.length < 1 || parts.length > 2) return fallback;
+
+  const lengths = parts.map((part) => {
+    const match = part.match(/^((?:\d+(?:\.\d+)?)|(?:\.\d+))([a-z]+|%)?$/i);
+    if (!match) return null;
+    const value = Number.parseFloat(match[1]);
+    const unit = match[2] || "";
+    return !unit && value !== 0 ? null : { value, unit };
+  });
+  if (lengths.some((length) => !length)) return fallback;
+
+  const units = new Set(
+    lengths.filter((length) => length.value !== 0).map((length) => length.unit)
+  );
+  if (units.size > 1) return fallback;
+  const unit =
+    units.values().next().value ||
+    lengths.find(({ unit }) => unit)?.unit ||
+    "px";
+  if (lengths.some((length) => length.unit && length.unit !== unit)) {
+    return fallback;
+  }
+
+  return {
+    vertical: lengths[0].value,
+    horizontal: (lengths[1] || lengths[0]).value,
+    unit,
+    isEditable: true,
+  };
 }
 
 export function colorToHex(color) {
-  if (!color) return "#ffffff";
-  const namedColors = {
-    white: "#ffffff",
-    black: "#000000",
-    red: "#ff0000",
-    green: "#00ff00",
-    blue: "#0000ff",
-    yellow: "#ffff00",
-    cyan: "#00ffff",
-    magenta: "#ff00ff",
-    gray: "#808080",
-    grey: "#808080",
-    orange: "#ffa500",
-    transparent: "#ffffff",
-  };
-  const normalized = color.toLowerCase().trim();
-  if (namedColors[normalized]) return namedColors[normalized];
-  if (normalized.startsWith("#")) return normalized;
-  const rgba = parseRgba(normalized);
-  return rgba ? rgbToHex(rgba.r, rgba.g, rgba.b) : "#ffffff";
+  const parsed = parseCssColor(color);
+  return parsed ? rgbToHex(parsed.r, parsed.g, parsed.b) : "#ffffff";
 }

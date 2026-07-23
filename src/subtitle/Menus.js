@@ -6,6 +6,17 @@ import {
   resolveM3ThemeMode,
 } from "../styles/m3";
 import { useSystemDarkPreference } from "../hooks/SystemColorScheme";
+import {
+  parseCssToObject,
+  patchCssProperty,
+} from "../views/Options/subtitleStyleUtils";
+
+const SUBTITLE_BACKGROUND_PROPERTIES = [
+  "background",
+  "background-color",
+  "background-image",
+  "backdrop-filter",
+];
 
 export const MENU_STYLES = String.raw`
 .kt-subtitle-panel {
@@ -164,6 +175,14 @@ export function resolveSubtitleBackgroundMode(windowStyle = "") {
   return "translucent";
 }
 
+export function patchSubtitleBackgroundStyle(windowStyle, presetStyle) {
+  const preset = parseCssToObject(presetStyle);
+  return SUBTITLE_BACKGROUND_PROPERTIES.reduce(
+    (style, property) => patchCssProperty(style, property, preset[property]),
+    windowStyle
+  );
+}
+
 export function Menus({
   i18n,
   formData,
@@ -316,7 +335,10 @@ export function Menus({
         onChange={(value) =>
           handleChange({
             name: "windowStyle",
-            value: SUBTITLE_BACKGROUND_STYLES[value],
+            value: patchSubtitleBackgroundStyle(
+              windowStyle,
+              SUBTITLE_BACKGROUND_STYLES[value]
+            ),
           })
         }
         items={[

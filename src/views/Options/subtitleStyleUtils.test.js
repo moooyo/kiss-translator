@@ -1,8 +1,16 @@
 import {
+  colorToHex,
+  getCssLengthSliderRange,
   objectToCss,
+  parseCssColor,
   parseCssToObject,
+  parseFontSize,
+  parseLineHeight,
+  parsePadding,
   patchCssProperty,
+  resolveEditableBackgroundRgba,
   resolveBackgroundRgba,
+  serializeFontSize,
 } from "./subtitleStyleUtils";
 
 describe("subtitleStyleUtils", () => {
@@ -93,5 +101,98 @@ describe("subtitleStyleUtils", () => {
     expect(resolveBackgroundRgba({ background: "rgba(1, 2, 3, 0.4)" })).toEqual(
       { r: 1, g: 2, b: 3, a: 0.4 }
     );
+  });
+
+  test("parses short, long, and alpha hex colors without using a fallback", () => {
+    expect(parseCssColor("#1aF")).toEqual({ r: 17, g: 170, b: 255, a: 1 });
+    expect(resolveBackgroundRgba({ "background-color": "#123456" })).toEqual({
+      r: 18,
+      g: 52,
+      b: 86,
+      a: 1,
+    });
+    expect(parseCssColor("#11223380")).toEqual({
+      r: 17,
+      g: 34,
+      b: 51,
+      a: 128 / 255,
+    });
+    expect(colorToHex("#abc")).toBe("#aabbcc");
+  });
+
+  test("rejects colors that cannot be safely round-tripped by color controls", () => {
+    expect(parseCssColor("var(--caption-color)")).toBeNull();
+    expect(parseCssColor("rebeccapurple")).toBeNull();
+    expect(
+      resolveEditableBackgroundRgba({
+        "background-color": "var(--caption-background)",
+      })
+    ).toBeNull();
+    expect(
+      resolveEditableBackgroundRgba({
+        background: "linear-gradient(#000, transparent)",
+      })
+    ).toBeNull();
+  });
+
+  test("edits simple font sizes without converting their unit or syntax", () => {
+    const fontSize = parseFontSize("24px");
+
+    expect(fontSize).toMatchObject({
+      preferred: 24,
+      preferredUnit: "px",
+      kind: "simple",
+      isEditable: true,
+    });
+    expect(getCssLengthSliderRange(24, "px")).toEqual({
+      min: 0,
+      max: 64,
+      step: 1,
+    });
+    expect(serializeFontSize(fontSize, 28)).toBe("28px");
+  });
+
+  test("preserves every clamp unit when editing its preferred size", () => {
+    const fontSize = parseFontSize("clamp(16px, 2cqw, 20px)");
+
+    expect(serializeFontSize(fontSize, 2.4)).toBe("clamp(16px, 2.4cqw, 20px)");
+  });
+
+  test("marks unsupported font sizes and line heights as non-editable", () => {
+    expect(parseFontSize("var(--caption-size)").isEditable).toBe(false);
+    expect(parseFontSize("large").isEditable).toBe(false);
+    expect(parseLineHeight("var(--caption-line-height)").isEditable).toBe(
+      false
+    );
+    expect(parseLineHeight("normal").isEditable).toBe(false);
+  });
+
+  test("uses a pixel-aware range for the default two-value padding", () => {
+    const padding = parsePadding("12px 20px");
+
+    expect(padding).toEqual({
+      vertical: 12,
+      horizontal: 20,
+      unit: "px",
+      isEditable: true,
+    });
+    expect(getCssLengthSliderRange(padding.vertical, padding.unit).max).toBe(
+      64
+    );
+    expect(getCssLengthSliderRange(padding.horizontal, padding.unit).max).toBe(
+      64
+    );
+  });
+
+  test("marks variable, keyword, mixed-unit, and complex padding as non-editable", () => {
+    [
+      "var(--caption-padding)",
+      "inherit",
+      "12px 1rem",
+      "1px 2px 3px",
+      "calc(1rem + 2px)",
+    ].forEach((padding) => {
+      expect(parsePadding(padding).isEditable).toBe(false);
+    });
   });
 });

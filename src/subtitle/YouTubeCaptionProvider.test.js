@@ -53,13 +53,7 @@ jest.mock("./youtubePlayerUi.js", () => ({
 }));
 
 jest.mock("./youtubeCaptionTracks.js", () => ({
-  buildTrackKey: (url) =>
-    [
-      url.searchParams.get("v") || "",
-      url.searchParams.get("lang") || "",
-      url.searchParams.get("kind") || "",
-    ].join("|"),
-  findCaptionTrack: (tracks) => tracks[0],
+  ...jest.requireActual("./youtubeCaptionTracks.js"),
   getCaptionTracks: jest.fn(),
   getSubtitleEvents: jest.fn(),
   isSameLang: (...args) => mockIsSameLang(...args),
@@ -241,7 +235,7 @@ describe("YouTubeCaptionProvider manual translation", () => {
     expect(mockManagerInstances).toHaveLength(2);
   });
 
-  test("loads the current track when initialized without an intercepted request", async () => {
+  test("loads the only current track when initialized without an intercepted request", async () => {
     getCaptionTracks.mockResolvedValue({
       captionTracks: [
         {
@@ -269,6 +263,131 @@ describe("YouTubeCaptionProvider manual translation", () => {
     expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
     expect(eventsToSubtitles).toHaveBeenCalledTimes(1);
     expect(mockManagerInstances).toHaveLength(1);
+  });
+
+  test("recovers the second track selected by reliable default metadata", async () => {
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          languageCode: "en",
+        },
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=fr",
+          languageCode: "fr",
+        },
+      ],
+      audioTracks: [
+        {
+          defaultCaptionTrackIndex: 1,
+          hasDefaultTrack: true,
+        },
+      ],
+      fullDescription: "",
+    });
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      showList: "off",
+    });
+    await act(async () => {
+      await waitForCurrentTrackRecovery();
+      await flushPromises();
+    });
+
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(getSubtitleEvents.mock.calls[0][0].searchParams.get("lang")).toBe(
+      "fr"
+    );
+  });
+
+  test("waits for an intercepted request when multiple tracks are ambiguous", async () => {
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          languageCode: "en",
+        },
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=fr",
+          languageCode: "fr",
+        },
+      ],
+      fullDescription: "",
+    });
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      showList: "off",
+    });
+    await act(async () => {
+      await waitForCurrentTrackRecovery();
+      await flushPromises();
+    });
+
+    expect(getCaptionTracks).toHaveBeenCalledTimes(1);
+    expect(getSubtitleEvents).not.toHaveBeenCalled();
+    expect(eventsToSubtitles).not.toHaveBeenCalled();
+    expect(mockManagerInstances).toHaveLength(0);
+  });
+
+  test("prefers a real intercepted request over pending recovery metadata", async () => {
+    let resolveRecoveryMetadata;
+    getCaptionTracks
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveRecoveryMetadata = resolve;
+          })
+      )
+      .mockResolvedValue({
+        captionTracks: [
+          {
+            baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=fr",
+            languageCode: "fr",
+          },
+        ],
+        fullDescription: "",
+      });
+
+    await YouTubeInitializer({
+      autoTranslate: true,
+      aiContextSlug: "-",
+      showList: "off",
+    });
+    await act(async () => {
+      await waitForCurrentTrackRecovery();
+    });
+    expect(getCaptionTracks).toHaveBeenCalledTimes(1);
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "xhr-youtube",
+          url: "https://www.youtube.com/api/timedtext?v=video-1&lang=fr",
+          response: "{}",
+        },
+      })
+    );
+    await act(async () => flushPromises());
+
+    resolveRecoveryMetadata({
+      captionTracks: [
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          languageCode: "en",
+        },
+      ],
+      fullDescription: "",
+    });
+    await act(async () => flushPromises());
+
+    expect(getSubtitleEvents).toHaveBeenCalledTimes(1);
+    expect(getSubtitleEvents.mock.calls[0][0].searchParams.get("lang")).toBe(
+      "fr"
+    );
   });
 
   test("loads the new video after navigation while suspended", async () => {

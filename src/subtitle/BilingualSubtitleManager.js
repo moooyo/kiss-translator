@@ -74,6 +74,28 @@ export class BilingualSubtitleManager {
   #playerControlBarObserver = null; // 监听播放器底部控制条显隐突变的 MutationObserver
   #syncPaperBottomAfterDrag = null; // 拖拽结束后按当前控制条状态修正字幕位置
 
+  #onCaptionPointerEnter = (event) => {
+    if (
+      event.target !== this.#captionWindowEl ||
+      !this.#isHoverLookupEnabled()
+    ) {
+      return;
+    }
+
+    this.#wasPlayingBeforeHover = Boolean(
+      this.#videoEl && !this.#videoEl.paused
+    );
+    if (this.#wasPlayingBeforeHover) {
+      this.#videoEl.pause();
+    }
+  };
+
+  #onCaptionPointerLeave = (event) => {
+    if (event.target !== this.#captionWindowEl) return;
+    this.#resumeVideoPausedForHover();
+    this.#hoverTarget = null;
+  };
+
   /**
    * @param {object} options
    * @param {HTMLVideoElement} options.videoEl - 原生网页 video 节点
@@ -149,6 +171,8 @@ export class BilingualSubtitleManager {
    */
   destroy() {
     logger.info("Bilingual Subtitle Manager: Destroying...");
+    this.#resumeVideoPausedForHover();
+    this.#removeCaptionHoverListeners();
     this.#translationSessionId += 1; // 递增会话 ID，使当前在途的异步请求回调全部失效
     this.#abortController?.abort(); // 中止未返回的底层请求
     this.#abortController = null;
@@ -271,38 +295,13 @@ export class BilingualSubtitleManager {
     videoContainer.style.position = "relative";
     videoContainer.appendChild(container);
 
-    const isHoverLookupEnabled = this.#isHoverLookupEnabled();
-
     // 4. 为字幕框启用拖拽交互
     this.#enableDragging(this.#paperEl, container, this.#captionWindowEl, () =>
       this.#syncPaperBottomAfterDrag?.()
     );
 
-    // 5. 如果开启了悬浮查词，则在鼠标 hover 字幕窗口时暂停视频，方便用户稳妥查词；移开鼠标时自动恢复播放
-    if (isHoverLookupEnabled) {
-      this.#captionWindowEl.addEventListener("pointerenter", (e) => {
-        if (e.target === this.#captionWindowEl) {
-          this.#wasPlayingBeforeHover = this.#videoEl && !this.#videoEl.paused;
-          if (this.#videoEl && !this.#videoEl.paused) {
-            this.#videoEl.pause();
-          }
-        }
-      });
-
-      this.#captionWindowEl.addEventListener("pointerleave", (e) => {
-        if (e.target === this.#captionWindowEl) {
-          if (
-            this.#wasPlayingBeforeHover &&
-            this.#videoEl &&
-            this.#videoEl.paused
-          ) {
-            this.#videoEl.play();
-          }
-          this.#wasPlayingBeforeHover = false;
-          this.#hoverTarget = null;
-        }
-      });
-    }
+    // 5. Keep stable handlers attached so runtime setting changes apply immediately.
+    this.#attachCaptionHoverListeners();
 
     // 6. 开启底部控制栏显隐监听
     this.#observePlayerControlBar();
@@ -314,6 +313,41 @@ export class BilingualSubtitleManager {
   #attachSpanListeners() {
     this.#wordTooltipController?.pruneDetachedSpanListeners();
     this.#wordTooltipController?.attachSpanListeners(this.#captionWindowEl);
+  }
+
+  #attachCaptionHoverListeners() {
+    this.#captionWindowEl?.addEventListener(
+      "pointerenter",
+      this.#onCaptionPointerEnter
+    );
+    this.#captionWindowEl?.addEventListener(
+      "pointerleave",
+      this.#onCaptionPointerLeave
+    );
+  }
+
+  #removeCaptionHoverListeners() {
+    this.#captionWindowEl?.removeEventListener(
+      "pointerenter",
+      this.#onCaptionPointerEnter
+    );
+    this.#captionWindowEl?.removeEventListener(
+      "pointerleave",
+      this.#onCaptionPointerLeave
+    );
+  }
+
+  #resumeVideoPausedForHover() {
+    const shouldResume = this.#wasPlayingBeforeHover;
+    this.#wasPlayingBeforeHover = false;
+    if (!shouldResume || !this.#videoEl?.paused) return;
+
+    try {
+      const playPromise = this.#videoEl.play();
+      playPromise?.catch?.(() => undefined);
+    } catch (_error) {
+      // Playback can become unavailable while the player is being removed.
+    }
   }
 
   /**
@@ -834,7 +868,11 @@ export class BilingualSubtitleManager {
 
   // 更新配置项
   updateSetting(obj) {
+    const wasHoverLookupEnabled = this.#isHoverLookupEnabled();
     this.#setting = { ...this.#setting, ...obj };
+    if (wasHoverLookupEnabled && !this.#isHoverLookupEnabled()) {
+      this.#resumeVideoPausedForHover();
+    }
     if (Object.prototype.hasOwnProperty.call(obj, "throttleTrans")) {
       this.#resetTranslationThrottle();
     }

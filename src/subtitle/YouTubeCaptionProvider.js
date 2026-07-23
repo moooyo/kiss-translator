@@ -17,6 +17,7 @@ import { browser } from "../libs/browser.js";
 import {
   buildTrackKey,
   findCaptionTrack,
+  findDefaultCaptionTrack,
   getCaptionTracks,
   getSubtitleEvents,
   isSameLang,
@@ -401,13 +402,7 @@ export class YouTubeCaptionProvider {
       return;
     }
 
-    const captionTracks = [...(trackData.captionTracks || [])];
-    const preferredTrack = captionTracks[0];
-    const captionTrack = findCaptionTrack(
-      captionTracks,
-      preferredTrack?.languageCode,
-      preferredTrack?.kind || null
-    );
+    const captionTrack = findDefaultCaptionTrack(trackData);
     if (!captionTrack?.baseUrl) return;
 
     const trackUrl = new URL(captionTrack.baseUrl, window.location.origin);

@@ -45,12 +45,17 @@ import {
 import {
   colorToHex,
   cssObjectToReactStyle,
+  getCssLengthSliderRange,
   hexToRgb,
   parseCssToObject,
+  parseCssColor,
   parseFontSize,
+  parseLineHeight,
   parsePadding,
+  resolveEditableBackgroundRgba,
   resolveBackgroundRgba,
   rgbToHex,
+  serializeFontSize,
 } from "./subtitleStyleUtils";
 import { useSubtitleStyleEditor } from "./useSubtitleStyleEditor";
 
@@ -269,88 +274,115 @@ export default function SubtitleSetting() {
   const transFontSize = parseFontSize(transCssObj["font-size"] || "");
 
   const windowPadding = parsePadding(windowCssObj["padding"] || "0.5em 1em");
+  const verticalPaddingRange = getCssLengthSliderRange(
+    windowPadding.vertical,
+    windowPadding.unit
+  );
+  const horizontalPaddingRange = getCssLengthSliderRange(
+    windowPadding.horizontal,
+    windowPadding.unit
+  );
+  const editableWindowBgRgba = resolveEditableBackgroundRgba(windowCssObj);
   const windowBgRgba = resolveBackgroundRgba(windowCssObj);
   const windowBgHex = rgbToHex(windowBgRgba.r, windowBgRgba.g, windowBgRgba.b);
-  const windowLineHeight = parseFloat(windowCssObj["line-height"]) || 1.3;
+  const windowLineHeight = parseLineHeight(windowCssObj["line-height"]);
   const windowHasTextShadow = !!windowCssObj["text-shadow"];
 
   // 缓存可复用的单个文本（如原文或译文）的 CSS 字体、大小及颜色滑动条控制器结构
   const textStyleControls = useCallback(
-    (label, fontSize, cssObj, updateCss) => (
-      <Box>
-        <Typography variant="subtitle2" gutterBottom>
-          {label}
-        </Typography>
-        <Stack spacing={1.5}>
-          {/* 字号 Slider 滑动控制 */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ minWidth: 56, flexShrink: 0 }}
-            >
-              {i18n("font_size") || "字体大小"}
-            </Typography>
-            <Slider
-              aria-label={`${label} ${i18n("font_size")}`}
-              size="small"
-              value={fontSize.preferred}
-              min={0.5}
-              max={5}
-              step={0.1}
-              onChange={(e, val) => {
-                const p = fontSize.preferred || 1;
-                const minRatio = fontSize.min / p;
-                const maxRatio = fontSize.max / p;
-                updateCss(
-                  "font-size",
-                  `clamp(${(val * minRatio).toFixed(2)}${fontSize.unit}, ${val}cqw, ${(val * maxRatio).toFixed(2)}${fontSize.unit})`
-                );
-              }}
-              sx={{ flex: 1 }}
-            />
-            <Typography
-              variant="body2"
-              sx={{ minWidth: 28, textAlign: "right" }}
-            >
-              {fontSize.preferred}
-            </Typography>
-          </Box>
-          {/* 字体颜色选取器与 HEX 文本框 */}
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Typography
-              variant="body2"
-              color="text.secondary"
-              sx={{ minWidth: 56, flexShrink: 0 }}
-            >
-              {i18n("font_color") || "字体颜色"}
-            </Typography>
-            <Box
-              component="input"
-              type="color"
-              aria-label={`${label} ${i18n("font_color")}`}
-              value={colorToHex(cssObj["color"])}
-              onChange={(e) => updateCss("color", e.target.value)}
-              sx={{
-                width: 28,
-                height: 28,
-                border: "none",
-                cursor: "pointer",
-                p: 0,
-                bgcolor: "transparent",
-              }}
-            />
-            <TextField
-              size="small"
-              value={cssObj["color"] || ""}
-              onChange={(e) => updateCss("color", e.target.value)}
-              placeholder="#ffffff"
-              sx={{ flex: 1 }}
-            />
-          </Box>
-        </Stack>
-      </Box>
-    ),
+    (label, fontSize, cssObj, updateCss) => {
+      const fontSizeRange = getCssLengthSliderRange(
+        fontSize.preferred,
+        fontSize.preferredUnit
+      );
+      const colorSource = cssObj["color"] || "";
+      const parsedColor = colorSource
+        ? parseCssColor(colorSource)
+        : { r: 255, g: 255, b: 255, a: 1 };
+      const colorIsEditable = !colorSource || Boolean(parsedColor);
+
+      return (
+        <Box>
+          <Typography variant="subtitle2" gutterBottom>
+            {label}
+          </Typography>
+          <Stack spacing={1.5}>
+            {/* 字号 Slider 滑动控制 */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1.5 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ minWidth: 56, flexShrink: 0 }}
+              >
+                {i18n("font_size") || "字体大小"}
+              </Typography>
+              <Slider
+                aria-label={`${label} ${i18n("font_size")}`}
+                size="small"
+                value={fontSize.preferred}
+                min={fontSizeRange.min}
+                max={fontSizeRange.max}
+                step={fontSizeRange.step}
+                disabled={!fontSize.isEditable}
+                onChange={(e, val) => {
+                  const value = serializeFontSize(fontSize, val);
+                  if (value) updateCss("font-size", value);
+                }}
+                sx={{ flex: 1 }}
+              />
+              <Typography
+                variant="body2"
+                sx={{ minWidth: 48, textAlign: "right" }}
+              >
+                {fontSize.preferred}
+                {fontSize.preferredUnit}
+              </Typography>
+            </Box>
+            {/* 字体颜色选取器与 HEX 文本框 */}
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                sx={{ minWidth: 56, flexShrink: 0 }}
+              >
+                {i18n("font_color") || "字体颜色"}
+              </Typography>
+              <Box
+                component="input"
+                type="color"
+                aria-label={`${label} ${i18n("font_color")}`}
+                value={colorToHex(cssObj["color"])}
+                disabled={!colorIsEditable}
+                onChange={(e) => {
+                  if (!parsedColor) return;
+                  const rgb = hexToRgb(e.target.value);
+                  const value =
+                    parsedColor.a < 1
+                      ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${parsedColor.a})`
+                      : e.target.value;
+                  updateCss("color", value);
+                }}
+                sx={{
+                  width: 28,
+                  height: 28,
+                  border: "none",
+                  cursor: colorIsEditable ? "pointer" : "not-allowed",
+                  p: 0,
+                  bgcolor: "transparent",
+                }}
+              />
+              <TextField
+                size="small"
+                value={cssObj["color"] || ""}
+                onChange={(e) => updateCss("color", e.target.value)}
+                placeholder="#ffffff"
+                sx={{ flex: 1 }}
+              />
+            </Box>
+          </Stack>
+        </Box>
+      );
+    },
     [i18n]
   );
 
@@ -763,6 +795,7 @@ export default function SubtitleSetting() {
                         type="color"
                         aria-label={i18n("background_color")}
                         value={windowBgHex}
+                        disabled={!editableWindowBgRgba}
                         onChange={(e) => {
                           const rgb = hexToRgb(e.target.value);
                           updateWindowCss(
@@ -774,7 +807,9 @@ export default function SubtitleSetting() {
                           width: 28,
                           height: 28,
                           border: "none",
-                          cursor: "pointer",
+                          cursor: editableWindowBgRgba
+                            ? "pointer"
+                            : "not-allowed",
                           p: 0,
                           bgcolor: "transparent",
                         }}
@@ -789,6 +824,7 @@ export default function SubtitleSetting() {
                         min={0}
                         max={1}
                         step={0.05}
+                        disabled={!editableWindowBgRgba}
                         onChange={(e, val) => {
                           updateWindowCss(
                             "background-color",
@@ -818,10 +854,11 @@ export default function SubtitleSetting() {
                       <Slider
                         aria-label={i18n("line_height")}
                         size="small"
-                        value={windowLineHeight}
-                        min={1}
-                        max={2.5}
+                        value={windowLineHeight.value}
+                        min={0}
+                        max={Math.max(2.5, windowLineHeight.value * 2)}
                         step={0.1}
+                        disabled={!windowLineHeight.isEditable}
                         onChange={(e, val) =>
                           updateWindowCss("line-height", String(val))
                         }
@@ -831,7 +868,7 @@ export default function SubtitleSetting() {
                         variant="body2"
                         sx={{ minWidth: 28, textAlign: "right" }}
                       >
-                        {windowLineHeight}
+                        {windowLineHeight.value}
                       </Typography>
                     </Box>
                   </Grid>
@@ -852,9 +889,10 @@ export default function SubtitleSetting() {
                         aria-label={i18n("vertical")}
                         size="small"
                         value={windowPadding.vertical}
-                        min={0}
-                        max={2}
-                        step={0.1}
+                        min={verticalPaddingRange.min}
+                        max={verticalPaddingRange.max}
+                        step={verticalPaddingRange.step}
+                        disabled={!windowPadding.isEditable}
                         onChange={(e, val) => {
                           updateWindowCss(
                             "padding",
@@ -870,9 +908,10 @@ export default function SubtitleSetting() {
                         aria-label={i18n("horizontal")}
                         size="small"
                         value={windowPadding.horizontal}
-                        min={0}
-                        max={3}
-                        step={0.1}
+                        min={horizontalPaddingRange.min}
+                        max={horizontalPaddingRange.max}
+                        step={horizontalPaddingRange.step}
+                        disabled={!windowPadding.isEditable}
                         onChange={(e, val) => {
                           updateWindowCss(
                             "padding",

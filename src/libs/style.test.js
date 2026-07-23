@@ -45,4 +45,24 @@ describe("built-in translation styles", () => {
     expect(css).toContain("@keyframes kt-translation-blink");
     expect(css).toContain("@keyframes kt-translation-glow");
   });
+
+  test("does not retain entrance keyframes over opacity and transform", () => {
+    const [classMap, css] = genTextClass([
+      {
+        styleSlug: "custom-motion",
+        styleCode: "opacity: 0.4; transform: scale(0.9);",
+      },
+    ]);
+    const entranceRule = css.match(/\.kiss-translator-inner\{([^}]*)\}/)?.[1];
+    const customRule = css.match(
+      new RegExp(`\\.${classMap["custom-motion"]}\\{([^}]*)\\}`)
+    )?.[1];
+
+    expect(entranceRule).toContain(
+      "animation:kt-translation-up .5s cubic-bezier(.3,1.4,.4,1)"
+    );
+    expect(entranceRule).not.toMatch(/\bboth\b/);
+    expect(customRule).toContain("opacity:0.4");
+    expect(customRule).toContain("transform:scale(0.9)");
+  });
 });

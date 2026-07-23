@@ -647,16 +647,19 @@ export default class TranslatorManager {
   }
 
   /**
-   * 翻译动作分发入口。
+   * Dispatches runtime actions.
    *
-   * 顶层页面发起的动作会同步广播给 iframe；来自扩展 background 的动作
-   * 已经是统一入口，不再二次广播，避免 iframe 收到重复指令。
+   * Page-level actions initiated in a document are forwarded to child frames.
+   * Selection-box opening stays in the originating frame because selections
+   * are frame-specific. Background actions are already distributed and must
+   * not be forwarded a second time.
    */
   #processActions({ action, args } = {}, fromExt = false) {
     if (!action) return;
 
-    // 非 background 指令需要主动同步给子 iframe，保持多 frame 页面状态一致。
-    if (!fromExt) {
+    // Keep page-level actions in sync across frames. Opening the selection
+    // translator is frame-local because each frame owns a separate selection.
+    if (!fromExt && action !== MSG_OPEN_TRANBOX) {
       sendIframeMsg(action, args);
     }
 

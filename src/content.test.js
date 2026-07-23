@@ -17,6 +17,10 @@ jest.mock("./libs/browser", () => ({
 
 describe("content runtime marker", () => {
   const marker = "__KISS_CONTENT_RUNTIME__chrome-extension://test-id/";
+  const flushPromises = async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  };
 
   beforeEach(() => {
     jest.resetModules();
@@ -31,13 +35,86 @@ describe("content runtime marker", () => {
   });
 
   test("clears the marker after startup rejects", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation();
     mockRun.mockRejectedValueOnce(new Error("startup failed"));
 
     require("./content");
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushPromises();
 
     expect(globalThis[marker]).toBeUndefined();
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
+  });
+
+  test("stores an identity and liveness probe in the marker", () => {
+    mockRun.mockResolvedValueOnce();
+
+    require("./content");
+
+    expect(globalThis[marker]).toEqual(
+      expect.objectContaining({
+        identity: expect.any(Object),
+        probe: expect.any(Function),
+      })
+    );
+  });
+
+  test("deduplicates injection while the existing runtime is alive", () => {
+    mockRun.mockResolvedValueOnce();
+
+    require("./content");
+    const firstRuntime = globalThis[marker];
+    jest.resetModules();
+    require("./content");
+
+    expect(mockRun).toHaveBeenCalledTimes(1);
+    expect(globalThis[marker]).toBe(firstRuntime);
+  });
+
+  test("replaces a marker whose runtime context was invalidated", () => {
+    mockRun.mockResolvedValue();
+
+    require("./content");
+    const oldRuntime = globalThis[marker];
+
+    jest.resetModules();
+    mockGetURL.mockReset();
+    mockGetURL
+      .mockReturnValueOnce("chrome-extension://test-id/")
+      .mockImplementationOnce(() => {
+        throw new Error("Extension context invalidated.");
+      });
+    require("./content");
+
+    expect(mockRun).toHaveBeenCalledTimes(2);
+    expect(globalThis[marker]).not.toBe(oldRuntime);
+  });
+
+  test("an old startup rejection cannot remove a replacement marker", async () => {
+    const consoleError = jest.spyOn(console, "error").mockImplementation();
+    let rejectOldStartup;
+    const oldStartup = new Promise((resolve, reject) => {
+      rejectOldStartup = reject;
+    });
+    mockRun.mockReturnValueOnce(oldStartup).mockResolvedValueOnce();
+
+    require("./content");
+    jest.resetModules();
+    mockGetURL.mockReset();
+    mockGetURL
+      .mockReturnValueOnce("chrome-extension://test-id/")
+      .mockImplementationOnce(() => {
+        throw new Error("Extension context invalidated.");
+      });
+    require("./content");
+    const replacementRuntime = globalThis[marker];
+
+    rejectOldStartup(new Error("old startup failed"));
+    await flushPromises();
+
+    expect(globalThis[marker]).toBe(replacementRuntime);
+    expect(consoleError).toHaveBeenCalledTimes(1);
+    consoleError.mockRestore();
   });
 
   test("does not start when the extension context is already invalid", () => {
@@ -54,9 +131,9 @@ describe("content runtime marker", () => {
     mockRun.mockRejectedValueOnce(new Error("Extension context invalidated."));
 
     require("./content");
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushPromises();
 
+    expect(globalThis[marker]).toBeUndefined();
     expect(consoleError).not.toHaveBeenCalled();
     consoleError.mockRestore();
   });

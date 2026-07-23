@@ -499,7 +499,7 @@ describe("useSelectionController", () => {
 
     expect(controller.setBoxPosition).toHaveBeenLastCalledWith({
       x: 20,
-      y: 158,
+      y: 136,
     });
 
     act(() => {

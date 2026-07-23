@@ -1,46 +1,34 @@
-// 左右拉伸触发区的宽度 (8px 左侧 + 8px 右侧)
+// Horizontal resize grips: 8px on each side.
 const TRANBOX_SIDE_GRIP_WIDTH = 16;
-// 翻译框非内容区的高度 (36px Header + 8px 顶部拉伸区 + 8px 底部拉伸区)
-const TRANBOX_CHROME_HEIGHT = 52;
+// Vertical chrome: 56px header, 16px resize grips, and 2px card border.
+const TRANBOX_CHROME_HEIGHT = 74;
 
-/**
- * 获取翻译框包含拉伸触发区在内的整体外部宽度
- */
+/** Returns the translation box width including its resize grips. */
 export function getTranBoxOuterWidth(contentWidth) {
   return contentWidth + TRANBOX_SIDE_GRIP_WIDTH;
 }
 
-/**
- * 获取翻译框包含 Header 和拉伸触发区在内的整体外部高度
- */
+/** Returns the translation box height including all vertical chrome. */
 export function getTranBoxOuterHeight(contentHeight) {
   return contentHeight + TRANBOX_CHROME_HEIGHT;
 }
 
-/**
- * 获取翻译框内容区允许的最大宽度 (防止整体外部宽度超出视口)
- */
+/** Returns the maximum content width that fits within the viewport. */
 export function getMaxTranBoxContentWidth() {
   return Math.max(0, window.innerWidth - TRANBOX_SIDE_GRIP_WIDTH);
 }
 
-/**
- * 获取翻译框内容区允许的最大高度 (防止整体外部高度超出视口)
- */
+/** Returns the maximum content height that fits within the viewport. */
 export function getMaxTranBoxContentHeight() {
   return Math.max(0, window.innerHeight - TRANBOX_CHROME_HEIGHT);
 }
 
-/**
- * 获取翻译框允许的最大 X 坐标 (防止右侧拉伸区溢出屏幕)
- */
+/** Returns the maximum X coordinate that keeps the box in the viewport. */
 export function getMaxTranBoxX(contentWidth) {
   return Math.max(0, window.innerWidth - getTranBoxOuterWidth(contentWidth));
 }
 
-/**
- * 获取翻译框允许的最大 Y 坐标 (防止底部拉伸区溢出屏幕)
- */
+/** Returns the maximum Y coordinate that keeps the box in the viewport. */
 export function getMaxTranBoxY(contentHeight) {
   return Math.max(0, window.innerHeight - getTranBoxOuterHeight(contentHeight));
 }

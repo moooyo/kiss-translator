@@ -90,7 +90,7 @@ describe("useTranBoxState", () => {
 
     expect(controller.state.boxPosition).toEqual({
       x: 464,
-      y: 208,
+      y: 186,
     });
 
     act(() => {
@@ -107,7 +107,7 @@ describe("useTranBoxState", () => {
     });
 
     expect(controller.state.boxSize.w).toBe(784);
-    expect(controller.state.boxSize.h).toBe(448);
+    expect(controller.state.boxSize.h).toBe(426);
     expect(controller.state.boxPosition).toEqual({
       x: 0,
       y: 0,
@@ -150,7 +150,7 @@ describe("useTranBoxState", () => {
 
     expect(controller.state.boxSize).toEqual({
       w: 484,
-      h: 298,
+      h: 276,
     });
     expect(controller.state.boxPosition).toEqual({
       x: 0,

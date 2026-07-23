@@ -197,7 +197,7 @@ export const genTextClass = (customStyles = []) => {
       to { opacity: 1; transform: none; }
     }
     .kiss-translator-inner {
-      animation: kt-translation-up .5s cubic-bezier(.3,1.4,.4,1) both;
+      animation: kt-translation-up .5s cubic-bezier(.3,1.4,.4,1);
     }
     @media (prefers-reduced-motion: reduce) {
       .kiss-translator-inner { animation: none; }

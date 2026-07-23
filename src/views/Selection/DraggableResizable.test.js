@@ -4,7 +4,12 @@ import DraggableResizable from "./DraggableResizable";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
-jest.mock("../../libs/mobile", () => ({ isMobile: false }));
+let mockIsMobile = false;
+jest.mock("../../libs/mobile", () => ({
+  get isMobile() {
+    return mockIsMobile;
+  },
+}));
 
 const emptyRect = {
   x: 0,
@@ -27,6 +32,7 @@ describe("DraggableResizable auto height bounds", () => {
   let originalResizeObserver;
 
   beforeEach(() => {
+    mockIsMobile = false;
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
@@ -82,6 +88,12 @@ describe("DraggableResizable auto height bounds", () => {
     return panel;
   }
 
+  function dispatchTouchEvent(target, type, targetTouches = []) {
+    const event = new Event(type, { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "targetTouches", { value: targetTouches });
+    target.dispatchEvent(event);
+  }
+
   test("allows a short auto-height panel to reach the viewport bottom", () => {
     const panel = renderPanel();
     panel.setPosition.mockClear();
@@ -131,4 +143,98 @@ describe("DraggableResizable auto height bounds", () => {
     expect(getComputedStyle(content).overflow).toBe("hidden auto");
     expect(getComputedStyle(content).borderRadius).toBe("0 0 21px 21px");
   });
+
+  test("clears a previous drag before ignoring an interactive control", () => {
+    const panel = renderPanel({
+      autoHeight: false,
+      header: <button type="button">control</button>,
+    });
+    const header = container.querySelector(".KT-draggable-header");
+    const button = container.querySelector("button");
+    panel.setPosition.mockClear();
+
+    act(() => {
+      header.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 10,
+          clientY: 10,
+        })
+      );
+    });
+    act(() => {
+      button.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 10,
+          clientY: 10,
+        })
+      );
+    });
+    act(() => {
+      header.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 50,
+          clientY: 50,
+        })
+      );
+    });
+
+    expect(panel.setPosition).not.toHaveBeenCalled();
+  });
+
+  test("clears a drag when the pointer is cancelled", () => {
+    const panel = renderPanel({ autoHeight: false });
+    const header = container.querySelector(".KT-draggable-header");
+    panel.setPosition.mockClear();
+
+    act(() => {
+      header.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 10,
+          clientY: 10,
+        })
+      );
+    });
+    act(() => {
+      header.dispatchEvent(new Event("pointercancel", { bubbles: true }));
+    });
+    act(() => {
+      header.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 50,
+          clientY: 50,
+        })
+      );
+    });
+
+    expect(panel.setPosition).not.toHaveBeenCalled();
+  });
+
+  test.each(["touchend", "touchcancel"])(
+    "clears a touch drag on %s",
+    (endEvent) => {
+      mockIsMobile = true;
+      const panel = renderPanel({ autoHeight: false });
+      const header = container.querySelector(".KT-draggable-header");
+      panel.setPosition.mockClear();
+
+      act(() => {
+        dispatchTouchEvent(header, "touchstart", [
+          { clientX: 10, clientY: 10 },
+        ]);
+      });
+      act(() => {
+        dispatchTouchEvent(header, endEvent);
+      });
+      act(() => {
+        dispatchTouchEvent(header, "touchmove", [{ clientX: 50, clientY: 50 }]);
+      });
+
+      expect(panel.setPosition).not.toHaveBeenCalled();
+    }
+  );
 });

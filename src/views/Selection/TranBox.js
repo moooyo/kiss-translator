@@ -63,11 +63,7 @@ function TranBoxHeader({
   }, [setShowBox]);
 
   return (
-    <div
-      className="kt-tranbox-header"
-      onMouseUp={(e) => e.stopPropagation()}
-      onTouchEnd={(e) => e.stopPropagation()}
-    >
+    <div className="kt-tranbox-header" onMouseUp={(e) => e.stopPropagation()}>
       <span className="kt-tranbox-header__drag" aria-hidden="true">
         <DragIndicatorRoundedIcon />
       </span>

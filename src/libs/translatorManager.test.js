@@ -146,6 +146,7 @@ const { TransboxManager } = require("./tranbox");
 const { InputTranslator } = require("./inputTranslate");
 const { PopupManager } = require("./popupManager");
 const { FabManager } = require("./fabManager");
+const { sendIframeMsg } = require("./iframe");
 const TranslatorManager = require("./translatorManager").default;
 
 function setupMockConstructors() {
@@ -383,6 +384,35 @@ describe("TranslatorManager SPA lifecycle", () => {
     expect(eventHandler.mock.calls[0][0].detail).toEqual({
       action: "open-tranbox",
       args: { text: "hello" },
+    });
+
+    document.removeEventListener("kiss-inner", eventHandler);
+  });
+
+  test("keeps open-tranbox local while broadcasting page-level actions", () => {
+    const manager = createManager();
+    const eventHandler = jest.fn();
+    manager.start();
+    document.addEventListener("kiss-inner", eventHandler);
+
+    window.dispatchEvent(
+      new CustomEvent("kiss-translator", {
+        detail: { action: "open-tranbox", args: { text: "local" } },
+      })
+    );
+
+    expect(eventHandler).toHaveBeenCalledTimes(1);
+    expect(sendIframeMsg).not.toHaveBeenCalled();
+
+    window.dispatchEvent(
+      new CustomEvent("kiss-translator", {
+        detail: { action: "trans-toggle", args: { enabled: true } },
+      })
+    );
+
+    expect(sendIframeMsg).toHaveBeenCalledTimes(1);
+    expect(sendIframeMsg).toHaveBeenCalledWith("trans-toggle", {
+      enabled: true,
     });
 
     document.removeEventListener("kiss-inner", eventHandler);

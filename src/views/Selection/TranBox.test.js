@@ -223,4 +223,20 @@ describe("TranBox dictionary view", () => {
     );
     act(() => root.unmount());
   });
+
+  test("lets touchend reach the draggable interaction owner", () => {
+    const { container, root } = renderTranBox(createTranBoxProps());
+    const documentTouchEnd = jest.fn();
+    document.addEventListener("touchend", documentTouchEnd);
+
+    act(() => {
+      container
+        .querySelector(".kt-tranbox-header")
+        .dispatchEvent(new Event("touchend", { bubbles: true }));
+    });
+
+    expect(documentTouchEnd).toHaveBeenCalledTimes(1);
+    document.removeEventListener("touchend", documentTouchEnd);
+    act(() => root.unmount());
+  });
 });

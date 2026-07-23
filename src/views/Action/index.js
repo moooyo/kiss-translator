@@ -104,7 +104,7 @@ export default function Action({ translator, processActions }) {
               </Box>
             }
           >
-            <Box width={360}>
+            <Box width={popProps.width}>
               <PopupCont
                 rule={rule}
                 setting={setting}

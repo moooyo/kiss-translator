@@ -100,12 +100,11 @@ async function flushEffects() {
 }
 
 async function renderApis(api = createApi(), update = jest.fn()) {
+  let currentApi = api;
   const container = document.createElement("div");
   document.body.appendChild(container);
   const root = createRoot(container);
-
-  useApiList.mockReturnValue({
-    transApis: [api],
+  const apiListValue = {
     addApi: jest.fn(),
     deleteApi: jest.fn(),
     deleteApis: jest.fn(),
@@ -115,12 +114,22 @@ async function renderApis(api = createApi(), update = jest.fn()) {
     copyApi: jest.fn(),
     alphaSortApis: jest.fn(),
     reorderApis: jest.fn(),
-  });
-  useApiItem.mockReturnValue({
-    api,
-    update,
-    reset: jest.fn(),
-  });
+  };
+
+  const setApi = (nextApi) => {
+    currentApi = nextApi;
+    useApiList.mockReturnValue({
+      transApis: [currentApi],
+      ...apiListValue,
+    });
+    useApiItem.mockReturnValue({
+      api: currentApi,
+      update,
+      reset: jest.fn(),
+    });
+  };
+
+  setApi(currentApi);
 
   await act(async () => {
     root.render(<Apis />);
@@ -130,6 +139,13 @@ async function renderApis(api = createApi(), update = jest.fn()) {
   return {
     container,
     update,
+    rerender: async (nextApi) => {
+      setApi(nextApi);
+      await act(async () => {
+        root.render(<Apis />);
+      });
+      await flushEffects();
+    },
     unmount: () => {
       act(() => root.unmount());
       container.remove();
@@ -150,6 +166,36 @@ function getSaveButton(container) {
     (button) => button.textContent === "save"
   );
 }
+
+describe("Apis persisted updates", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("follows clean updates without discarding a dirty API draft", async () => {
+    const initialApi = createApi();
+    const view = await renderApis(initialApi);
+    const cleanUpdate = { ...initialApi, model: "remote-clean-model" };
+
+    await view.rerender(cleanUpdate);
+    expect(getInput(view.container, "model").value).toBe("remote-clean-model");
+
+    await act(async () => {
+      Simulate.change(getInput(view.container, "model"), {
+        target: { name: "model", value: "local-model-draft" },
+      });
+    });
+    await view.rerender({ ...cleanUpdate });
+    expect(getInput(view.container, "model").value).toBe("local-model-draft");
+
+    await view.rerender({ ...cleanUpdate, model: "remote-conflict" });
+    expect(getInput(view.container, "model").value).toBe("local-model-draft");
+    expect(getSaveButton(view.container).disabled).toBe(false);
+
+    view.unmount();
+  });
+});
 
 describe("Apis model list", () => {
   afterEach(() => {

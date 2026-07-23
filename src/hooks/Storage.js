@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MSG_RUNTIME_SETTING_PATCH, STOKEY_SETTING } from "../config";
 import { storage } from "../libs/storage";
 import { kissLog } from "../libs/log";
 import { syncData } from "../libs/sync";
+import { isExt } from "../libs/client";
+import { sendBgMsg } from "../libs/msg";
+import { createSettingPatch, mergeSettingPatch } from "../libs/settingPatch";
 import { useDebouncedCallback } from "./DebouncedCallback";
 import { isOptions } from "../libs/browser";
 
@@ -51,18 +55,103 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState(defaultVal);
   const skipRemoteSyncValueRef = useRef();
+  const externalStorageValueRef = useRef();
+  const dataRef = useRef(defaultVal);
+  const persistedSettingRef = useRef(defaultVal);
+  const settingWriteQueueRef = useRef(Promise.resolve());
+  const localChangeRevisionRef = useRef(0);
+  const remoteSyncRevisionRef = useRef(0);
+  const isBackgroundManagedSetting = isExt && key === STOKEY_SETTING;
 
-  // 首次挂载时从本地存储异步加载初始数据
+  dataRef.current = data;
+
+  const applyPersistedSetting = useCallback(
+    (storedValue) => {
+      const pendingPatch = createSettingPatch(
+        persistedSettingRef.current,
+        dataRef.current
+      );
+      const nextPersisted = storedValue ?? {};
+      const visiblePersisted = storedValue ?? defaultVal;
+      const nextData =
+        pendingPatch === undefined
+          ? visiblePersisted
+          : mergeSettingPatch(visiblePersisted, pendingPatch);
+
+      persistedSettingRef.current = nextPersisted;
+      dataRef.current = nextData;
+      setData((currentValue) =>
+        isSameStorageValue(currentValue, nextData) ? currentValue : nextData
+      );
+    },
+    [defaultVal]
+  );
+
+  // Subscribe before reading so a late initial read cannot overwrite a newer
+  // value delivered by the storage change channel.
   useEffect(() => {
     let isMounted = true;
+    let storageRevision = 0;
+
+    persistedSettingRef.current = defaultVal;
+    settingWriteQueueRef.current = Promise.resolve();
+    localChangeRevisionRef.current = 0;
+    remoteSyncRevisionRef.current = 0;
+
+    const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
+      if (!isMounted) return;
+      storageRevision += 1;
+
+      if (isBackgroundManagedSetting) {
+        applyPersistedSetting(storedValue);
+        return;
+      }
+
+      const nextValue = storedValue ?? defaultVal;
+      setData((currentValue) => {
+        if (isSameStorageValue(currentValue, nextValue)) return currentValue;
+        externalStorageValueRef.current = nextValue;
+        skipRemoteSyncValueRef.current = { value: nextValue };
+        dataRef.current = nextValue;
+        return nextValue;
+      });
+    });
 
     const loadInitialData = async () => {
+      const revisionAtStart = storageRevision;
       try {
         const storedVal = await storage.getObj(key);
+        if (!isMounted || storageRevision !== revisionAtStart) return;
+
         if (storedVal === undefined || storedVal === null) {
-          // 如果存储中没有该值，写入初始默认值
-          await storage.setObj(key, defaultVal);
-        } else if (isMounted) {
+          if (isBackgroundManagedSetting) {
+            const revisionBeforeInitialization = storageRevision;
+            const response = await sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
+              patch: {},
+              scope: "none",
+            });
+            if (!isMounted) return;
+            if (
+              storageRevision === revisionBeforeInitialization &&
+              response &&
+              "setting" in response
+            ) {
+              persistedSettingRef.current = response.setting;
+              dataRef.current = response.setting;
+              setData(response.setting);
+            } else if (storageRevision === revisionBeforeInitialization) {
+              persistedSettingRef.current = {};
+              dataRef.current = defaultVal;
+              setData(defaultVal);
+            }
+          } else {
+            await storage.setObj(key, defaultVal);
+          }
+        } else {
+          if (isBackgroundManagedSetting) {
+            persistedSettingRef.current = storedVal;
+          }
+          dataRef.current = storedVal;
           setData(storedVal);
         }
       } catch (err) {
@@ -78,23 +167,66 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
 
     return () => {
       isMounted = false;
+      unsubscribe?.();
     };
-  }, [key, defaultVal]);
+  }, [key, defaultVal, isBackgroundManagedSetting, applyPersistedSetting]);
 
   // 远端同步处理器
-  const runSync = useCallback(async (keyToSync, valueToSync) => {
-    try {
-      const res = await syncData(keyToSync, valueToSync);
-      if (res?.isNew) {
-        setData(res.value);
+  const runSync = useCallback(
+    async (keyToSync, valueToSync) => {
+      try {
+        const res = await syncData(keyToSync, valueToSync);
+        if (res?.isNew) {
+          const nextValue = res.value;
+          if (!isBackgroundManagedSetting) {
+            skipRemoteSyncValueRef.current = { value: nextValue };
+          }
+          dataRef.current = nextValue;
+          setData(nextValue);
+        }
+      } catch (error) {
+        kissLog("Sync failed", keyToSync);
       }
-    } catch (error) {
-      kissLog("Sync failed", keyToSync);
-    }
-  }, []);
+    },
+    [isBackgroundManagedSetting]
+  );
 
   // 对远端同步逻辑进行防抖，防止高频触发写盘和网络请求
   const debouncedSync = useDebouncedCallback(runSync, 3000);
+
+  const enqueueSettingWrite = useCallback(() => {
+    const operation = settingWriteQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        const patch = createSettingPatch(
+          persistedSettingRef.current,
+          dataRef.current
+        );
+        if (patch === undefined) return;
+
+        const localRevision = localChangeRevisionRef.current;
+        const response = await sendBgMsg(MSG_RUNTIME_SETTING_PATCH, {
+          patch,
+          scope: "none",
+        });
+        if (!response || !("setting" in response)) return;
+
+        applyPersistedSetting(response.setting);
+        if (
+          syncKey &&
+          isOptions() &&
+          localRevision > remoteSyncRevisionRef.current
+        ) {
+          remoteSyncRevisionRef.current = localRevision;
+          debouncedSync(syncKey, response.setting);
+        }
+      });
+
+    settingWriteQueueRef.current = operation;
+    void operation.catch((err) => {
+      kissLog(`storage save error for key: ${key}`, err);
+    });
+  }, [key, syncKey, applyPersistedSetting, debouncedSync]);
 
   // 数据发生改变时触发本地写盘及远端同步
   useEffect(() => {
@@ -103,6 +235,17 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     }
 
     if (data === null) {
+      return;
+    }
+
+    if (isBackgroundManagedSetting) {
+      enqueueSettingWrite();
+      return;
+    }
+
+    if (isSameStorageValue(externalStorageValueRef.current, data)) {
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
       return;
     }
 
@@ -122,16 +265,30 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     if (syncKey && isOptions()) {
       debouncedSync(syncKey, data);
     }
-  }, [key, syncKey, isLoading, data, debouncedSync]);
+  }, [
+    key,
+    syncKey,
+    isLoading,
+    data,
+    debouncedSync,
+    isBackgroundManagedSetting,
+    enqueueSettingWrite,
+  ]);
 
   /**
    * 全量替换状态值并自动触发写盘副作用
    * @param {any | ((prevData: any) => any)} valueOrFn 新的值或一个返回新值的函数。
    */
   const save = useCallback((valueOrFn) => {
-    setData((prevData) =>
-      typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn
-    );
+    setData((prevData) => {
+      const nextData =
+        typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn;
+      if (!isSameStorageValue(prevData, nextData)) {
+        localChangeRevisionRef.current += 1;
+      }
+      dataRef.current = nextData;
+      return nextData;
+    });
   }, []);
 
   /**
@@ -147,7 +304,12 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       // 确保 preData 是一个对象，避免展开 null 或 undefined
       const baseObj =
         typeof prevData === "object" && prevData !== null ? prevData : {};
-      return { ...baseObj, ...partialData };
+      const nextData = { ...baseObj, ...partialData };
+      if (!isSameStorageValue(prevData, nextData)) {
+        localChangeRevisionRef.current += 1;
+      }
+      dataRef.current = nextData;
+      return nextData;
     });
   }, []);
 
@@ -170,6 +332,14 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     try {
       const storedVal = await storage.getObj(key);
       const nextData = storedVal ?? defaultVal;
+      if (isBackgroundManagedSetting) {
+        persistedSettingRef.current = storedVal ?? {};
+        dataRef.current = nextData;
+        setData((currentValue) =>
+          isSameStorageValue(currentValue, nextData) ? currentValue : nextData
+        );
+        return;
+      }
       if (isSameStorageValue(data, nextData)) {
         return;
       }
@@ -180,7 +350,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     } catch (err) {
       kissLog(`storage reload error for key: ${key}`, err);
     }
-  }, [key, defaultVal, data]);
+  }, [key, defaultVal, data, isBackgroundManagedSetting]);
 
   return { data, save, update, remove, reload, isLoading };
 }

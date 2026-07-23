@@ -43,6 +43,7 @@ export const MSG_CLEAR_CACHES = "clear_caches"; // 请求后台脚本清理本�
 export const MSG_OPEN_SEPARATE_WINDOW = "open_separate_window"; // 请求后台脚本开启独立窗口
 export const PORT_STREAM_FETCH = "kiss_stream_fetch"; // 双向长连接端口名称：用于大模型翻译时的流式输出通道
 export const MSG_UPDATE_ICON = "update_icon"; // 通知后台脚本更新扩展的工具栏图标状态 (激活/灰色状态)
+export const MSG_RUNTIME_SETTING_PATCH = "runtime_setting_patch"; // Persist a deep setting patch through the background writer.
 export const MSG_SHA256 = "sha256"; // 请求后台脚本代算 SHA-256 签名
 
 // --- 用于 Window.postMessage 与自定义事件通信的事件名称 ---

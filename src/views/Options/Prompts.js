@@ -49,6 +49,7 @@ import {
 } from "../../config";
 import { usePromptList } from "../../hooks/Prompt";
 import CodeField from "./CodeField";
+import { usePersistedEntityDraft } from "./usePersistedEntityDraft";
 
 const TRANSLATION_PROMPT_PLACEHOLDERS = [
   INPUT_PLACE_TEXT,
@@ -184,7 +185,16 @@ function PromptFields({
 }) {
   const i18n = useI18n();
   const confirm = useConfirm();
-  const [formData, setFormData] = useState(() => normalizePrompt(prompt));
+  const normalizedPrompt = normalizePrompt(prompt);
+  const {
+    draft: formData,
+    setDraft: setFormData,
+    isDirty: hasDraftChanges,
+  } = usePersistedEntityDraft(
+    normalizedPrompt,
+    normalizedPrompt.slug,
+    normalizePrompt
+  );
   const promptDisplayName = getPromptDisplayName(prompt, i18n);
   const systemPromptRef = useRef(null);
   const userPromptRef = useRef(null);
@@ -193,17 +203,7 @@ function PromptFields({
     formData.category === PROMPT_CATEGORY_USER ||
     formData.category === PROMPT_CATEGORY_DICTIONARY;
 
-  useLayoutEffect(() => {
-    setFormData(normalizePrompt(prompt));
-  }, [prompt]);
-
-  const isModified = useMemo(
-    () =>
-      !isPreset &&
-      JSON.stringify(normalizePrompt(prompt)) !==
-        JSON.stringify(normalizePrompt(formData)),
-    [formData, isPreset, prompt]
-  );
+  const isModified = !isPreset && hasDraftChanges;
 
   const handleChange = (event) => {
     const { name, value } = event.target;

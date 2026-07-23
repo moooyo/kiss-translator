@@ -31,6 +31,7 @@ import {
   STOKEY_SEPARATE_WINDOW,
   PORT_STREAM_FETCH,
   MSG_UPDATE_ICON,
+  MSG_RUNTIME_SETTING_PATCH,
   MSG_SHA256,
 } from "./config";
 import {
@@ -49,6 +50,7 @@ import { injectInlineJsBg, injectInternalCss } from "./libs/injector";
 import { kissLog, logger } from "./libs/log";
 import { chromeDetect, chromeTranslate } from "./libs/builtinAI";
 import { sha256 } from "./libs/utils";
+import { applyRuntimeSettingPatch } from "./libs/runtimeSettingPatch";
 
 globalThis.__KISS_CONTEXT__ = "background";
 
@@ -544,6 +546,8 @@ const messageHandlers = {
   [MSG_CLEAR_CACHES]: () => tryClearCaches(), // 清空翻译缓存
   [MSG_OPEN_SEPARATE_WINDOW]: () => openSeparateWindowWithSavedBounds(), // 打开独立翻译小窗口
   [MSG_UPDATE_ICON]: (args, sender) => updateIcon(args, sender?.tab?.id), // 变更页面的插件高亮图标
+  [MSG_RUNTIME_SETTING_PATCH]: (args, sender) =>
+    applyRuntimeSettingPatch(args, sender),
 };
 
 /**

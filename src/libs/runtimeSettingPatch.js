@@ -1,0 +1,73 @@
+import { KV_SETTING_KEY, MSG_RUNTIME_SETTING_PATCH } from "../config";
+import { browser } from "./browser";
+import { getCurTabId } from "./msg";
+import { mergeSettingPatch } from "./settingPatch";
+import {
+  getSettingWithDefault,
+  putSyncMeta,
+  setSetting as persistSetting,
+} from "./storage";
+
+let operationQueue = Promise.resolve();
+
+function enqueueOperation(task) {
+  const result = operationQueue.then(task);
+  operationQueue = result.catch(() => undefined);
+  return result;
+}
+
+export async function applyRuntimeSettingPatch(
+  { patch = {}, scope = "all" } = {},
+  sender,
+  dependencies = {}
+) {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    throw new TypeError("Runtime setting patch must be an object");
+  }
+
+  const getSetting = dependencies.getSetting || getSettingWithDefault;
+  const setSetting = dependencies.setSetting || persistSetting;
+  const markSyncMeta = dependencies.markSyncMeta || putSyncMeta;
+  const getActiveTabId = dependencies.getActiveTabId || getCurTabId;
+  const queryTabs =
+    dependencies.queryTabs || ((query) => browser.tabs.query(query));
+  const sendTabMessage =
+    dependencies.sendTabMessage ||
+    ((tabId, message) => browser.tabs.sendMessage(tabId, message));
+
+  // Persist and broadcast in one queue so concurrent contexts observe the
+  // same ordering and cannot overwrite fields written by another context.
+  return enqueueOperation(async () => {
+    const currentSetting = await getSetting();
+    const mergedSetting = mergeSettingPatch(currentSetting, patch);
+    await setSetting(mergedSetting);
+    await markSyncMeta(KV_SETTING_KEY);
+    await dependencies.onPersisted?.(mergedSetting, patch);
+
+    let tabs;
+    if (scope === "none") {
+      tabs = [];
+    } else if (scope === "current") {
+      const tabId = sender?.tab?.id ?? (await getActiveTabId());
+      tabs = Number.isInteger(tabId) ? [{ id: tabId }] : [];
+    } else {
+      tabs = await queryTabs({});
+    }
+
+    const message = {
+      action: MSG_RUNTIME_SETTING_PATCH,
+      args: { patch },
+    };
+    const results = await Promise.allSettled(
+      tabs
+        .filter((tab) => Number.isInteger(tab.id))
+        .map((tab) => sendTabMessage(tab.id, message))
+    );
+    return {
+      delivered: results.filter((result) => result.status === "fulfilled")
+        .length,
+      attempted: results.length,
+      setting: mergedSetting,
+    };
+  });
+}

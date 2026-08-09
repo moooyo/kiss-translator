@@ -8,7 +8,6 @@ import {
   STOKEY_FAB,
   STOKEY_TRANBOX,
   STOKEY_SYNC,
-  STOKEY_MSAUTH,
   STOKEY_BDAUTH,
   STOKEY_RULESCACHE_PREFIX,
   STOKEY_DISABLED_SUB_RULES,
@@ -18,7 +17,10 @@ import {
   BUILTIN_RULES,
   getSettingVersion,
   migrateSettingPromptsToV2,
+  migrateSettingToV3,
   SETTINGS_VERSION_V2,
+  CURRENT_SETTINGS_VERSION,
+  DEFAULT_TRANBOX_SETTING,
 } from "../config";
 import { isExt, isGm } from "./client";
 import { browser, isExtensionContextInvalidatedError } from "./browser";
@@ -47,6 +49,22 @@ function addLocalStorageListener(key, listener) {
     listeners.delete(listener);
     if (listeners.size === 0) localStorageListeners.delete(key);
   };
+}
+
+function hasExtensionStorageChangeChannel() {
+  return (
+    isExt && typeof browser?.storage?.onChanged?.addListener === "function"
+  );
+}
+
+function getOptionalGmMethod(method, legacyMethod) {
+  try {
+    const fallbackObjects =
+      typeof window === "undefined" ? [] : [window.KISS_GM];
+    return getGmMethod(method, legacyMethod, fallbackObjects);
+  } catch {
+    return undefined;
+  }
 }
 
 /**
@@ -80,8 +98,10 @@ function getGmStorage() {
  * @param {*} val 待写入的字符串数据
  */
 async function set(key, val) {
+  let changeWillBeEmittedExternally = false;
   if (isExt && browser?.storage?.local) {
     await browser.storage.local.set({ [key]: val });
+    changeWillBeEmittedExternally = hasExtensionStorageChangeChannel();
   } else if (isExt && process.env.NODE_ENV === "production") {
     throw new Error("Extension storage API is not available");
   } else if (isGm) {
@@ -89,7 +109,9 @@ async function set(key, val) {
   } else {
     window.localStorage.setItem(key, val);
   }
-  emitStorageChange(key, val);
+  if (!changeWillBeEmittedExternally) {
+    emitStorageChange(key, val);
+  }
 }
 
 /**
@@ -115,8 +137,10 @@ async function get(key) {
  * @param {string} key 键名
  */
 async function del(key) {
+  let changeWillBeEmittedExternally = false;
   if (isExt && browser?.storage?.local) {
     await browser.storage.local.remove([key]);
+    changeWillBeEmittedExternally = hasExtensionStorageChangeChannel();
   } else if (isExt && process.env.NODE_ENV === "production") {
     throw new Error("Extension storage API is not available");
   } else if (isGm) {
@@ -124,14 +148,16 @@ async function del(key) {
   } else {
     window.localStorage.removeItem(key);
   }
-  emitStorageChange(key, null);
+  if (!changeWillBeEmittedExternally) {
+    emitStorageChange(key, null);
+  }
 }
 
 function subscribe(key, listener) {
   const removeLocalListener = addLocalStorageListener(key, listener);
   let removeExternalListener = () => {};
 
-  if (isExt && browser?.storage?.onChanged) {
+  if (hasExtensionStorageChangeChannel()) {
     const handleChanged = (changes, areaName) => {
       if (areaName !== "local" || !changes[key]) return;
       listener(changes[key].newValue ?? null);
@@ -145,25 +171,37 @@ function subscribe(key, listener) {
       }
     };
   } else if (isGm) {
-    const addValueChangeListener =
-      globalThis.GM?.addValueChangeListener ||
-      globalThis.GM_addValueChangeListener;
-    const removeValueChangeListener =
-      globalThis.GM?.removeValueChangeListener ||
-      globalThis.GM_removeValueChangeListener;
-    if (typeof addValueChangeListener === "function") {
-      const listenerId = Promise.resolve(
+    const addValueChangeListener = getOptionalGmMethod(
+      "addValueChangeListener",
+      "GM_addValueChangeListener"
+    );
+    const removeValueChangeListener = getOptionalGmMethod(
+      "removeValueChangeListener",
+      "GM_removeValueChangeListener"
+    );
+    if (addValueChangeListener) {
+      let subscriptionActive = true;
+      const listenerId = Promise.resolve().then(() =>
         addValueChangeListener(key, (_name, _oldValue, newValue, remote) => {
-          if (remote === false) return;
+          if (!subscriptionActive || remote === false) return;
           listener(newValue ?? null);
         })
       );
+      void listenerId.catch((error) => {
+        kissLog("add GM storage listener error: ", key, error);
+      });
       removeExternalListener = () => {
+        subscriptionActive = false;
         void listenerId
-          .then((id) => removeValueChangeListener?.(id))
-          .catch((error) =>
-            kissLog("remove GM storage listener error: ", key, error)
-          );
+          .then(async (id) => {
+            if (id === undefined || !removeValueChangeListener) return;
+            try {
+              await removeValueChangeListener(id);
+            } catch (error) {
+              kissLog("remove GM storage listener error: ", key, error);
+            }
+          })
+          .catch(() => undefined);
       };
     }
   } else if (typeof window !== "undefined") {
@@ -177,7 +215,10 @@ function subscribe(key, listener) {
       window.removeEventListener("storage", handleStorage);
   }
 
+  let unsubscribed = false;
   return () => {
+    if (unsubscribed) return;
+    unsubscribed = true;
     removeLocalListener();
     removeExternalListener();
   };
@@ -268,6 +309,10 @@ const writeSettingBackupBeforeV2 = (setting) =>
 const mergeSettingWithDefault = (setting) => ({
   ...DEFAULT_SETTING,
   ...(setting || {}),
+  tranboxSetting: {
+    ...DEFAULT_TRANBOX_SETTING,
+    ...(setting?.tranboxSetting || {}),
+  },
   version: setting?.version ?? DEFAULT_SETTING.version,
 });
 export const migrateStoredSettingToV2 = async (
@@ -284,16 +329,14 @@ export const migrateStoredSettingToV2 = async (
 
 export const runDataMigration = async () => {
   const rawSetting = await getSetting();
-  if (rawSetting && getSettingVersion(rawSetting) < SETTINGS_VERSION_V2) {
+  if (rawSetting && getSettingVersion(rawSetting) < CURRENT_SETTINGS_VERSION) {
     try {
-      const nextSetting = await migrateStoredSettingToV2(
-        rawSetting,
-        rawSetting
-      );
+      const v2Setting = await migrateStoredSettingToV2(rawSetting, rawSetting);
+      const nextSetting = migrateSettingToV3(v2Setting);
       await setObj(STOKEY_SETTING, nextSetting);
-      kissLog("Migration to V2 completed.");
+      kissLog(`Migration to V${CURRENT_SETTINGS_VERSION} completed.`);
     } catch (err) {
-      kissLog("Data migration to V2 failed:", err);
+      kissLog(`Data migration to V${CURRENT_SETTINGS_VERSION} failed:`, err);
     }
   }
 };
@@ -305,8 +348,8 @@ export const getSettingWithDefault = async () => {
   }
 
   const setting =
-    getSettingVersion(rawSetting) < SETTINGS_VERSION_V2
-      ? migrateSettingPromptsToV2(rawSetting)
+    getSettingVersion(rawSetting) < CURRENT_SETTINGS_VERSION
+      ? migrateSettingToV3(rawSetting)
       : rawSetting;
 
   return mergeSettingWithDefault(setting);
@@ -411,10 +454,6 @@ export const debounceSyncMeta = debounce((key) => {
     kissLog("update sync metadata error: ", key, error);
   });
 }, 300);
-
-// --- 微软云服务授权 Token 存取 ---
-export const getMsauth = () => getObj(STOKEY_MSAUTH);
-export const setMsauth = (val) => setObj(STOKEY_MSAUTH, val);
 
 // --- 百度云服务授权 Token 存取 ---
 export const getBdauth = () => getObj(STOKEY_BDAUTH);

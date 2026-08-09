@@ -1,12 +1,20 @@
 import { YouTubeSubtitleList } from "./YouTubeSubtitleList";
 import { apiMicrosoftDict } from "../apis/index.js";
+import { downloadBlobFile } from "../libs/utils.js";
 
 jest.mock("../libs/storage.js", () => ({
   getSettingWithDefault: jest.fn(() => Promise.resolve({ darkMode: "light" })),
+  getWordsWithDefault: jest.fn(),
+  setWords: jest.fn(),
+  debounceSyncMeta: jest.fn(),
 }));
 
 jest.mock("../apis/index.js", () => ({
   apiMicrosoftDict: jest.fn(),
+}));
+
+jest.mock("../libs/utils.js", () => ({
+  downloadBlobFile: jest.fn(),
 }));
 
 function createVideoElement({ playerHeight = 360 } = {}) {
@@ -48,6 +56,8 @@ const subtitle = {
   translation: "你好世界",
 };
 
+let favoriteWords = {};
+
 function renderVisibleSubtitleItems(manager) {
   manager._cancelVirtualRender();
   manager.subtitleListEl.getClientRects = () => [{ width: 320, height: 300 }];
@@ -59,13 +69,30 @@ function renderVisibleSubtitleItems(manager) {
   manager._cancelVirtualRender();
 }
 
+async function flushPromises() {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
+
 describe("YouTubeSubtitleList", () => {
   beforeEach(() => {
     apiMicrosoftDict.mockReset();
+    const storage = require("../libs/storage.js");
+    favoriteWords = {};
+    storage.getWordsWithDefault.mockImplementation(() =>
+      Promise.resolve(favoriteWords)
+    );
+    storage.setWords.mockImplementation((words) => {
+      favoriteWords = words;
+      return Promise.resolve();
+    });
   });
 
   afterEach(() => {
     jest.useRealTimers();
+    jest.restoreAllMocks();
   });
 
   test("renders panel controls with i18n text", async () => {
@@ -76,6 +103,8 @@ describe("YouTubeSubtitleList", () => {
           bilingual_subtitles: "Bilingual subtitles",
           vocabulary_book: "Vocabulary",
           download_subtitles_vtt: "Download subtitles (VTT)",
+          download_translation_subtitles_vtt:
+            "Download translation subtitles (VTT)",
           download_raw_subtitle_events_json: "Download source data (JSON)",
           close: "Close panel",
         })[key] || ""
@@ -90,6 +119,7 @@ describe("YouTubeSubtitleList", () => {
         "Bilingual subtitles [75%]",
         "Vocabulary",
         "Download subtitles (VTT)",
+        "Download translation subtitles (VTT)",
         "Download source data (JSON)",
       ])
     );
@@ -97,8 +127,7 @@ describe("YouTubeSubtitleList", () => {
       "Close panel"
     );
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushPromises();
     manager.destroy();
   });
 
@@ -120,9 +149,31 @@ describe("YouTubeSubtitleList", () => {
     expect(container.style.height).toBe("360px");
     expect(container.style.maxHeight).toBe("360px");
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushPromises();
     manager.destroy();
+  });
+
+  test("downloads translation-only subtitles from the panel action", async () => {
+    const now = jest.spyOn(Date, "now").mockReturnValue(1234);
+    const videoEl = createVideoElement();
+    window.history.replaceState({}, "", "/watch?v=video-1");
+    const manager = new YouTubeSubtitleList(videoEl, (key) =>
+      key === "download_translation_subtitles_vtt" ? "Translation VTT" : ""
+    );
+
+    manager.initialize([subtitle], [], 100);
+    Array.from(document.querySelectorAll("button"))
+      .find((button) => button.textContent === "Translation VTT")
+      .click();
+
+    expect(downloadBlobFile).toHaveBeenCalledWith(
+      expect.stringContaining("你好世界"),
+      "kiss-subtitles-translation-video-1_1234.vtt"
+    );
+
+    await flushPromises();
+    manager.destroy();
+    now.mockRestore();
   });
 
   test("adds hover lookup spans to original text when enabled", async () => {
@@ -140,8 +191,7 @@ describe("YouTubeSubtitleList", () => {
       ).map((node) => node.textContent)
     ).toEqual(["hello", "world"]);
 
-    await Promise.resolve();
-    await Promise.resolve();
+    await flushPromises();
     manager.destroy();
   });
 
@@ -152,6 +202,7 @@ describe("YouTubeSubtitleList", () => {
         bilingual_subtitles: "Subtitles",
         vocabulary_book: "Vocabulary",
         download_subtitles_vtt: "Download VTT",
+        download_translation_subtitles_vtt: "Download translated VTT",
         download_raw_subtitle_events_json: "Download JSON",
         close: "Close panel",
       })[key] || "";
@@ -175,18 +226,22 @@ describe("YouTubeSubtitleList", () => {
         bilingual_subtitles: "Bilingual subtitles",
         vocabulary_book: "Vocabulary",
         download_subtitles_vtt: "Download VTT",
+        download_translation_subtitles_vtt: "Download translated VTT",
         download_raw_subtitle_events_json: "Download JSON",
         close: "Close panel",
       })[key] || "";
     manager.updateSetting({
       i18n,
       enableHoverLookup: true,
+      autoFavWord: true,
       theme: { darkMode: "dark" },
     });
     Array.from(container.querySelectorAll("button"))
       .find((button) => button.title === "Close panel")
       .click();
     expect(manager.container).toBe(container);
+    expect(manager.autoFavWord).toBe(true);
+    expect(manager._wordTooltipController.autoFavWord).toBe(true);
     expect(container.style.display).toBe("none");
     Object.defineProperty(videoEl, "paused", {
       value: false,
@@ -299,7 +354,7 @@ describe("YouTubeSubtitleList", () => {
       .dispatchEvent(new Event("pointerenter"));
     jest.advanceTimersByTime(300);
     await apiMicrosoftDict.mock.results[0].value;
-    await Promise.resolve();
+    await flushPromises();
     await Promise.resolve();
 
     expect(apiMicrosoftDict).toHaveBeenCalledWith("ready");
@@ -313,9 +368,108 @@ describe("YouTubeSubtitleList", () => {
       })
     );
 
+    const storage = require("../libs/storage.js");
+    const favoriteButton = document.querySelector(".kiss-favorite-word-button");
+    expect(storage.setWords).not.toHaveBeenCalled();
+    expect(favoriteButton.getAttribute("aria-pressed")).toBe("false");
+
+    favoriteButton.click();
+    await flushPromises();
+
+    expect(storage.setWords).toHaveBeenCalledWith({
+      ready: expect.objectContaining({
+        phonetic: "/redi/",
+        definition: "adj. 准备好的",
+      }),
+    });
+    expect(storage.setWords.mock.calls[0][0].ready.timestamp).toBeUndefined();
+
     document.removeEventListener("kiss-add-word", addWordHandler);
     manager.destroy();
     jest.useRealTimers();
+  });
+
+  test("automatically favorites successful hovered word lookups when enabled", async () => {
+    jest.useFakeTimers();
+    apiMicrosoftDict.mockResolvedValue({
+      aus: [{ key: "美", phonetic: "/redi/" }],
+      trs: [{ pos: "adj.", def: "准备好的" }],
+      sentences: [{ eng: "ready to go", chs: "准备出发" }],
+    });
+    const storage = require("../libs/storage.js");
+    const videoEl = createVideoElement();
+    const manager = new YouTubeSubtitleList(videoEl, () => "", {
+      enableHoverLookup: true,
+      autoFavWord: true,
+    });
+
+    manager.initialize(
+      [{ ...subtitle, start: 33000, text: "ready to go" }],
+      [],
+      100
+    );
+    renderVisibleSubtitleItems(manager);
+    document
+      .querySelector(".kiss-subtitle-word")
+      .dispatchEvent(new Event("pointerenter"));
+    jest.advanceTimersByTime(300);
+    await apiMicrosoftDict.mock.results[0].value;
+    await flushPromises();
+
+    expect(storage.setWords).toHaveBeenCalledWith({
+      ready: expect.objectContaining({
+        phonetic: "/redi/",
+        definition: "adj. 准备好的",
+        examples: [{ eng: "ready to go", chs: "准备出发" }],
+      }),
+    });
+    expect(storage.setWords.mock.calls[0][0].ready.timestamp).toBeUndefined();
+
+    manager.destroy();
+    jest.useRealTimers();
+  });
+
+  test("toggles a vocabulary item's global favorite state", async () => {
+    const storage = require("../libs/storage.js");
+    const videoEl = createVideoElement();
+    const manager = new YouTubeSubtitleList(videoEl);
+    const item = {
+      word: "ready",
+      timestamp: 33000,
+      phonetic: "/redi/",
+      definition: "adj. 准备好的",
+      examples: [{ eng: "ready to go", chs: "准备出发" }],
+    };
+
+    manager.initialize([subtitle], [], 100);
+    manager.addWord(
+      item.word,
+      item.phonetic,
+      item.definition,
+      item.examples,
+      item.timestamp
+    );
+    manager._renderVocabulary();
+    const button = document.querySelector(".kiss-favorite-word-button");
+
+    await flushPromises();
+    expect(button.style.marginLeft).toBe("auto");
+    expect(button.getAttribute("aria-pressed")).toBe("false");
+
+    button.click();
+    await flushPromises();
+
+    expect(storage.setWords).toHaveBeenCalledWith({
+      ready: expect.objectContaining({
+        phonetic: "/redi/",
+        definition: "adj. 准备好的",
+        examples: item.examples,
+      }),
+    });
+    expect(storage.setWords.mock.calls[0][0].ready.timestamp).toBeUndefined();
+    expect(button.getAttribute("aria-pressed")).toBe("true");
+
+    manager.destroy();
   });
 
   test("clears word tooltip when the subtitle list scrolls away from the hovered word", async () => {

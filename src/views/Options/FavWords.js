@@ -72,14 +72,11 @@ function resolveAiDictApiSetting({
  * @param {Object} props
  * @param {string} props.word - 生词/词组文本
  * @param {number} props.index - 单词在生词表中的序号
- * @param {number} [props.createdAt] - 收藏生词的创建时间戳
- * @param {number} [props.timestamp] - 关联的视频播放时间戳 (毫秒)
  */
 function FavAccordion({
   word,
   index,
   createdAt,
-  timestamp,
   phonetic,
   definition,
   tranboxSetting,
@@ -118,30 +115,6 @@ function FavAccordion({
     setExpanded((pre) => !pre);
   };
 
-  // 将时间戳 (毫秒数) 格式化为 MM:SS 格式，方便视频时间跳转提示展示
-  const formatTime = (milliseconds) => {
-    if (!milliseconds) return "";
-    const totalSeconds = Math.floor(milliseconds / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  // 处理点击跳转到视频指定时间点的事件
-  const jumpToTime = (e) => {
-    e.stopPropagation();
-    if (timestamp) {
-      // 通过 window.postMessage 向主页面发送跨文档消息，通知视频播放器跳转到对应时间
-      window.postMessage(
-        {
-          type: "KISS_TRANSLATOR_JUMP_TO_TIME",
-          time: timestamp,
-        },
-        "*"
-      );
-    }
-  };
-
   return (
     <Accordion
       className="kt-word-card"
@@ -165,23 +138,6 @@ function FavAccordion({
               ? new Date(createdAt).toLocaleDateString()
               : `#${index + 1}`}
           </Typography>
-          {/* 若带有视频时间戳，展示可点击跳转的时间按钮 */}
-          {timestamp && (
-            <Button
-              size="small"
-              onClick={jumpToTime}
-              style={{
-                minWidth: "auto",
-                padding: "0 4px",
-                marginLeft: "10px",
-                fontSize: "0.9rem",
-                color: "#1e88e5",
-                textTransform: "none",
-              }}
-            >
-              {formatTime(timestamp)}
-            </Button>
-          )}
         </Box>
       </AccordionSummary>
       <AccordionDetails>
@@ -573,7 +529,6 @@ export default function FavWords() {
                 index={index}
                 word={word}
                 createdAt={entry.createdAt}
-                timestamp={entry.timestamp}
                 phonetic={entry.phonetic}
                 definition={entry.definition}
                 tranboxSetting={tranboxSetting}

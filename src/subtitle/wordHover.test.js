@@ -1,8 +1,20 @@
 import { apiMicrosoftDict } from "../apis";
+import { saveFavoriteWordIfMissing } from "./favoriteWords";
 import { addWordHoverStyles, WordTooltipController } from "./wordHover";
 
 jest.mock("../apis", () => ({ apiMicrosoftDict: jest.fn() }));
 jest.mock("../libs/log", () => ({ logger: { info: jest.fn() } }));
+jest.mock("./favoriteWords", () => ({
+  createFavoriteButton: ({ word }) => {
+    const button = global.document.createElement("button");
+    button.type = "button";
+    button.className = "kiss-favorite-word-button";
+    button.textContent = "♡";
+    button.setAttribute("aria-label", `Favorite ${word}`);
+    return button;
+  },
+  saveFavoriteWordIfMissing: jest.fn(),
+}));
 
 describe("WordTooltipController hover behavior", () => {
   beforeEach(() => {
@@ -15,6 +27,8 @@ describe("WordTooltipController hover behavior", () => {
     document.getElementById("kiss-word-hover-styles")?.remove();
     apiMicrosoftDict.mockClear();
     apiMicrosoftDict.mockImplementation(() => new Promise(() => {}));
+    saveFavoriteWordIfMissing.mockReset();
+    saveFavoriteWordIfMissing.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -137,6 +151,59 @@ describe("WordTooltipController hover behavior", () => {
     expect(controller.tooltipEl.textContent).toContain("second");
     expect(controller.tooltipEl.textContent).toContain("second definition");
     expect(controller.tooltipEl.textContent).not.toContain("first definition");
+    controller.destroy();
+  });
+
+  test("keeps a successful definition visible when automatic saving fails", async () => {
+    apiMicrosoftDict.mockResolvedValue({ trs: [{ def: "definition" }] });
+    saveFavoriteWordIfMissing.mockRejectedValue(new Error("save failed"));
+    const controller = new WordTooltipController({ autoFavWord: true });
+
+    await controller.showWordTooltip("first");
+
+    expect(controller.tooltipEl.textContent).toContain("definition");
+    expect(controller.tooltipEl.textContent).not.toContain(
+      "Failed to load definition"
+    );
+    controller.destroy();
+  });
+
+  test("does not render a stale lookup after automatic saving completes", async () => {
+    let resolveFirstSave;
+    apiMicrosoftDict.mockImplementation((word) =>
+      Promise.resolve({ trs: [{ def: `${word} definition` }] })
+    );
+    saveFavoriteWordIfMissing
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveFirstSave = resolve;
+          })
+      )
+      .mockResolvedValue(false);
+    const controller = new WordTooltipController({ autoFavWord: true });
+
+    const firstLookup = controller.showWordTooltip("first");
+    await Promise.resolve();
+    await Promise.resolve();
+    const secondLookup = controller.showWordTooltip("second");
+    await secondLookup;
+    resolveFirstSave(true);
+    await firstLookup;
+
+    expect(controller.tooltipEl.textContent).toContain("second definition");
+    expect(controller.tooltipEl.textContent).not.toContain("first definition");
+    controller.destroy();
+  });
+
+  test("does not automatically save empty dictionary arrays", async () => {
+    apiMicrosoftDict.mockResolvedValue({ trs: [], aus: [], sentences: [] });
+    const controller = new WordTooltipController({ autoFavWord: true });
+
+    await controller.showWordTooltip("first");
+
+    expect(saveFavoriteWordIfMissing).not.toHaveBeenCalled();
+    expect(controller.tooltipEl.textContent).toContain("No definition found");
     controller.destroy();
   });
 

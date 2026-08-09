@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useLayoutEffect, useRef, useState } from "react";
+import { createSettingPatch, mergeSettingPatch } from "../../libs/settingPatch";
 
 function normalizeEntity(entity) {
   return entity ?? {};
@@ -38,7 +39,7 @@ function areEntitiesEqual(left, right) {
 /**
  * Keeps an editor draft separate from incoming persisted snapshots.
  * Equal snapshots are ignored, clean drafts follow persisted changes, and dirty
- * drafts survive conflicting persisted changes while the baseline advances.
+ * drafts are rebased onto persisted changes while the baseline advances.
  */
 export function usePersistedEntityDraft(
   entity,
@@ -64,14 +65,23 @@ export function usePersistedEntityDraft(
 
     const hasLocalChanges = !areEntitiesEqual(baseline, draft);
     setBaseline(persistedEntity);
-    if (!hasLocalChanges) {
+    if (hasLocalChanges) {
+      const localPatch = createSettingPatch(baseline, draft);
+      setDraft(mergeSettingPatch(persistedEntity, localPatch));
+    } else {
       setDraft(persistedEntity);
     }
   }, [baseline, draft, entityIdentity, persistedEntity]);
 
+  const discardDraft = useCallback(() => {
+    setBaseline(persistedEntity);
+    setDraft(persistedEntity);
+  }, [persistedEntity]);
+
   return {
     draft,
     setDraft,
+    discardDraft,
     isDirty: !areEntitiesEqual(baseline, draft),
   };
 }

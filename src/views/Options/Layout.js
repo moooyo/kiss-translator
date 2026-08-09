@@ -6,6 +6,29 @@ import { useI18n } from "../../hooks/I18n";
 import { useMediaQueryMatch } from "../../hooks/MediaQuery";
 import { OPTIONS_STYLES } from "./styles";
 
+export async function fetchLatestVersion({ signal, now = Date.now } = {}) {
+  const versionUrls = [
+    process.env.REACT_APP_VERSION_URL,
+    process.env.REACT_APP_VERSION_URL_GITHUB,
+  ].filter(Boolean);
+  let lastError;
+
+  for (const versionUrl of versionUrls) {
+    try {
+      const response = await fetch(`${versionUrl}?t=${now()}`, { signal });
+      if (!response.ok) {
+        throw new Error(`Version request failed: ${response.status}`);
+      }
+      return (await response.text()).trim();
+    } catch (error) {
+      if (error?.name === "AbortError") throw error;
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("No version URL configured");
+}
+
 export default function Layout() {
   const location = useLocation();
   const i18n = useI18n();
@@ -19,12 +42,8 @@ export default function Layout() {
     if (process.env.NODE_ENV === "test") return undefined;
     let active = true;
     const controller = new AbortController();
-    fetch(`${process.env.REACT_APP_VERSION_URL}?t=${Date.now()}`, {
-      signal: controller.signal,
-    })
-      .then((response) => response.text())
-      .then((text) => {
-        const version = text.trim();
+    fetchLatestVersion({ signal: controller.signal })
+      .then((version) => {
         if (
           active &&
           version &&

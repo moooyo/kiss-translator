@@ -16,6 +16,20 @@ jest.mock("../libs/log.js", () => ({
 }));
 
 describe("youtubeCaptionTracks", () => {
+  const originalFetch = global.fetch;
+
+  beforeEach(() => {
+    global.fetch = jest.fn();
+  });
+
+  afterAll(() => {
+    if (originalFetch) {
+      global.fetch = originalFetch;
+    } else {
+      delete global.fetch;
+    }
+  });
+
   test("matches language families by their leading language code", () => {
     expect(isSameLang("zh-CN", "zh-TW")).toBe(true);
     expect(isSameLang("en", "fr")).toBe(false);
@@ -57,13 +71,92 @@ describe("youtubeCaptionTracks", () => {
     expect(findCaptionTrack([chat, normal], "en", null)).toBe(normal);
   });
 
-  test("keeps the existing pop fallback behavior when no track matches", () => {
+  test("does not mutate tracks when using the fallback", () => {
     const tracks = [{ languageCode: "de" }];
 
     expect(findCaptionTrack(tracks, "en", null)).toEqual({
       languageCode: "de",
     });
-    expect(tracks).toHaveLength(0);
+    expect(tracks).toHaveLength(1);
+  });
+
+  test("reuses one page request for concurrent tracks of the same video", async () => {
+    const playerResponse = {
+      captions: {
+        playerCaptionsTracklistRenderer: {
+          captionTracks: [{ languageCode: "en" }],
+        },
+      },
+    };
+    global.fetch.mockResolvedValue({
+      text: async () =>
+        `ytInitialPlayerResponse = ${JSON.stringify(playerResponse)};`,
+    });
+
+    const results = await Promise.all([
+      getCaptionTracks("cache-video-1"),
+      getCaptionTracks("cache-video-1"),
+    ]);
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(results[0].captionTracks).toHaveLength(1);
+    expect(results[1].captionTracks).toHaveLength(1);
+  });
+
+  test("fetches again when the video changes", async () => {
+    global.fetch.mockResolvedValue({
+      text: async () =>
+        'ytInitialPlayerResponse = {"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"languageCode":"en"}]}}};',
+    });
+
+    await getCaptionTracks("cache-video-2");
+    await getCaptionTracks("cache-video-3");
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+  });
+
+  test("allows a retry after invalid page metadata", async () => {
+    global.fetch
+      .mockResolvedValueOnce({ text: async () => "invalid response" })
+      .mockResolvedValueOnce({
+        text: async () =>
+          'ytInitialPlayerResponse = {"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"languageCode":"en"}]}}};',
+      });
+
+    await getCaptionTracks("retry-video");
+    const result = await getCaptionTracks("retry-video");
+
+    expect(global.fetch).toHaveBeenCalledTimes(2);
+    expect(result.captionTracks).toHaveLength(1);
+  });
+
+  test("does not let an aborted recovery poison a same-video request", async () => {
+    let resolveFetch;
+    global.fetch.mockReturnValue(
+      new Promise((resolve) => {
+        resolveFetch = resolve;
+      })
+    );
+    const recoveryController = new AbortController();
+    const recovery = getCaptionTracks("abort-video", {
+      signal: recoveryController.signal,
+    });
+
+    recoveryController.abort();
+    await expect(recovery).resolves.toEqual({});
+
+    const intercepted = getCaptionTracks("abort-video");
+    resolveFetch({
+      text: async () =>
+        'ytInitialPlayerResponse = {"captions":{"playerCaptionsTracklistRenderer":{"captionTracks":[{"languageCode":"en"}]}}};',
+    });
+
+    await expect(intercepted).resolves.toEqual(
+      expect.objectContaining({
+        captionTracks: [{ languageCode: "en" }],
+      })
+    );
+    expect(global.fetch).toHaveBeenCalledTimes(1);
   });
 
   test("selects the second caption track from reliable audio metadata", () => {

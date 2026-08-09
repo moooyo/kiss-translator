@@ -20,6 +20,7 @@ import {
   PROMPT_MODE_FOLLOW_API,
   getDictionaryPromptOptions,
   getPromptDisplayName,
+  OPT_SKIPLANGS_SELECTION,
 } from "../../config";
 import ShortcutInput from "./ShortcutInput";
 import { useCallback, useMemo } from "react";
@@ -113,6 +114,7 @@ export default function Tranbox() {
     aiDictApiSlug = "-",
     aiDictPromptSlug = PROMPT_MODE_FOLLOW_API,
     blacklist = "",
+    skipLangs = [],
   } = tranboxSetting;
 
   return (
@@ -125,6 +127,18 @@ export default function Tranbox() {
                 checked={transOpen}
                 label={i18n("toggle_selection_translate")}
                 onChange={(checked) => updateTranbox({ transOpen: checked })}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={i18n("selection_skip_langs")}
+              description={i18n("selection_skip_langs_helper")}
+            >
+              <SettingsSelect
+                multiple
+                value={skipLangs}
+                label={i18n("selection_skip_langs")}
+                onChange={(value) => updateTranbox({ skipLangs: value })}
+                options={OPT_SKIPLANGS_SELECTION}
               />
             </SettingsRow>
             <SettingsRow label={i18n("trigger_mode")}>

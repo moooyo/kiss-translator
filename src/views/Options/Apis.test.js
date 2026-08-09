@@ -2,8 +2,13 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { Simulate } from "react-dom/test-utils";
 import Apis from "./Apis";
-import { OPT_TRANS_BUILTINAI, OPT_TRANS_OPENAI } from "../../config";
-import { fetchModelList } from "../../libs/modelList";
+import {
+  OPT_TRANS_BUILTINAI,
+  OPT_TRANS_OPENAI,
+  OPT_TRANS_GEMINI,
+  OPT_TRANS_GEMINI_2,
+} from "../../config";
+import { fetchModelCatalog } from "../../libs/modelList";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 HTMLElement.prototype.scrollTo = jest.fn();
@@ -44,7 +49,7 @@ jest.mock("../../apis", () => ({
 }));
 
 jest.mock("../../libs/modelList", () => ({
-  fetchModelList: jest.fn(),
+  fetchModelCatalog: jest.fn(),
 }));
 
 jest.mock("./ReusableAutocomplete", () => {
@@ -75,7 +80,6 @@ jest.mock("./ReusableAutocomplete", () => {
     );
   };
 });
-
 const { useApiList, useApiItem } = require("../../hooks/Api");
 
 function createApi(overrides = {}) {
@@ -267,6 +271,16 @@ describe("Apis persisted updates", () => {
     );
     expect(getSaveButton(view.container).disabled).toBe(false);
 
+    await act(async () => {
+      Simulate.click(getSaveButton(view.container));
+    });
+    expect(view.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        url: "https://draft.example/v1",
+        model: "remote-conflicting-model",
+      })
+    );
+
     view.unmount();
   });
 });
@@ -278,7 +292,10 @@ describe("Apis model list", () => {
   });
 
   test("loads model list once when model input is focused", async () => {
-    fetchModelList.mockResolvedValue(["gpt-4o", "gpt-4.1"]);
+    fetchModelCatalog.mockResolvedValue({
+      models: ["gpt-4o", "gpt-4.1"],
+      thinkingCapabilities: {},
+    });
     const view = await renderApis();
     const modelInput = getInput(view.container, "model");
 
@@ -292,14 +309,64 @@ describe("Apis model list", () => {
       await Promise.resolve();
     });
 
-    expect(fetchModelList).toHaveBeenCalledTimes(1);
-    expect(fetchModelList).toHaveBeenCalledWith({
+    expect(fetchModelCatalog).toHaveBeenCalledTimes(1);
+    expect(fetchModelCatalog).toHaveBeenCalledWith({
       apiType: OPT_TRANS_OPENAI,
       modelListUrl: "https://api.openai.com/v1/models",
       key: "sk-test",
       httpTimeout: 30,
     });
     expect(modelInput.getAttribute("data-options")).toContain("gpt-4o");
+
+    view.unmount();
+  });
+
+  test("saves OpenRouter reasoning metadata for the selected model", async () => {
+    fetchModelCatalog.mockResolvedValue({
+      models: ["provider/mandatory-model"],
+      thinkingCapabilities: {
+        "provider/mandatory-model": {
+          model: "provider/mandatory-model",
+          supportedEfforts: ["high", "low"],
+          mandatory: true,
+        },
+      },
+    });
+    const update = jest.fn();
+    const view = await renderApis(
+      createApi({
+        apiSlug: "OpenRouter",
+        apiName: "OpenRouter",
+        apiType: "OpenRouter",
+        model: "provider/mandatory-model",
+        modelListUrl: "https://openrouter.ai/api/v1/models",
+        thinkingMode: "disabled",
+      }),
+      update
+    );
+    const modelInput = getInput(view.container, "model");
+
+    await act(async () => {
+      Simulate.focus(modelInput);
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(view.container.textContent).toContain(
+      "gemini_thinking_minimum_helper"
+    );
+
+    await act(async () => {
+      Simulate.click(getSaveButton(view.container));
+    });
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        thinkingCapabilities: {
+          model: "provider/mandatory-model",
+          supportedEfforts: ["high", "low"],
+          mandatory: true,
+        },
+      })
+    );
 
     view.unmount();
   });
@@ -313,7 +380,7 @@ describe("Apis model list", () => {
       await Promise.resolve();
     });
 
-    expect(fetchModelList).not.toHaveBeenCalled();
+    expect(fetchModelCatalog).not.toHaveBeenCalled();
 
     view.unmount();
   });
@@ -347,7 +414,7 @@ describe("Apis model list", () => {
   });
 
   test("shows fetch failure without clearing model", async () => {
-    fetchModelList.mockRejectedValue(new Error("network failed"));
+    fetchModelCatalog.mockRejectedValue(new Error("network failed"));
     const view = await renderApis();
     const modelInput = getInput(view.container, "model");
 
@@ -365,7 +432,7 @@ describe("Apis model list", () => {
   });
 
   test("resets model list error when url or key changes", async () => {
-    fetchModelList.mockRejectedValue(new Error("network failed"));
+    fetchModelCatalog.mockRejectedValue(new Error("network failed"));
     const view = await renderApis();
     const modelInput = getInput(view.container, "model");
     const modelListUrlInput = getInput(view.container, "modelListUrl");
@@ -656,6 +723,30 @@ describe("Apis unsaved detail guard", () => {
     view.unmount();
   });
 
+  test("follows persisted defaults after a dirty draft is reset", async () => {
+    const initialApi = createApi();
+    const view = await renderApis(initialApi);
+    await editUrlDraft(view.container);
+    mockConfirm.mockResolvedValueOnce(true);
+
+    await act(async () => {
+      Simulate.click(getButton(view.container, "restore_default"));
+      await Promise.resolve();
+    });
+
+    expect(view.reset).toHaveBeenCalledTimes(1);
+    await view.rerender({
+      ...initialApi,
+      url: "https://reset.example/v1",
+    });
+    expect(getInput(view.container, "url").value).toBe(
+      "https://reset.example/v1"
+    );
+    expect(getSaveButton(view.container).disabled).toBe(true);
+
+    view.unmount();
+  });
+
   test("keeps the API draft when deletion is confirmed but discard is cancelled", async () => {
     const view = await renderApis();
     const { deleteApi } = useApiList.mock.results[0].value;
@@ -696,6 +787,116 @@ describe("Apis unsaved detail guard", () => {
 
     expect(deleteApis).not.toHaveBeenCalled();
     expect(urlInput.value).toBe("https://draft.example/v1");
+
+    view.unmount();
+  });
+});
+
+describe("Apis batch concurrency", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("disables batch concurrency at one when context is enabled", async () => {
+    const view = await renderApis(
+      createApi({
+        useBatchFetch: true,
+        batchConcurrency: 4,
+        useContext: true,
+      })
+    );
+    const concurrencyInput = getInput(view.container, "batchConcurrency");
+
+    expect(concurrencyInput.value).toBe("1");
+    expect(concurrencyInput.disabled).toBe(true);
+    expect(view.container.textContent).toContain(
+      "batch_concurrency_context_hint"
+    );
+
+    view.unmount();
+  });
+});
+
+describe("Apis temperature input", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("renders temperature input for OpenAI but hides it for Gemini and Gemini2", async () => {
+    const openaiView = await renderApis(
+      createApi({ apiType: OPT_TRANS_OPENAI })
+    );
+    expect(
+      openaiView.container.querySelector('input[name="temperature"]')
+    ).not.toBeNull();
+    openaiView.unmount();
+
+    const geminiView = await renderApis(
+      createApi({ apiType: OPT_TRANS_GEMINI })
+    );
+    expect(
+      geminiView.container.querySelector('input[name="temperature"]')
+    ).toBeNull();
+    geminiView.unmount();
+
+    const gemini2View = await renderApis(
+      createApi({ apiType: OPT_TRANS_GEMINI_2 })
+    );
+    expect(
+      gemini2View.container.querySelector('input[name="temperature"]')
+    ).toBeNull();
+    gemini2View.unmount();
+  });
+});
+
+describe("Apis Gemini thinking efforts", () => {
+  afterEach(() => {
+    jest.clearAllMocks();
+    document.body.innerHTML = "";
+  });
+
+  test("falls back to the default selection for an unsupported saved effort", async () => {
+    const view = await renderApis(
+      createApi({
+        apiSlug: OPT_TRANS_GEMINI,
+        apiType: OPT_TRANS_GEMINI,
+        model: "gemini-3-pro-preview",
+        thinkingMode: "enabled",
+        thinkingEffort: "medium",
+      })
+    );
+    const effortInput = getInput(view.container, "thinkingEffort");
+    expect(effortInput.value).toBe("_default");
+
+    view.unmount();
+  });
+
+  test("accepts a normalized effort as the new clean draft", async () => {
+    const initialApi = createApi({
+      apiSlug: OPT_TRANS_GEMINI,
+      apiType: OPT_TRANS_GEMINI,
+      model: "gemini-3-pro-preview",
+      thinkingMode: "enabled",
+      thinkingEffort: "medium",
+    });
+    const view = await renderApis(initialApi);
+    await editUrlDraft(view.container);
+
+    await act(async () => {
+      Simulate.click(getSaveButton(view.container));
+    });
+
+    expect(view.update).toHaveBeenCalledWith(
+      expect.objectContaining({ thinkingEffort: "_default" })
+    );
+    await view.rerender({
+      ...initialApi,
+      url: "https://draft.example/v1",
+      thinkingEffort: "_default",
+    });
+    expect(getSaveButton(view.container).disabled).toBe(true);
 
     view.unmount();
   });

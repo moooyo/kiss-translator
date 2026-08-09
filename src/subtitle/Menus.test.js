@@ -127,6 +127,10 @@ describe("subtitle Menus", () => {
     expect(DEFAULT_SUBTITLE_SETTING.autoTranslate).toBe(true);
   });
 
+  test("keeps automatic subtitle word favorites disabled by default", () => {
+    expect(DEFAULT_SUBTITLE_SETTING.autoFavWord).toBe(false);
+  });
+
   test("uses the shared brand and dark-mode token set", () => {
     const view = renderMenus({ brandColor: "violet", darkMode: "dark" });
     const panel = view.container.querySelector(".kt-subtitle-panel");

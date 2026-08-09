@@ -1,6 +1,8 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import Popup from ".";
+import { sendBgMsg } from "../../libs/msg";
+import { MSG_OPEN_OPTIONS } from "../../config";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -31,7 +33,17 @@ jest.mock("../../hooks/Setting", () => ({
 
 jest.mock("./Header", () => {
   const React = require("react");
-  return () => React.createElement("div", null, "header");
+  return ({ openSettings }) =>
+    React.createElement(
+      "div",
+      null,
+      "header",
+      React.createElement(
+        "button",
+        { type: "button", onClick: openSettings },
+        "open-settings"
+      )
+    );
 });
 
 jest.mock("./PopupCont", () => {
@@ -58,7 +70,28 @@ describe("Popup focus", () => {
     mockPopupContentAutofocus = false;
     mockSetting = { tranboxSetting: {} };
     mockSendTabMsg.mockResolvedValue(undefined);
+    sendBgMsg.mockClear();
     window.history.replaceState({}, "", "/popup.html");
+  });
+
+  test("opens settings through the background fallback channel", async () => {
+    const container = document.createElement("div");
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<Popup />);
+      await Promise.resolve();
+    });
+    act(() => {
+      Array.from(container.querySelectorAll("button"))
+        .find((button) => button.textContent === "open-settings")
+        .click();
+    });
+
+    expect(sendBgMsg).toHaveBeenCalledWith(MSG_OPEN_OPTIONS);
+    act(() => root.unmount());
+    container.remove();
   });
 
   test("focuses the popup shell instead of the first form control", async () => {

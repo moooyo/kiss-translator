@@ -6,6 +6,7 @@ export const SETTINGS_I18N = {
     ja: `この API には未保存の変更があります。破棄しますか？`,
     ko: `이 API에 저장되지 않은 변경 사항이 있습니다. 버릴까요?`,
     tr: `Bu API'de kaydedilmemiş değişiklikler var. Değişiklikler silinsin mi?`,
+    vi: `API này có thay đổi chưa lưu. Bạn có muốn bỏ các thay đổi đó không?`,
   },
   discard_prompt_changes_confirm: {
     zh: `当前提示词有未保存的更改，确定放弃吗？`,
@@ -14,6 +15,7 @@ export const SETTINGS_I18N = {
     ja: `このプロンプトには未保存の変更があります。破棄しますか？`,
     ko: `이 프롬프트에 저장되지 않은 변경 사항이 있습니다. 버릴까요?`,
     tr: `Bu istemde kaydedilmemiş değişiklikler var. Değişiklikler silinsin mi?`,
+    vi: `Lời nhắc này có thay đổi chưa lưu. Bạn có muốn bỏ các thay đổi đó không?`,
   },
   discard_changes: {
     zh: `放弃更改`,
@@ -22,6 +24,7 @@ export const SETTINGS_I18N = {
     ja: `変更を破棄`,
     ko: `변경 사항 버리기`,
     tr: `Değişiklikleri Sil`,
+    vi: `Bỏ thay đổi`,
   },
   sync_method_webdav_description: {
     zh: `Nextcloud、坚果云等 WebDAV 服务`,
@@ -30,6 +33,7 @@ export const SETTINGS_I18N = {
     ja: `Nextcloud や Nutstore などの WebDAV サービス`,
     ko: `Nextcloud 또는 Nutstore 같은 WebDAV 서비스`,
     tr: `Nextcloud veya Nutstore gibi WebDAV hizmetleri`,
+    vi: `Các dịch vụ WebDAV như Nextcloud hoặc Nutstore`,
   },
   sync_method_gist_description: {
     zh: `私密 GitHub Gist`,
@@ -38,6 +42,7 @@ export const SETTINGS_I18N = {
     ja: `非公開 GitHub Gist`,
     ko: `비공개 GitHub Gist`,
     tr: `Özel GitHub Gist`,
+    vi: `GitHub Gist riêng tư`,
   },
   sync_method_worker_description: {
     zh: `自托管 Cloudflare Worker`,
@@ -46,5 +51,6 @@ export const SETTINGS_I18N = {
     ja: `セルフホストの Cloudflare Worker`,
     ko: `자체 호스팅 Cloudflare Worker`,
     tr: `Kendi barındırdığınız Cloudflare Worker`,
+    vi: `Cloudflare Worker tự lưu trữ`,
   },
 };

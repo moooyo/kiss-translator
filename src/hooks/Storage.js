@@ -98,6 +98,8 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     settingWriteQueueRef.current = Promise.resolve();
     localChangeRevisionRef.current = 0;
     remoteSyncRevisionRef.current = 0;
+    externalStorageValueRef.current = undefined;
+    skipRemoteSyncValueRef.current = undefined;
 
     const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
       if (!isMounted) return;
@@ -284,6 +286,8 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     setData((prevData) => {
       const nextData =
         typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn;
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
       if (!isSameStorageValue(prevData, nextData)) {
         localChangeRevisionRef.current += 1;
       }
@@ -306,6 +310,8 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       const baseObj =
         typeof prevData === "object" && prevData !== null ? prevData : {};
       const nextData = { ...baseObj, ...partialData };
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
       if (!isSameStorageValue(prevData, nextData)) {
         localChangeRevisionRef.current += 1;
       }
@@ -318,8 +324,13 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
    * 从 Storage 中删除该值，并将状态重置为 null。
    */
   const remove = useCallback(async () => {
+    externalStorageValueRef.current = undefined;
+    skipRemoteSyncValueRef.current = undefined;
     try {
       await storage.del(key);
+      externalStorageValueRef.current = undefined;
+      skipRemoteSyncValueRef.current = undefined;
+      dataRef.current = null;
       setData(null);
     } catch (err) {
       kissLog(`storage remove error for key: ${key}`, err);

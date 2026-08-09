@@ -69,7 +69,6 @@ jest.mock("./trans", () => ({
       return item;
     }),
   handleSummarize: jest.fn(),
-  handleMicrosoftLangdetect: jest.fn(),
 }));
 
 import { apiDict, apiSubtitle, apiTranslate } from "./index";
@@ -81,7 +80,10 @@ import { getFetchPool } from "../libs/pool";
 import { getHttpCachePolyfill, putHttpCachePolyfill } from "../libs/cache";
 import {
   DEFAULT_API_LIST,
+  DEFAULT_BATCH_CONCURRENCY,
   OPT_TRANS_BUILTINAI,
+  OPT_TRANS_DEEPL,
+  OPT_TRANS_DEEPLX,
   OPT_TRANS_OPENAI,
 } from "../config";
 
@@ -491,6 +493,123 @@ describe("apiTranslate prompt queue isolation", () => {
     expect(queueKeys[0]).toBe(queueKeys[1]);
     expect(signedTexts[0]).not.toContain("prompt_a");
     expect(signedTexts[1]).not.toContain("prompt_b");
+  });
+
+  test("passes configured batch concurrency and isolates its queue", async () => {
+    await apiTranslate({
+      text: "hello",
+      fromLang: "en",
+      toLang: "zh-CN",
+      apiSetting: {
+        ...getOpenAiApiSetting("batch prompt A"),
+        batchConcurrency: 3,
+        useContext: false,
+      },
+      useCache: false,
+    });
+
+    expect(getBatchQueue).toHaveBeenCalledWith(
+      expect.stringMatching(/_3$/),
+      handleTranslate,
+      expect.objectContaining({ batchConcurrency: 3 })
+    );
+  });
+
+  test("uses the default batch concurrency when the setting omits it", async () => {
+    const apiSetting = getOpenAiApiSetting("batch prompt A");
+    delete apiSetting.batchConcurrency;
+
+    await apiTranslate({
+      text: "hello",
+      fromLang: "en",
+      toLang: "zh-CN",
+      apiSetting,
+      useCache: false,
+    });
+
+    expect(getBatchQueue).toHaveBeenCalledWith(
+      expect.stringMatching(new RegExp(`_${DEFAULT_BATCH_CONCURRENCY}$`)),
+      handleTranslate,
+      expect.objectContaining({
+        batchConcurrency: DEFAULT_BATCH_CONCURRENCY,
+      })
+    );
+  });
+
+  test("forces batch concurrency to one for context sessions", async () => {
+    await apiTranslate({
+      text: "hello",
+      fromLang: "en",
+      toLang: "zh-CN",
+      apiSetting: {
+        ...getOpenAiApiSetting("batch prompt A"),
+        batchConcurrency: 4,
+        useContext: true,
+      },
+      useCache: false,
+    });
+
+    expect(getBatchQueue).toHaveBeenCalledWith(
+      expect.stringMatching(/_1$/),
+      handleTranslate,
+      expect.objectContaining({ batchConcurrency: 1 })
+    );
+  });
+});
+
+describe("apiTranslate DeepL language mappings", () => {
+  beforeEach(() => {
+    mockGetCacheDigest.mockResolvedValue("a".repeat(64));
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
+  });
+
+  test("uses a Traditional Chinese target variant and generic Chinese source for DeepL", async () => {
+    const addTask = jest.fn().mockResolvedValue(["繁體譯文", "ZH"]);
+    getBatchQueue.mockReturnValue({ addTask });
+
+    const result = await apiTranslate({
+      text: "hello",
+      fromLang: "zh-TW",
+      toLang: "zh-TW",
+      apiSetting: {
+        ...DEFAULT_API_LIST.find((api) => api.apiType === OPT_TRANS_DEEPL),
+        apiSlug: "deepl_test",
+      },
+      useCache: false,
+    });
+
+    expect(addTask).toHaveBeenCalledWith(
+      "hello",
+      expect.objectContaining({ from: "ZH", to: "ZH-HANT" })
+    );
+    expect(result.srCode).toBe("zh-CN");
+  });
+
+  test("uses a Traditional Chinese target variant and generic Chinese source for DeepLX", async () => {
+    async function* translate() {
+      yield { id: 0, result: ["繁體譯文", "ZH"] };
+    }
+    handleTranslate.mockImplementationOnce(translate);
+
+    const result = await apiTranslate({
+      text: "hello",
+      fromLang: "zh-TW",
+      toLang: "zh-TW",
+      apiSetting: {
+        ...DEFAULT_API_LIST.find((api) => api.apiType === OPT_TRANS_DEEPLX),
+        apiSlug: "deeplx_test",
+      },
+      useCache: false,
+    });
+
+    expect(handleTranslate).toHaveBeenCalledWith(
+      ["hello"],
+      expect.objectContaining({ from: "ZH", to: "ZH-HANT" })
+    );
+    expect(result.srCode).toBe("zh-CN");
   });
 });
 

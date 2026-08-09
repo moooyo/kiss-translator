@@ -209,6 +209,7 @@ export default function SubtitleSetting() {
     fontScale = 100,
     enhanceMode,
     hoverLookupMode,
+    autoFavWord = false,
     showList = OPT_ENHANCE_MOBILE_OFF,
     skipAd = false,
     aiContextSlug = "-",
@@ -532,6 +533,16 @@ export default function SubtitleSetting() {
                   },
                   { value: OPT_ENHANCE_ON, label: i18n("enable") },
                 ]}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={i18n("auto_fav_word")}
+              description={i18n("settings_auto_favorite_description")}
+            >
+              <SettingsSwitch
+                checked={autoFavWord}
+                label={i18n("auto_fav_word")}
+                onChange={(checked) => updateSubtitle({ autoFavWord: checked })}
               />
             </SettingsRow>
           </SettingsCard>

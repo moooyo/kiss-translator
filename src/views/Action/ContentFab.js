@@ -13,7 +13,7 @@ import MenuItem from "@mui/material/MenuItem";
 import MenuList from "@mui/material/MenuList";
 import Paper from "@mui/material/Paper";
 import Popper from "@mui/material/Popper";
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ThemeProvider from "../../hooks/Theme";
 import { SettingProvider } from "../../hooks/Setting";
 import { useI18n } from "../../hooks/I18n";
@@ -29,6 +29,7 @@ import { sendBgMsg } from "../../libs/msg";
 import useWindowSize from "../../hooks/WindowSize";
 import Draggable from "./Draggable";
 import { ACTION_STYLES } from "./styles";
+import { useFullscreenDetect } from "../../hooks/useFullscreenDetect";
 
 export const FAB_POPPER_MODIFIERS = [
   {
@@ -53,7 +54,7 @@ export const FAB_POPPER_MODIFIERS = [
 ];
 
 export function ContentFabContent({
-  fabConfig: { x: fabX, y: fabY, fabClickAction = 0 } = {},
+  fabConfig: { x: fabX, y: fabY, edge: fabEdge, fabClickAction = 0 } = {},
   processActions,
 }) {
   const i18n = useI18n();
@@ -62,6 +63,11 @@ export function ContentFabContent({
   const [moved, setMoved] = useState(false);
   const [open, setOpen] = useState(false);
   const anchorRef = useRef(null);
+  const { isVideoFullscreen } = useFullscreenDetect();
+
+  useEffect(() => {
+    if (isVideoFullscreen) setOpen(false);
+  }, [isVideoFullscreen]);
 
   const runAction = useCallback(
     (action) => {
@@ -100,8 +106,9 @@ export function ContentFabContent({
       height: fabSize,
       left: fabX ?? Math.max(12, windowSize.w - fabSize - 26),
       top: fabY ?? Math.max(12, windowSize.h - fabSize - 26),
+      edge: fabEdge,
     }),
-    [fabX, fabY, windowSize]
+    [fabEdge, fabX, fabY, windowSize]
   );
 
   const items = [
@@ -137,6 +144,7 @@ export function ContentFabContent({
       key="fab"
       {...fabProps}
       snapEdge
+      show={!isVideoFullscreen}
       onStart={() => setMoved(false)}
       onMove={() => setMoved(true)}
       handler={

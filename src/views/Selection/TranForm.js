@@ -44,6 +44,7 @@ import CompactLanguageSelect from "../Popup/CompactLanguageSelect";
 export default function TranForm({
   text,
   setText,
+  translationText = text,
   apiSlugs: initApiSlugs,
   fromLang: initFromLang,
   toLang: initToLang,
@@ -378,7 +379,7 @@ export default function TranForm({
           {activeApiSlugs.map((slug) => (
             <TranCont
               key={slug}
-              text={text}
+              text={translationText}
               fromLang={fromLang}
               toLang={realToLang}
               apiSlug={slug}
@@ -703,7 +704,7 @@ export default function TranForm({
         activeApiSlugs.map((slug) => (
           <TranCont
             key={slug}
-            text={text}
+            text={translationText}
             fromLang={fromLang}
             toLang={realToLang}
             simpleStyle={simpleStyle}

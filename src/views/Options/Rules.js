@@ -69,6 +69,13 @@ import ShowMoreButton from "./ShowMoreButton";
 import { useConfirm } from "../../hooks/Confirm";
 import { useAllTextStyles } from "../../hooks/CustomStyles";
 import { css } from "@emotion/css";
+import {
+  SettingsCard,
+  SettingsRow,
+  SettingsSection,
+  SettingsSelect,
+  SettingsSwitch,
+} from "./SettingsCard";
 
 // 计算规则的初始表单值
 const calculateInitialValues = (rule) => {
@@ -129,6 +136,8 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
     fromLang, // 源语言
     toLang, // 目标语言
     textStyle, // 预设译文样式 slug
+    wrapOriginal = "false", // 是否为原文节点增加包裹元素
+    originalTextStyle = "style_none", // 原文样式 slug
     transOpen, // 是否开启翻译
     // bgColor,
     // textDiyStyle,
@@ -155,6 +164,12 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
     highlightWords = OPT_HIGHLIGHT_WORDS_DISABLE, // 单词高亮策略
     transOrder, // 文本顺序：由 DEFAULT_RULE / GLOBLA_RULE 提供初始值
   } = formValues;
+
+  const globalRule = rules?.list?.find((item) => item.pattern === GLOBAL_KEY);
+  const effectiveWrapOriginal =
+    wrapOriginal === GLOBAL_KEY
+      ? globalRule?.wrapOriginal === "true"
+      : wrapOriginal === "true";
 
   // 判断当前表单值是否与初始值不同，决定是否激活“保存”按钮
   const isModified = useMemo(() => {
@@ -270,6 +285,19 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
   ]
     .map((slug) => allTextStyles.find((style) => style.styleSlug === slug))
     .filter(Boolean);
+  const canInheritGlobalRule = rule?.pattern !== GLOBAL_KEY;
+  const wrapOriginalOptions = [
+    ...(canInheritGlobalRule ? [{ value: GLOBAL_KEY, label: GLOBAL_KEY }] : []),
+    { value: "false", label: i18n("disable") },
+    { value: "true", label: i18n("enable") },
+  ];
+  const originalTextStyleOptions = [
+    ...(canInheritGlobalRule ? [{ value: GLOBAL_KEY, label: GLOBAL_KEY }] : []),
+    ...allTextStyles.map((style) => ({
+      value: style.styleSlug,
+      label: style.styleName,
+    })),
+  ];
 
   return (
     <form onSubmit={handleSubmit}>
@@ -306,6 +334,46 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </div>
           </section>
         )}
+        <SettingsSection
+          title={i18n("wrap_original")}
+          className="kt-rule-original-settings"
+        >
+          <SettingsCard>
+            <SettingsRow label={i18n("wrap_original")}>
+              {canInheritGlobalRule ? (
+                <SettingsSelect
+                  value={wrapOriginal}
+                  label={i18n("wrap_original")}
+                  options={wrapOriginalOptions}
+                  disabled={disabled}
+                  onChange={(value) => updateFormValue("wrapOriginal", value)}
+                />
+              ) : (
+                <SettingsSwitch
+                  checked={wrapOriginal === "true"}
+                  label={i18n("wrap_original")}
+                  disabled={disabled}
+                  onChange={(checked) =>
+                    updateFormValue("wrapOriginal", checked ? "true" : "false")
+                  }
+                />
+              )}
+            </SettingsRow>
+            {effectiveWrapOriginal && (
+              <SettingsRow label={i18n("original_text_style")}>
+                <SettingsSelect
+                  value={originalTextStyle}
+                  label={i18n("original_text_style")}
+                  options={originalTextStyleOptions}
+                  disabled={disabled}
+                  onChange={(value) =>
+                    updateFormValue("originalTextStyle", value)
+                  }
+                />
+              </SettingsRow>
+            )}
+          </SettingsCard>
+        </SettingsSection>
         {/* 规则匹配模式输入框（如域名或通配符 '*'） */}
         <CodeField
           size="small"

@@ -661,6 +661,7 @@ describe("YouTubeCaptionProvider manual translation", () => {
       fontScale: 100,
       showList: "on",
       enhanceMode: "on",
+      autoFavWord: false,
       uiLang: "zh",
     });
     window.dispatchEvent(
@@ -676,12 +677,14 @@ describe("YouTubeCaptionProvider manual translation", () => {
 
     const manager = mockManagerInstances[0];
     const subtitleList = mockSubtitleListInstances[0];
+    expect(subtitleList.options.autoFavWord).toBe(false);
     await YouTubeInitializer({
       autoTranslate: true,
       aiContextSlug: "-",
       fontScale: 125,
       showList: "on",
       enhanceMode: "on",
+      autoFavWord: true,
       uiLang: "en",
     });
 
@@ -689,7 +692,12 @@ describe("YouTubeCaptionProvider manual translation", () => {
     expect(mockSubtitleListInstances).toEqual([subtitleList]);
     expect(manager.destroy).not.toHaveBeenCalled();
     expect(subtitleList.destroy).not.toHaveBeenCalled();
-    expect(subtitleList.updateSetting).toHaveBeenCalled();
+    expect(subtitleList.updateSetting).toHaveBeenCalledWith(
+      expect.objectContaining({ autoFavWord: true })
+    );
+    expect(manager.updateSetting).toHaveBeenCalledWith(
+      expect.objectContaining({ autoFavWord: true })
+    );
 
     provider.updateSetting({ name: "showList", value: "off" });
     provider.updateSetting({ name: "showList", value: "on" });

@@ -25,6 +25,7 @@ import {
   OPT_TRANS_CLOUDFLAREAI,
   OPT_TRANS_OLLAMA,
   OPT_TRANS_OPENROUTER,
+  OPT_TRANS_ORCAROUTER,
   OPT_TRANS_CUSTOMIZE,
   API_SPE_TYPES,
   INPUT_PLACE_FROM,
@@ -48,9 +49,10 @@ import {
   defaultSystemPromptLines,
   INPUT_PLACE_SUMMARY,
   INPUT_PLACE_CONTEXT,
-  THINKING_PARAM_MAP,
+  resolveThinkingStrategy,
+  getGeminiThinkingStrategy,
+  isGeminiInteractionsUrl,
 } from "../config";
-import { msAuth } from "../libs/auth";
 import { genDeeplFree } from "./deepl";
 import { genBaidu } from "./baidu";
 import { interpreter } from "../libs/interpreter";
@@ -310,6 +312,21 @@ const geminiText = (parts) =>
         .join("")
     : "";
 
+const geminiInteractionText = (res) =>
+  Array.isArray(res?.steps)
+    ? res.steps
+        .filter((step) => step?.type === "model_output")
+        .flatMap((step) => (Array.isArray(step.content) ? step.content : []))
+        .filter((content) => content?.type === "text" && content.text)
+        .map((content) => content.text)
+        .join("")
+    : "";
+
+const geminiResponseText = (res) =>
+  Array.isArray(res?.steps)
+    ? geminiInteractionText(res)
+    : geminiText(res?.candidates?.[0]?.content?.parts);
+
 const parseIndexSubtitleRes = (raw, events, fromLang = "auto") => {
   // 对齐器只建一次词表：buildResult 在截断修复兜底时可能执行两次。
   const aligner = createSubtitleIndexAligner(events);
@@ -414,51 +431,47 @@ const siliconflowEffortMap = {
  * 注入推理模式（Thinking）的专用控制参数。
  * 针对 DeepSeek, 阿里百炼, 硅基流动, Cerebras, OpenRouter 各大模型厂商繁杂的推理链配置参数进行统一映射注入。
  */
-const injectThinking = (body, { apiType, thinkingMode, thinkingEffort }) => {
-  if (thinkingMode === "auto") return; // 留空由模型网关自动决定
+const injectThinking = (
+  body,
+  { apiType, model, thinkingMode, thinkingEffort, thinkingCapabilities }
+) => {
+  const strategy = resolveThinkingStrategy({
+    apiType,
+    model,
+    thinkingMode,
+    thinkingEffort,
+    thinkingCapabilities,
+  });
+  if (strategy.action === "none") return;
 
-  const param = THINKING_PARAM_MAP[apiType];
-  if (!param) return;
-
-  const hasEffort = thinkingEffort && thinkingEffort !== "_default";
-
-  switch (param.type) {
+  switch (strategy.capability.protocol) {
     case "deepseek":
       body.thinking = {
-        type: thinkingMode === "enabled" ? "enabled" : "disabled",
+        type: strategy.action === "enabled" ? "enabled" : "disabled",
       };
-      if (thinkingMode === "enabled" && hasEffort) {
-        body.reasoning_effort = thinkingEffort;
+      if (strategy.effort) {
+        body.reasoning_effort = strategy.effort;
       }
       break;
     case "aliyunbailian":
       // 百炼仅支持 enable_thinking 布尔开关，不支持推理强度参数
-      body.enable_thinking = thinkingMode === "enabled";
+      body.enable_thinking = strategy.action === "enabled";
       break;
     case "siliconflow":
-      body.enable_thinking = thinkingMode === "enabled";
-      if (thinkingMode === "enabled" && hasEffort) {
+      body.enable_thinking = strategy.action === "enabled";
+      if (strategy.effort) {
         // 将抽象等级转换为硅基流动所支持的具体思考 tokens 额度
-        body.thinking_budget = siliconflowEffortMap[thinkingEffort] || 8192;
-      }
-      break;
-    case "cerebras":
-      if (thinkingMode === "disabled") {
-        body.reasoning_effort = "none";
-      } else if (hasEffort) {
-        body.reasoning_effort = thinkingEffort;
+        body.thinking_budget = siliconflowEffortMap[strategy.effort] || 8192;
       }
       break;
     case "openai":
-      if (thinkingMode === "disabled") {
-        body.reasoning_effort = "none";
-      } else if (thinkingMode === "enabled" && hasEffort) {
-        body.reasoning_effort = thinkingEffort;
-      }
+      if (strategy.effort) body.reasoning_effort = strategy.effort;
       break;
     case "openrouter":
-      if (hasEffort) {
-        body.reasoning = { effort: thinkingEffort };
+      if (strategy.action === "enabled" && !strategy.effort) {
+        body.reasoning = { enabled: true };
+      } else if (strategy.effort) {
+        body.reasoning = { effort: strategy.effort };
       }
       break;
     default:
@@ -497,20 +510,19 @@ const genGoogle2 = ({ texts, from, to, url, key }) => {
   return { url, body, headers };
 };
 
-const genMicrosoft = ({ texts, from, to, token }) => {
+const genMicrosoft = ({ texts, from, to }) => {
+  // Edge 前端内部端点：无需鉴权，Body 为纯字符串数组；from 留空表示自动检测。
   const params = queryString.stringify({
-    from,
+    from: from || "",
     to,
-    "api-version": "3.0",
+    isEnterpriseClient: false,
   });
-  const url = `https://api-edge.cognitive.microsofttranslator.com/translate?${params}`;
+  const url = `https://edge.microsoft.com/translate/translatetext?${params}`;
   const headers = {
     "Content-type": "application/json",
-    Authorization: `Bearer ${token}`,
   };
-  const body = texts.map((text) => ({ Text: text }));
 
-  return { url, body, headers };
+  return { url, body: texts, headers };
 };
 
 const genAzureAI = ({ texts, from, to, url, key, region }) => {
@@ -617,6 +629,7 @@ const genOpenAI = ({
   apiType,
   thinkingMode,
   thinkingEffort,
+  thinkingCapabilities,
 }) => {
   const userMsg = {
     role: "user",
@@ -637,7 +650,13 @@ const genOpenAI = ({
     stream: useStream,
   };
 
-  injectThinking(body, { apiType, thinkingMode, thinkingEffort });
+  injectThinking(body, {
+    apiType,
+    model,
+    thinkingMode,
+    thinkingEffort,
+    thinkingCapabilities,
+  });
 
   const headers = {
     "Content-type": "application/json",
@@ -658,6 +677,7 @@ const genGemini = ({
   maxTokens,
   hisMsgs = [],
   useStream = false,
+  apiType,
   thinkingMode,
   thinkingEffort,
 }) => {
@@ -665,7 +685,46 @@ const genGemini = ({
     .replaceAll(INPUT_PLACE_MODEL, model)
     .replaceAll(INPUT_PLACE_KEY, key);
 
-  // 流式传输使用 streamGenerateContent 端点
+  // 官方 Interactions 与 generateContent 的请求体、上下文和流式事件均不同，必须按 URL 分流。
+  if (isGeminiInteractionsUrl(url)) {
+    const userMsg = {
+      type: "user_input",
+      content: [{ type: "text", text: userPrompt }],
+    };
+    const generationConfig = {
+      max_output_tokens: maxTokens,
+      temperature,
+    };
+
+    const strategy = getGeminiThinkingStrategy({
+      apiType,
+      url,
+      model,
+      thinkingMode,
+      thinkingEffort,
+    });
+    if (strategy.field) {
+      generationConfig[strategy.field] = strategy.value;
+    }
+
+    const body = {
+      model,
+      system_instruction: systemPrompt,
+      input: [...hisMsgs, userMsg],
+      stream: useStream,
+      // Interactions 默认会在服务端保存会话；翻译历史由客户端维护，因此显式关闭存储。
+      store: false,
+      generation_config: generationConfig,
+    };
+    const headers = {
+      "Content-type": "application/json",
+      "x-goog-api-key": key,
+    };
+
+    return { url, body, headers, userMsg };
+  }
+
+  // 自定义代理通常只实现 generateContent，不能随官方默认端点一起强制迁移协议。
   if (useStream) {
     url = url.replace(":generateContent", ":streamGenerateContent");
     url += (url.includes("?") ? "&" : "?") + "alt=sse";
@@ -674,26 +733,25 @@ const genGemini = ({
   const userMsg = { role: "user", parts: [{ text: userPrompt }] };
 
   const body = {
-    contents: [
-      {
-        role: "model",
-        parts: [{ text: systemPrompt }],
-      },
-      ...hisMsgs,
-      userMsg,
-    ],
+    systemInstruction: { parts: [{ text: systemPrompt }] },
+    contents: [...hisMsgs, userMsg],
     generationConfig: {
       maxOutputTokens: maxTokens,
       temperature,
     },
   };
 
-  if (thinkingMode === "disabled") {
-    body.generationConfig.thinkingConfig = { thinkingBudget: 0 };
-  } else if (thinkingMode && thinkingMode !== "auto") {
-    if (thinkingEffort && thinkingEffort !== "_default") {
-      body.generationConfig.thinkingConfig = { thinkingLevel: thinkingEffort };
-    }
+  const strategy = getGeminiThinkingStrategy({
+    apiType,
+    url,
+    model,
+    thinkingMode,
+    thinkingEffort,
+  });
+  if (strategy.field) {
+    body.generationConfig.thinkingConfig = {
+      [strategy.field]: strategy.value,
+    };
   }
 
   Object.assign(body, {
@@ -757,7 +815,16 @@ const genGemini2 = ({
     stream: useStream,
   };
 
-  injectThinking(body, { apiType, thinkingMode, thinkingEffort });
+  const strategy = getGeminiThinkingStrategy({
+    apiType,
+    url,
+    model,
+    thinkingMode,
+    thinkingEffort,
+  });
+  if (strategy.field) {
+    body[strategy.field] = strategy.value;
+  }
 
   const headers = {
     "Content-type": "application/json",
@@ -779,6 +846,7 @@ const genClaude = ({
   useStream = false,
   thinkingMode,
   thinkingEffort,
+  thinkingCapabilities,
 }) => {
   const userMsg = {
     role: "user",
@@ -793,13 +861,22 @@ const genClaude = ({
     stream: useStream,
   };
 
-  if (thinkingMode && thinkingMode !== "auto") {
-    if (thinkingMode === "enabled") {
-      body.thinking = { type: "adaptive" };
-      if (thinkingEffort && thinkingEffort !== "_default") {
-        body.output_config = { effort: thinkingEffort };
-      }
-    }
+  const strategy = resolveThinkingStrategy({
+    apiType: OPT_TRANS_CLAUDE,
+    model,
+    thinkingMode,
+    thinkingEffort,
+    thinkingCapabilities,
+  });
+  if (strategy.action === "enabled") {
+    body.thinking = { type: "adaptive" };
+    if (strategy.effort) body.output_config = { effort: strategy.effort };
+  } else if (strategy.action === "disabled") {
+    body.thinking = { type: "disabled" };
+  } else if (strategy.action === "effort" && strategy.effort) {
+    // 强制思考模型不能发送 disabled，只能保持 adaptive 并降到最低等级。
+    body.thinking = { type: "adaptive" };
+    body.output_config = { effort: strategy.effort };
   }
 
   const headers = {
@@ -824,6 +901,7 @@ const genOpenRouter = ({
   useStream = false,
   thinkingMode,
   thinkingEffort,
+  thinkingCapabilities,
 }) => {
   const userMsg = {
     role: "user",
@@ -846,13 +924,69 @@ const genOpenRouter = ({
 
   injectThinking(body, {
     apiType: OPT_TRANS_OPENROUTER,
+    model,
     thinkingMode,
     thinkingEffort,
+    thinkingCapabilities,
   });
 
   const headers = {
     "Content-type": "application/json",
     Authorization: `Bearer ${key}`,
+    "HTTP-Referer": "https://fishjar.github.io/kiss-translator/",
+    "X-OpenRouter-Title": "KISS Translator",
+  };
+
+  return { url, body, headers, userMsg };
+};
+
+const genOrcaRouter = ({
+  url,
+  key,
+  systemPrompt,
+  userPrompt,
+  model,
+  temperature,
+  maxTokens,
+  hisMsgs = [],
+  useStream = false,
+  thinkingMode,
+  thinkingEffort,
+  thinkingCapabilities,
+}) => {
+  const userMsg = {
+    role: "user",
+    content: userPrompt,
+  };
+  const body = {
+    model,
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt,
+      },
+      ...hisMsgs,
+      userMsg,
+    ],
+    temperature,
+    max_completion_tokens: maxTokens,
+    stream: useStream,
+  };
+
+  injectThinking(body, {
+    apiType: OPT_TRANS_ORCAROUTER,
+    model,
+    thinkingMode,
+    thinkingEffort,
+    thinkingCapabilities,
+  });
+
+  const headers = {
+    "Content-type": "application/json",
+    Authorization: `Bearer ${key}`,
+    // 聚合网关的调用来源标识，便于在 OrcaRouter 控制台区分本扩展的用量
+    "HTTP-Referer": "https://fishjar.github.io/kiss-translator/",
+    "X-Title": "KISS Translator",
   };
 
   return { url, body, headers, userMsg };
@@ -870,6 +1004,7 @@ const genOllama = ({
   useStream = false,
   thinkingMode,
   thinkingEffort,
+  thinkingCapabilities,
 }) => {
   const userMsg = {
     role: "user",
@@ -891,8 +1026,10 @@ const genOllama = ({
 
   injectThinking(body, {
     apiType: OPT_TRANS_OLLAMA,
+    model,
     thinkingMode,
     thinkingEffort,
+    thinkingCapabilities,
   });
   body.stream = useStream;
 
@@ -959,6 +1096,7 @@ const genReqFuncs = {
   [OPT_TRANS_CLOUDFLAREAI]: genCloudflareAI,
   [OPT_TRANS_OLLAMA]: genOllama,
   [OPT_TRANS_OPENROUTER]: genOpenRouter,
+  [OPT_TRANS_ORCAROUTER]: genOrcaRouter,
   [OPT_TRANS_CUSTOMIZE]: genCustom,
 };
 
@@ -1097,8 +1235,15 @@ export const genTransReq = async ({ reqHook, ...args }) => {
     method = "POST",
   } = genReqFuncs[apiType](args);
 
-  if (events && apiType === OPT_TRANS_GEMINI && body?.generationConfig) {
-    body.generationConfig.responseMimeType = "application/json";
+  if (events && apiType === OPT_TRANS_GEMINI) {
+    if (body?.generation_config) {
+      body.response_format = {
+        type: "text",
+        mime_type: "application/json",
+      };
+    } else if (body?.generationConfig) {
+      body.generationConfig.responseMimeType = "application/json";
+    }
   }
 
   // 合并用户自定义headers和body
@@ -1254,6 +1399,7 @@ export const parseTransRes = async (
     case OPT_TRANS_ZAI:
     case OPT_TRANS_GEMINI_2:
     case OPT_TRANS_OPENROUTER:
+    case OPT_TRANS_ORCAROUTER:
       modelMsg = res?.choices?.[0]?.message;
       if (history && userMsg && modelMsg) {
         history.add(userMsg, {
@@ -1263,11 +1409,16 @@ export const parseTransRes = async (
       }
       return parseAIRes(modelMsg?.content, useBatchFetch);
     case OPT_TRANS_GEMINI:
-      modelMsg = res?.candidates?.[0]?.content;
-      if (history && userMsg && modelMsg) {
-        history.add(userMsg, modelMsg);
+      if (history && Array.isArray(res?.steps)) {
+        history.clear();
+        history.add(...res.steps);
+      } else {
+        modelMsg = res?.candidates?.[0]?.content;
+        if (history && userMsg && modelMsg) {
+          history.add(userMsg, modelMsg);
+        }
       }
-      return parseAIRes(geminiText(modelMsg?.parts), useBatchFetch);
+      return parseAIRes(geminiResponseText(res), useBatchFetch);
     case OPT_TRANS_CLAUDE:
       modelMsg = { role: res?.role, content: res?.content?.text };
       if (history && userMsg && modelMsg) {
@@ -1330,10 +1481,11 @@ function parseDictRes(res, apiType) {
     case OPT_TRANS_ZAI:
     case OPT_TRANS_GEMINI_2:
     case OPT_TRANS_OPENROUTER:
+    case OPT_TRANS_ORCAROUTER:
     case OPT_TRANS_OLLAMA:
       return res?.choices?.[0]?.message?.content || "";
     case OPT_TRANS_GEMINI:
-      return geminiText(res?.candidates?.[0]?.content?.parts);
+      return geminiResponseText(res);
     case OPT_TRANS_CLAUDE:
       return res?.content?.[0]?.text || "";
     case OPT_TRANS_CUSTOMIZE:
@@ -1441,7 +1593,8 @@ export const handleDict = async ({
           // 流式模型可能先输出 Markdown 代码围栏，边流式展示边剥离可避免 UI 闪出 ```。
           fullContent = stripMarkdownCodeBlock(fullContent, true);
           onStreamChunk({ markdown: fullContent });
-        } catch {
+        } catch (error) {
+          if (error?.isAIStreamTerminal) throw error;
           // 忽略单个 SSE 数据帧解析失败，等待后续帧继续输出。
         }
       }
@@ -1557,15 +1710,14 @@ export async function* handleTranslate(
     hisMsgs = history.getAll();
   }
 
-  const enableStream = useStream && API_SPE_TYPES.stream.has(apiType);
-
-  let token = "";
-  if (apiType === OPT_TRANS_MICROSOFT) {
-    token = await msAuth();
-    if (!token) {
-      throw new Error("got msauth error");
-    }
-  }
+  const enableStream =
+    useStream &&
+    API_SPE_TYPES.stream.has(apiType) &&
+    !(
+      apiType === OPT_TRANS_GEMINI &&
+      useContext &&
+      isGeminiInteractionsUrl(apiSetting.url)
+    );
 
   const getRequest = (requestUseStream) =>
     genTransReq({
@@ -1578,7 +1730,6 @@ export async function* handleTranslate(
       langMap,
       glossary,
       hisMsgs,
-      token,
       useStream: requestUseStream,
       docInfo,
     });
@@ -1703,6 +1854,17 @@ async function* handleTranslateStreamInternal(
             continue;
           }
 
+          // 中间态必须先于同一段的最终结果发出，避免较晚到达的 partial
+          // 回调覆盖已经完成的译文。
+          if (realtimeParser && streamRenderMode === "realtime") {
+            const items = realtimeParser.write(delta);
+            for (const { id, partialText, isComplete } of items) {
+              if (!isComplete) {
+                yield { id, partialText, isComplete: false };
+              }
+            }
+          }
+
           if (!formatDetected) {
             const { isJson, detected } = detectStreamFormat(fullContent);
             if (detected) {
@@ -1732,17 +1894,9 @@ async function* handleTranslateStreamInternal(
               yield { id, result: translation };
             }
           }
-          // 实时渲染模式：yield 段落级中间态
-          if (realtimeParser && streamRenderMode === "realtime") {
-            const items = realtimeParser.write(delta);
-            for (const { id, partialText, isComplete } of items) {
-              if (!isComplete) {
-                yield { id, partialText, isComplete: false };
-              }
-            }
-          }
         }
       } catch (e) {
+        if (e?.isAIStreamTerminal) throw e;
         // 忽略解析错误
       }
     }
@@ -1781,35 +1935,6 @@ async function* handleTranslateStreamInternal(
     }
   }
 }
-
-/**
- * Microsoft语言识别聚合及解析
- * @param {*} texts
- * @returns
- */
-export const handleMicrosoftLangdetect = async (texts = []) => {
-  const token = await msAuth();
-  const input =
-    "https://api-edge.cognitive.microsofttranslator.com/detect?api-version=3.0";
-  const init = {
-    headers: {
-      "Content-type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    method: "POST",
-    body: JSON.stringify(texts.map((text) => ({ Text: text }))),
-  };
-
-  const res = await fetchData(input, init, {
-    useCache: false,
-  });
-
-  if (Array.isArray(res)) {
-    return res.map((r) => r.language);
-  }
-
-  return [];
-};
 
 /**
  * 执行字幕断句与字幕翻译请求。
@@ -1907,6 +2032,7 @@ export const handleSubtitle = async ({
     case OPT_TRANS_ZAI:
     case OPT_TRANS_GEMINI_2:
     case OPT_TRANS_OPENROUTER:
+    case OPT_TRANS_ORCAROUTER:
     case OPT_TRANS_OLLAMA:
       return parseSTRes(
         res?.choices?.[0]?.message?.content ?? "",
@@ -1914,7 +2040,6 @@ export const handleSubtitle = async ({
         from
       );
     case OPT_TRANS_GEMINI: {
-      const candidate = res?.candidates?.[0];
       const { thinkingMode } = apiSetting;
       const thinkingWasOn =
         thinkingMode && thinkingMode !== "auto" && thinkingMode !== "disabled";
@@ -1922,9 +2047,12 @@ export const handleSubtitle = async ({
       // REVIEW: 本地 AI (Gemini Nano) 强大的降级容灾容错逻辑！
       // 字幕翻译时，如果开启了推理链 (Thinking)，可能会因推理产生大量额外 Token，
       // 触发 Gemini 发生 finishReason === "MAX_TOKENS" 的阶段性提前截断中止。
-      // 遇到该截断限制时，此处自动关闭推理（thinkingMode = "disabled"）并重新发送重试，
-      // 降级以取得无损字幕。该设计能够极大增强在复杂字幕网页下的长句稳定性。
-      if (candidate?.finishReason === "MAX_TOKENS" && thinkingWasOn) {
+      // 遇到该截断限制时，此处自动将推理降到当前模型支持的最低等级并重新发送重试，
+      // 尽量保留输出 token 以取得完整字幕。
+      const outputWasTruncated = Array.isArray(res?.steps)
+        ? res?.status === "incomplete" || res?.status === "budget_exceeded"
+        : res?.candidates?.[0]?.finishReason === "MAX_TOKENS";
+      if (outputWasTruncated && thinkingWasOn) {
         const [retryInput, retryInit] = await genTransReq({
           ...apiSetting,
           // Gemini 字幕重试同样需要完整 JSON/VTT 结果，避免把 SSE 当普通响应解析。
@@ -1944,15 +2072,12 @@ export const handleSubtitle = async ({
           fetchLimit,
           httpTimeout,
         });
-        if (retryRes?.candidates?.[0]?.content?.parts) {
-          return parseSTRes(
-            geminiText(retryRes.candidates[0].content.parts),
-            events,
-            from
-          );
+        const retryText = geminiResponseText(retryRes);
+        if (retryText) {
+          return parseSTRes(retryText, events, from);
         }
       }
-      return parseSTRes(geminiText(candidate?.content?.parts), events, from);
+      return parseSTRes(geminiResponseText(res), events, from);
     }
     case OPT_TRANS_CLAUDE:
       return parseSTRes(res?.content?.[0]?.text ?? "", events, from);
@@ -2034,7 +2159,8 @@ async function handleSubtitleStreamInternal(
 
       fullContent += delta;
       appendSubtitles(parser.write(delta), false);
-    } catch {
+    } catch (error) {
+      if (error?.isAIStreamTerminal) throw error;
       // 单个 SSE 分片异常不终止整条字幕流，等待后续分片或最终兜底解析补齐。
     }
   }
@@ -2117,10 +2243,11 @@ export const handleSummarize = async ({
     case OPT_TRANS_ZAI:
     case OPT_TRANS_GEMINI_2:
     case OPT_TRANS_OPENROUTER:
+    case OPT_TRANS_ORCAROUTER:
     case OPT_TRANS_OLLAMA:
       return res?.choices?.[0]?.message?.content?.trim() || "";
     case OPT_TRANS_GEMINI:
-      return geminiText(res?.candidates?.[0]?.content?.parts).trim() || "";
+      return geminiResponseText(res).trim() || "";
     case OPT_TRANS_CLAUDE:
       return res?.content?.[0]?.text?.trim() || "";
     case OPT_TRANS_CUSTOMIZE:

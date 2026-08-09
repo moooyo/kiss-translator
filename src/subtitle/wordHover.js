@@ -5,6 +5,10 @@ import {
   createM3CssVariableDeclarations,
   resolveM3Colors,
 } from "../styles/m3.js";
+import {
+  createFavoriteButton,
+  saveFavoriteWordIfMissing,
+} from "./favoriteWords.js";
 
 /**
  * 动态向网页 document.head 中注入生词 hover 及详情气泡弹窗所需的 CSS 样式
@@ -158,14 +162,30 @@ export function wrapWordsWithSpans(text) {
 }
 
 export class WordTooltipController {
-  constructor({ getVideoContainer, getTimestamp }) {
+  constructor({
+    getVideoContainer,
+    getTimestamp,
+    autoFavWord = false,
+    i18n = () => "",
+  } = {}) {
     this.getVideoContainer = getVideoContainer;
     this.getTimestamp = getTimestamp;
+    this.autoFavWord = autoFavWord;
+    this.i18n = i18n;
     this.tooltipEl = null;
     this.hoverTimeout = null;
     this.activeWordEl = null;
     this.lookupRequestId = 0;
     this.spanListeners = new Map();
+  }
+
+  updateSetting({ autoFavWord, i18n } = {}) {
+    if (typeof autoFavWord === "boolean") {
+      this.autoFavWord = autoFavWord;
+    }
+    if (typeof i18n === "function") {
+      this.i18n = i18n;
+    }
   }
 
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
@@ -322,7 +342,19 @@ export class WordTooltipController {
         examples,
         timestamp,
       });
-      this.#renderDictionaryResult(word, dictResult);
+      const wordData = { timestamp, phonetic, definition, examples };
+      const hasDictionaryResult = this.#hasDictionaryResult(dictResult);
+      if (this.autoFavWord && hasDictionaryResult) {
+        try {
+          await saveFavoriteWordIfMissing(word, wordData);
+        } catch (error) {
+          logger.info("Failed to save favorite subtitle word:", word, error);
+        }
+      }
+      if (requestId !== this.lookupRequestId || this.tooltipEl !== tooltipEl) {
+        return;
+      }
+      this.#renderDictionaryResult(word, dictResult, wordData);
     } catch (error) {
       if (requestId !== this.lookupRequestId || this.tooltipEl !== tooltipEl) {
         return;
@@ -343,6 +375,7 @@ export class WordTooltipController {
         <button type="button" class="kiss-word-tooltip-close">×</button>
       </div>
       <div class="kiss-word-definition">Failed to load definition</div>`);
+        this.#addFavoriteButton(word, { timestamp });
       }
     }
   }
@@ -387,15 +420,29 @@ export class WordTooltipController {
     return { phonetic, definition, examples };
   }
 
+  #hasDictionaryResult(dictResult) {
+    return ["trs", "aus", "sentences"].some(
+      (key) => Array.isArray(dictResult?.[key]) && dictResult[key].length > 0
+    );
+  }
+
   #dispatchAddWord(detail) {
     document.dispatchEvent(new CustomEvent("kiss-add-word", { detail }));
   }
 
-  #renderDictionaryResult(word, dictResult) {
-    if (
-      dictResult &&
-      (dictResult.trs || dictResult.aus || dictResult.sentences)
-    ) {
+  #addFavoriteButton(word, data) {
+    const header = this.tooltipEl?.querySelector(".kiss-word-tooltip-header");
+    const closeButton = header?.querySelector(".kiss-word-tooltip-close");
+    if (!header || !closeButton) return;
+
+    header.insertBefore(
+      createFavoriteButton({ word, data, i18n: this.i18n }),
+      closeButton
+    );
+  }
+
+  #renderDictionaryResult(word, dictResult, wordData) {
+    if (this.#hasDictionaryResult(dictResult)) {
       let content = `<div class="kiss-word-tooltip-header">
           <span>${word}</span>
           <button type="button" class="kiss-word-tooltip-close">×</button>
@@ -429,6 +476,7 @@ export class WordTooltipController {
 
       if (this.tooltipEl) {
         this.tooltipEl.innerHTML = trustedTypesHelper.createHTML(content);
+        this.#addFavoriteButton(word, wordData);
       }
       return;
     }
@@ -440,6 +488,7 @@ export class WordTooltipController {
           <button type="button" class="kiss-word-tooltip-close">×</button>
         </div>
         <div class="kiss-word-definition">No definition found</div>`);
+      this.#addFavoriteButton(word, wordData);
     }
   }
 }

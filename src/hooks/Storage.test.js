@@ -288,6 +288,44 @@ describe("useStorage remote sync", () => {
     host.unmount();
   });
 
+  test("does not retain an external marker after a batched local overwrite", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    act(() => {
+      storageListeners.forEach((listener) => listener({ source: "remote" }));
+      host.hookResult.save({ source: "local" });
+    });
+    await flushEffects();
+
+    expect(storage.setObj).toHaveBeenCalledWith("local-setting", {
+      source: "local",
+    });
+    expect(syncData).toHaveBeenCalledWith("kiss-setting_v2.json", {
+      source: "local",
+    });
+
+    storage.setObj.mockClear();
+    syncData.mockClear();
+    await act(async () => {
+      host.hookResult.save({ source: "remote" });
+    });
+    await flushEffects();
+
+    expect(storage.setObj).toHaveBeenCalledWith("local-setting", {
+      source: "remote",
+    });
+    expect(syncData).toHaveBeenCalledWith("kiss-setting_v2.json", {
+      source: "remote",
+    });
+
+    host.unmount();
+  });
+
   test("sends a minimal deep setting patch to the background writer", async () => {
     let storedSetting = {
       darkMode: "auto",

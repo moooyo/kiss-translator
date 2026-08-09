@@ -143,10 +143,18 @@ export class BilingualSubtitleManager {
     }
 
     addWordHoverStyles(this.#setting);
-    if (this.#wordTooltipController) return;
+    if (this.#wordTooltipController) {
+      this.#wordTooltipController.updateSetting({
+        autoFavWord: this.#setting.autoFavWord === true,
+        i18n: this.#setting.i18n,
+      });
+      return;
+    }
     this.#wordTooltipController = new WordTooltipController({
       getVideoContainer: () => this.#videoEl.parentElement?.parentElement,
       getTimestamp: () => this.#getCurrentSubtitleStartTime(),
+      autoFavWord: this.#setting.autoFavWord === true,
+      i18n: this.#setting.i18n,
     });
   }
 
@@ -847,9 +855,14 @@ export class BilingualSubtitleManager {
       this.#resetTranslationThrottle();
     }
     if (
-      ["hoverLookupMode", "enhanceMode", "brandColor", "darkMode"].some(
-        (name) => Object.prototype.hasOwnProperty.call(obj, name)
-      )
+      [
+        "hoverLookupMode",
+        "enhanceMode",
+        "autoFavWord",
+        "i18n",
+        "brandColor",
+        "darkMode",
+      ].some((name) => Object.prototype.hasOwnProperty.call(obj, name))
     ) {
       this.#syncWordTooltipController();
     }

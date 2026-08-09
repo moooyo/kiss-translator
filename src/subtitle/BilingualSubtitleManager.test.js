@@ -1,5 +1,6 @@
 import { BilingualSubtitleManager } from "./BilingualSubtitleManager";
 import { apiMicrosoftDict, apiTranslate } from "../apis/index.js";
+import { saveFavoriteWordIfMissing } from "./favoriteWords";
 
 jest.mock("../apis/index.js", () => ({
   apiTranslate: jest.fn(),
@@ -14,6 +15,15 @@ jest.mock("../libs/log.js", () => ({
     info: jest.fn(),
     warn: jest.fn(),
   },
+}));
+
+jest.mock("./favoriteWords", () => ({
+  createFavoriteButton: () => {
+    const button = global.document.createElement("button");
+    button.className = "kiss-favorite-word-button";
+    return button;
+  },
+  saveFavoriteWordIfMissing: jest.fn(),
 }));
 
 /**
@@ -128,6 +138,8 @@ describe("BilingualSubtitleManager", () => {
   beforeEach(() => {
     apiTranslate.mockReset();
     apiMicrosoftDict.mockReset();
+    saveFavoriteWordIfMissing.mockReset();
+    saveFavoriteWordIfMissing.mockResolvedValue(false);
   });
 
   afterEach(() => {
@@ -227,6 +239,37 @@ describe("BilingualSubtitleManager", () => {
 
     manager.updateSetting({ hoverLookupMode: "off" });
     expect(document.querySelector(".kiss-subtitle-word")).toBeNull();
+    expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
+    manager.destroy();
+  });
+
+  test("updates automatic favorites without recreating the manager", async () => {
+    jest.useFakeTimers();
+    apiMicrosoftDict.mockResolvedValue({
+      trs: [{ pos: "n.", def: "a greeting" }],
+    });
+    const videoEl = createVideoElement();
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "translated hello" }],
+      setting: { ...setting, hoverLookupMode: "on", autoFavWord: false },
+    });
+
+    manager.start();
+    const paper = document.querySelector(".kiss-caption-paper");
+    manager.updateSetting({ autoFavWord: true });
+    document
+      .querySelector(".kiss-subtitle-word")
+      .dispatchEvent(new Event("pointerenter", { bubbles: true }));
+    jest.advanceTimersByTime(300);
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(saveFavoriteWordIfMissing).toHaveBeenCalledWith(
+      "hello",
+      expect.objectContaining({ definition: "n. a greeting" })
+    );
     expect(document.querySelector(".kiss-caption-paper")).toBe(paper);
     manager.destroy();
   });

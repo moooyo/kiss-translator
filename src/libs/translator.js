@@ -180,6 +180,7 @@ export class Translator {
     highlight: `${APP_LCNAME}-highlight`,
     retry: `${APP_LCNAME}-retry`,
     backup: `${APP_LCNAME}-backup`,
+    original: `${APP_LCNAME}-original`,
     hoverBubble: `${APP_LCNAME}-hover-bubble`,
   };
 
@@ -352,6 +353,7 @@ export class Translator {
   #processedNodes = new WeakMap(); // 已处理（已执行翻译DOM操作）的单元
   #rootNodes = new Set(); // 已监控的根节点
   #skipMoNodes = new WeakSet(); // 忽略变化的节点
+  #ignoredMutationTargets = new WeakSet(); // 临时忽略扩展自身 DOM 调整产生的变化
   #plainTextPreprocessingNodes = new WeakSet(); // 正在流式预处理的纯文本 pre
 
   #removeKeydownHandler; // 快捷键清理函数
@@ -361,6 +363,8 @@ export class Translator {
   #hoverBubbleNode = null; // 鼠标悬停气泡容器
   #hoverBubbleTarget = null; // 当前气泡绑定的原文节点
   #hoverBubbleRunId = 0; // 用于丢弃过期的气泡翻译请求
+  #hoverOriginalTimer = null; // 延迟显示隐藏原文的定时器
+  #hoverOriginalTimerTarget = null; // 当前等待显示原文的译文容器
   #boundMouseMoveHandler; // 鼠标事件
   #boundKeyDownHandler; // 键盘事件
   #windowMessageHandler = null;
@@ -1145,6 +1149,7 @@ export class Translator {
     return new MutationObserver((mutations) => {
       for (const mutation of mutations) {
         if (
+          this.#ignoredMutationTargets.has(mutation.target) ||
           this.#skipMoNodes.has(mutation.target) ||
           this.#plainTextPreprocessingNodes.has(mutation.target) ||
           mutation.nextSibling?.tagName?.toLowerCase() ===
@@ -1187,10 +1192,61 @@ export class Translator {
     });
   }
 
+  #withIgnoredMutations(targets, callback) {
+    const validTargets = targets.filter((target) => target instanceof Node);
+    validTargets.forEach((target) => this.#ignoredMutationTargets.add(target));
+    try {
+      return callback();
+    } finally {
+      queueMicrotask(() => {
+        validTargets.forEach((target) =>
+          this.#ignoredMutationTargets.delete(target)
+        );
+      });
+    }
+  }
+
   // 节流的鼠标悬停事件
   #createDebounceMouseMover() {
     return debounce((targetNode) => {
       const startNode = targetNode;
+      // 仅译文模式下，真实鼠标目标是扩展生成的译文容器；必须先于普通页面节点识别。
+      const translationWrapper = startNode.closest?.(
+        `.${Translator.KISS_CLASS.warpper}`
+      );
+      const { mouseHoverKey = [], mouseHoverKey2 = [] } =
+        this.#setting.mouseHoverSetting;
+      const hasMouseHoverShortcut =
+        mouseHoverKey.length > 0 || mouseHoverKey2.length > 0;
+
+      if (translationWrapper) {
+        this.#hoveredNode = translationWrapper;
+        if (this.#canShowOriginalInHoverBubble(translationWrapper)) {
+          if (hasMouseHoverShortcut) {
+            // 配置了快捷键时只记录目标，等待快捷键回调立即显示原文。
+            this.#clearHoverOriginalTimer();
+            if (this.#hoverBubbleTarget !== translationWrapper) {
+              this.#hideHoverBubble();
+            }
+          } else {
+            this.#scheduleOriginalHoverBubble(translationWrapper);
+          }
+        } else {
+          this.#hideHoverBubble();
+        }
+        return;
+      }
+
+      if (
+        this.#hoverOriginalTimerTarget ||
+        this.#hoverBubbleTarget?.classList?.contains(
+          Translator.KISS_CLASS.warpper
+        )
+      ) {
+        // 鼠标已离开译文，取消待显示任务并清除现有原文气泡。
+        this.#hideHoverBubble();
+      }
+
       let foundNode = null;
       while (targetNode && targetNode !== document.body) {
         if (this.#observedNodes.has(targetNode)) {
@@ -1201,10 +1257,6 @@ export class Translator {
       }
       this.#hoveredNode = foundNode || startNode;
 
-      const { mouseHoverKey = [], mouseHoverKey2 = [] } =
-        this.#setting.mouseHoverSetting;
-      const hasMouseHoverShortcut =
-        mouseHoverKey.length > 0 || mouseHoverKey2.length > 0;
       if (!hasMouseHoverShortcut && !this.#isInitialized) {
         this.#init();
       }
@@ -1236,6 +1288,11 @@ export class Translator {
       this.#init();
     }
     let targetNode = this.#hoveredNode;
+    // 译文容器不属于 observedNodes，快捷键路径需要在普通可翻译节点校验之前处理。
+    if (this.#canShowOriginalInHoverBubble(targetNode)) {
+      this.#showOriginalHoverBubble(targetNode);
+      return;
+    }
     if (!targetNode || !this.#observedNodes.has(targetNode)) return;
 
     this.#toggleTargetNode(targetNode);
@@ -1270,6 +1327,87 @@ export class Translator {
       this.#setting.mouseHoverSetting?.displayMode ===
       OPT_MOUSE_HOVER_DISPLAY_BUBBLE
     );
+  }
+
+  // 原文气泡只依赖气泡模式和“隐藏原文”，不要求额外开启行内悬浮恢复选项。
+  #shouldUseOriginalHoverBubble() {
+    return (
+      this.#mouseHoverEnabled &&
+      this.#isMouseHoverBubbleMode() &&
+      this.#rule.transOnly === "true"
+    );
+  }
+
+  // 确认译文容器仍保存着本次翻译对应的隐藏原文节点。
+  #canShowOriginalInHoverBubble(wrapper) {
+    if (
+      !this.#shouldUseOriginalHoverBubble() ||
+      !wrapper?.classList?.contains(Translator.KISS_CLASS.warpper)
+    ) {
+      return false;
+    }
+
+    const data = this.#translationNodes.get(wrapper);
+    return Boolean(data?.isHide && data.nodes?.length);
+  }
+
+  // 原文节点已被移入 wrapper 内的 template 备份，读取 textContent 不会改变页面布局。
+  #getOriginalText(wrapper) {
+    const { nodes = [] } = this.#translationNodes.get(wrapper) || {};
+    return nodes
+      .map((node) => node.textContent || "")
+      .join("")
+      .trim();
+  }
+
+  // 取消直接悬停模式下尚未到期的原文气泡任务。
+  #clearHoverOriginalTimer() {
+    if (this.#hoverOriginalTimer) {
+      clearTimeout(this.#hoverOriginalTimer);
+      this.#hoverOriginalTimer = null;
+    }
+    this.#hoverOriginalTimerTarget = null;
+  }
+
+  // 快捷键为空时，沿用“悬浮显示原文延迟”的时长后再展示气泡。
+  #scheduleOriginalHoverBubble(wrapper) {
+    if (
+      this.#hoverBubbleTarget === wrapper &&
+      this.#hoverBubbleNode?.isConnected
+    ) {
+      return;
+    }
+    if (this.#hoverOriginalTimerTarget === wrapper) return;
+
+    this.#hideHoverBubble();
+    const parsedDelay = parseFloat(this.#rule.transOnlyRevertDelay);
+    const delay = Number.isFinite(parsedDelay) ? Math.max(0, parsedDelay) : 0.5;
+    this.#hoverOriginalTimerTarget = wrapper;
+    this.#hoverOriginalTimer = setTimeout(() => {
+      this.#hoverOriginalTimer = null;
+      this.#hoverOriginalTimerTarget = null;
+      if (
+        // 定时器到期时再次校验，避免鼠标移动或规则切换后显示过期内容。
+        this.#hoveredNode === wrapper &&
+        this.#canShowOriginalInHoverBubble(wrapper)
+      ) {
+        this.#showOriginalHoverBubble(wrapper);
+      }
+    }, delay * 1000);
+  }
+
+  // 直接复用气泡容器显示缓存原文，不发起反向翻译请求。
+  #showOriginalHoverBubble(wrapper) {
+    this.#clearHoverOriginalTimer();
+    const text = this.#getOriginalText(wrapper);
+    if (!text) {
+      this.#hideHoverBubble();
+      return;
+    }
+
+    this.#hideHoverBubble();
+    this.#hoverBubbleTarget = wrapper;
+    this.#showHoverBubble(text);
   }
 
   // 获取元素的 shadowRoot（支持 closed 模式）
@@ -1335,6 +1473,10 @@ export class Translator {
 
     let current = startNode;
     while (current && current !== document.body) {
+      if (current.classList?.contains(Translator.KISS_CLASS.original)) {
+        current = current.parentElement;
+        continue;
+      }
       if (this.#isBlockNode(current) || this.#observedNodes.has(current)) {
         // 确保找到的容器在我们监控的根节点内
         for (const root of this.#rootNodes) {
@@ -2093,6 +2235,8 @@ export class Translator {
       // skipLangs = [],
       highlightWords,
       transOrder = "original-first",
+      wrapOriginal,
+      originalTextStyle,
     } = this.#rule;
     const {
       newlineLength,
@@ -2253,13 +2397,22 @@ export class Translator {
         inner.innerHTML = trustedHTML;
       });
 
-      this.#translationNodes.set(wrapper, {
+      let originalWrapper = null;
+      if (wrapOriginal === "true") {
+        this.#withViewportAnchor(() => {
+          originalWrapper = this.#wrapOriginalNodes(nodes, originalTextStyle);
+        });
+      }
+
+      const translationData = {
         nodes,
+        originalWrapper,
         isHide: hideOrigin,
-      });
+      };
+      this.#translationNodes.set(wrapper, translationData);
       if (hideOrigin) {
         this.#withViewportAnchor(() => {
-          this.#removeNodes(nodes, wrapper);
+          this.#removeOriginal(translationData, wrapper);
         });
       }
 
@@ -2403,6 +2556,7 @@ overflow-wrap: anywhere !important;`;
 
   // 隐藏并移除悬停气泡，同时通过递增 RunId 废弃正在进行的翻译请求
   #hideHoverBubble() {
+    this.#clearHoverOriginalTimer();
     this.#hoverBubbleRunId++;
     this.#hoverBubbleTarget = null;
     if (this.#hoverBubbleNode) {
@@ -2413,6 +2567,7 @@ overflow-wrap: anywhere !important;`;
 
   // 气泡模式下翻译目标节点，处理请求竞态与错误边界
   async #translateHoverBubbleNode(node) {
+    this.#clearHoverOriginalTimer();
     if (!Translator.isElementOrFragment(node)) return;
     if (this.#hoverBubbleTarget === node && this.#hoverBubbleNode) return;
 
@@ -2513,14 +2668,16 @@ overflow-wrap: anywhere !important;`;
           });
         }
 
-        // 换行符替换
-        text = text.replace(/\r?\n/g, () => pushReplace(`&#10;`));
-
         return escapeHTML(text);
       }
 
       // 元素节点
       if (node.nodeType === Node.ELEMENT_NODE) {
+        // 收藏词高亮只影响原文显示，不应改变翻译请求的结构
+        if (node.classList.contains(Translator.KISS_CLASS.highlight)) {
+          return Array.from(node.childNodes, traverse).join("");
+        }
+
         if (this.#isIgnoredElement(node)) {
           return "";
         }
@@ -2602,7 +2759,13 @@ overflow-wrap: anywhere !important;`;
       return tag;
     }
 
-    const processedString = nodes.map(traverse).join("").trim();
+    let processedString = nodes.map(traverse).join("").trim();
+
+    // 先清理整个翻译片段两端的源码排版空白，再保护正文内部的换行和 Tab。
+    // 不能逐个 trim 文本节点，否则会破坏行内元素之间的必要空格。
+    processedString = processedString.replace(/\r?\n|\t/g, (whitespace) =>
+      pushReplace(whitespace === "\t" ? "&#9;" : "&#10;")
+    );
 
     return [processedString, placeholderMap];
   }
@@ -2751,6 +2914,10 @@ overflow-wrap: anywhere !important;`;
       ? wrapper.previousSibling
       : wrapper.nextSibling;
 
+    if (current?.classList?.contains(Translator.KISS_CLASS.original)) {
+      return [current];
+    }
+
     while (current) {
       if (
         this.#shouldBreak(current) &&
@@ -2794,6 +2961,56 @@ overflow-wrap: anywhere !important;`;
     return backup;
   }
 
+  #getOriginalStyleClass(style) {
+    return this.#textClass[style] || this.#textClass[OPT_STYLE_NONE] || "";
+  }
+
+  #wrapOriginalNodes(nodes, style) {
+    if (!nodes?.length) return null;
+
+    const parent = nodes[0].parentNode;
+    if (!parent || nodes.some((node) => node.parentNode !== parent)) {
+      return null;
+    }
+
+    const originalWrapper = document.createElement("span");
+    originalWrapper.className = [
+      Translator.KISS_CLASS.original,
+      this.#getOriginalStyleClass(style),
+    ]
+      .filter(Boolean)
+      .join(" ");
+
+    this.#withIgnoredMutations([parent, originalWrapper], () => {
+      nodes[0].before(originalWrapper);
+      nodes.forEach((node) => originalWrapper.appendChild(node));
+    });
+
+    return originalWrapper;
+  }
+
+  #unwrapOriginal(originalWrapper) {
+    if (!originalWrapper?.parentNode) return;
+
+    const parent = originalWrapper.parentNode;
+    this.#withIgnoredMutations([parent, originalWrapper], () => {
+      originalWrapper.replaceWith(...originalWrapper.childNodes);
+    });
+  }
+
+  #getOriginalUnits({ nodes = [], originalWrapper } = {}) {
+    return originalWrapper ? [originalWrapper] : nodes;
+  }
+
+  #setOriginalStyle(originalWrapper, oldStyle, newStyle) {
+    if (!originalWrapper) return;
+
+    const oldClass = this.#getOriginalStyleClass(oldStyle);
+    const newClass = this.#getOriginalStyleClass(newStyle);
+    if (oldClass) originalWrapper.classList.remove(oldClass);
+    if (newClass) originalWrapper.classList.add(newClass);
+  }
+
   #tryAdoptExistingTranslationHost(hostNode) {
     if (!Translator.isElementOrFragment(hostNode)) return false;
 
@@ -2806,11 +3023,18 @@ overflow-wrap: anywhere !important;`;
       const backup = this.#getTranslationBackup(wrapper);
       const backupNodes = backup ? Array.from(backup.content.childNodes) : [];
       const hasBackupNodes = backupNodes.length > 0;
-      const nodes = hasBackupNodes
+      const collectedNodes = hasBackupNodes
         ? backupNodes
         : this.#collectExistingTranslationNodes(wrapper);
+      const originalWrapper = collectedNodes.find((node) =>
+        node.classList?.contains(Translator.KISS_CLASS.original)
+      );
+      const nodes = originalWrapper
+        ? Array.from(originalWrapper.childNodes)
+        : collectedNodes;
       this.#translationNodes.set(wrapper, {
         nodes,
+        originalWrapper,
         isHide: hasBackupNodes,
       });
       nodes.forEach((node) => {
@@ -2833,9 +3057,12 @@ overflow-wrap: anywhere !important;`;
       this.#processedNodes.delete(parentElement);
 
       // 如果是仅显示译文模式，先恢复原文
-      const { nodes, isHide } = this.#translationNodes.get(el) || {};
-      if (isHide) {
-        this.#restoreOriginal(el, nodes);
+      const data = this.#translationNodes.get(el);
+      if (data?.isHide) {
+        this.#restoreOriginal(el, data);
+      }
+      if (data?.originalWrapper) {
+        this.#unwrapOriginal(data.originalWrapper);
       }
 
       this.#translationNodes.delete(el);
@@ -2850,64 +3077,62 @@ overflow-wrap: anywhere !important;`;
   }
 
   // 恢复原文
-  #restoreOriginal(el, nodes) {
-    if (nodes) {
-      const frag = document.createDocumentFragment();
-      nodes.forEach((n) => frag.appendChild(n));
+  #restoreOriginal(el, data) {
+    const originalUnits = this.#getOriginalUnits(data);
+    if (originalUnits.length) {
       const parent = el.parentElement;
-      parent?.insertBefore(frag, el);
+      if (parent) {
+        const sourceParents = originalUnits.map((node) => node.parentNode);
+        this.#withIgnoredMutations([...sourceParents, parent], () => {
+          const frag = document.createDocumentFragment();
+          originalUnits.forEach((node) => frag.appendChild(node));
+          if (this.#rule.transOrder === "translation-first") {
+            el.after(frag);
+          } else {
+            el.before(frag);
+          }
+        });
+      }
     }
   }
 
-  // 移除多个节点
-  #removeNodes(nodes, wrapper) {
-    if (nodes && wrapper) {
+  // 隐藏原文显示单元
+  #removeOriginal(data, wrapper) {
+    const originalUnits = this.#getOriginalUnits(data);
+    if (originalUnits.length && wrapper) {
       const backup = this.#getOrCreateTranslationBackup(wrapper);
-      nodes.forEach((n) => backup.content.appendChild(n));
-    } else if (nodes) {
-      const frag = document.createDocumentFragment();
-      nodes.forEach((n) => frag.appendChild(n));
+      const parent = originalUnits[0].parentNode;
+      this.#withIgnoredMutations([parent], () => {
+        originalUnits.forEach((node) => backup.content.appendChild(node));
+      });
     }
   }
 
   // 切换译文和双语显示
   #toggleTranslationOnly(node, transOnly) {
-    const { transOrder = "original-first" } = this.#rule;
     this.#findTranslationWrappers(node).forEach((el) => {
       const br = el.querySelector(":scope > br");
       const space = el.querySelector(
         `:scope > span.${Translator.KISS_CLASS.space}`
       );
-      const { nodes } = this.#translationNodes.get(el) || {};
+      const data = this.#translationNodes.get(el);
+      if (!data) return;
       if (transOnly === "true") {
         // 双语变为仅译文
         this.#withViewportAnchor(() => {
           if (br) br.hidden = true;
           if (space) space.hidden = true;
-          this.#removeNodes(nodes, el);
+          this.#removeOriginal(data, el);
         });
-        this.#translationNodes.set(el, { nodes, isHide: true });
+        this.#translationNodes.set(el, { ...data, isHide: true });
       } else {
         // 仅译文变为双语
         this.#withViewportAnchor(() => {
           if (br) br.hidden = false;
           if (space) space.hidden = false;
-          if (nodes && nodes.length) {
-            const frag = document.createDocumentFragment();
-            nodes.forEach((n) => frag.appendChild(n));
-            const parent = el.parentElement;
-            if (parent) {
-              if (transOrder === "translation-first") {
-                // 译文在上：原文节点应在 wrapper 之后
-                el.after(frag);
-              } else {
-                // 原文在上：原文节点应在 wrapper 之前
-                el.before(frag);
-              }
-            }
-          }
+          this.#restoreOriginal(el, data);
         });
-        this.#translationNodes.set(el, { nodes, isHide: false });
+        this.#translationNodes.set(el, { ...data, isHide: false });
       }
     });
   }
@@ -2916,9 +3141,12 @@ overflow-wrap: anywhere !important;`;
   #adjustWrapperPosition(wrapper, nodes, transOrder) {
     if (!nodes || !nodes.length) return;
 
+    const { originalWrapper } = this.#translationNodes.get(wrapper) || {};
+    const positionNodes = originalWrapper ? [originalWrapper] : nodes;
+
     // 获取第一个和最后一个原文节点的位置
-    const firstNode = nodes[0];
-    const lastNode = nodes[nodes.length - 1];
+    const firstNode = positionNodes[0];
+    const lastNode = positionNodes[positionNodes.length - 1];
 
     // 获取 wrapper 和原文节点的父容器
     const wrapperParent = wrapper.parentElement;
@@ -2952,6 +3180,39 @@ overflow-wrap: anywhere !important;`;
       );
       inner.classList.remove(this.#textClass[oldStyle]);
       inner.classList.add(this.#textClass[newStyle]);
+    });
+  }
+
+  #updateOriginalWrapping(node, wrapOriginal, originalTextStyle) {
+    this.#findTranslationWrappers(node).forEach((wrapper) => {
+      const data = this.#translationNodes.get(wrapper);
+      if (!data) return;
+
+      if (wrapOriginal === "true" && !data.originalWrapper) {
+        const originalWrapper = this.#wrapOriginalNodes(
+          data.nodes,
+          originalTextStyle
+        );
+        if (originalWrapper) {
+          this.#translationNodes.set(wrapper, {
+            ...data,
+            originalWrapper,
+          });
+        }
+      } else if (wrapOriginal !== "true" && data.originalWrapper) {
+        this.#unwrapOriginal(data.originalWrapper);
+        this.#translationNodes.set(wrapper, {
+          ...data,
+          originalWrapper: null,
+        });
+      }
+    });
+  }
+
+  #updateOriginalStyle(node, oldStyle, newStyle) {
+    this.#findTranslationWrappers(node).forEach((wrapper) => {
+      const { originalWrapper } = this.#translationNodes.get(wrapper) || {};
+      this.#setOriginalStyle(originalWrapper, oldStyle, newStyle);
     });
   }
 
@@ -2989,6 +3250,8 @@ overflow-wrap: anywhere !important;`;
       textStyle,
       transOnly,
       transOrder = "original-first",
+      wrapOriginal,
+      originalTextStyle,
     } = this.#rule;
 
     const needsRefresh =
@@ -3007,6 +3270,8 @@ overflow-wrap: anywhere !important;`;
         textStyle,
         transOnly,
         transOrder,
+        wrapOriginal,
+        originalTextStyle,
       });
       this.#refreshNode(node); // 会自动应用新样式
       return;
@@ -3017,6 +3282,19 @@ overflow-wrap: anywhere !important;`;
       const oldStyle = appliedRule.textStyle;
       appliedRule.textStyle = textStyle;
       this.#updateStyle(node, oldStyle, textStyle);
+    }
+
+    if (appliedRule.wrapOriginal !== wrapOriginal) {
+      appliedRule.wrapOriginal = wrapOriginal;
+      this.#withViewportAnchor(() => {
+        this.#updateOriginalWrapping(node, wrapOriginal, originalTextStyle);
+      });
+    }
+
+    if (appliedRule.originalTextStyle !== originalTextStyle) {
+      const oldStyle = appliedRule.originalTextStyle;
+      appliedRule.originalTextStyle = originalTextStyle;
+      this.#updateOriginalStyle(node, oldStyle, originalTextStyle);
     }
 
     // 文本顺序规则过时
@@ -3044,6 +3322,7 @@ overflow-wrap: anywhere !important;`;
     this.#translationNodes = new WeakMap();
     this.#processedNodes = new WeakMap();
     this.#plainTextPreprocessingNodes = new WeakSet();
+    this.#ignoredMutationTargets = new WeakSet();
     this.#io = this.#createIntersectionObserver();
   }
 
@@ -3052,6 +3331,11 @@ overflow-wrap: anywhere !important;`;
     if (this.#mouseHoverEnabled) return;
     this.#mouseHoverEnabled = true;
     this.#setting.mouseHoverSetting.useMouseHover = true;
+
+    if (this.#shouldUseOriginalHoverBubble() && this.#transOnlyRevertTarget) {
+      this.#clearTransOnlyRevertTimer();
+      this.#hideOriginalTemporarily(this.#transOnlyRevertTarget);
+    }
 
     document.addEventListener("mousemove", this.#boundMouseMoveHandler);
     const { mouseHoverKey = [], mouseHoverKey2 = [] } =
@@ -3081,6 +3365,7 @@ overflow-wrap: anywhere !important;`;
     if (!this.#mouseHoverEnabled) return;
     this.#mouseHoverEnabled = false;
     this.#setting.mouseHoverSetting.useMouseHover = false;
+    this.#hoveredNode = null;
     this.#hideHoverBubble();
 
     document.removeEventListener("mousemove", this.#boundMouseMoveHandler);
@@ -3093,6 +3378,8 @@ overflow-wrap: anywhere !important;`;
     this.#transOnlyRevertEnabled = true;
 
     this.#boundTransOnlyMouseOver = (e) => {
+      if (this.#shouldUseOriginalHoverBubble()) return;
+
       const wrapper = e.target.closest?.(`.${Translator.KISS_CLASS.warpper}`);
       if (wrapper) {
         const data = this.#translationNodes.get(wrapper);
@@ -3119,6 +3406,8 @@ overflow-wrap: anywhere !important;`;
     };
 
     this.#boundTransOnlyMouseOut = (e) => {
+      if (this.#shouldUseOriginalHoverBubble()) return;
+
       if (!this.#transOnlyRevertTarget) {
         const wrapper = e.target.closest?.(`.${Translator.KISS_CLASS.warpper}`);
         if (wrapper) this.#clearTransOnlyRevertTimer();
@@ -3169,9 +3458,8 @@ overflow-wrap: anywhere !important;`;
   }
 
   #showOriginalTemporarily(wrapper, data) {
-    const { nodes } = data;
     this.#withViewportAnchor(() => {
-      this.#restoreOriginal(wrapper, nodes);
+      this.#restoreOriginal(wrapper, data);
       const inner = wrapper.querySelector(
         `:scope > .${Translator.KISS_CLASS.inner}`
       );
@@ -3185,9 +3473,8 @@ overflow-wrap: anywhere !important;`;
   #hideOriginalTemporarily(wrapper) {
     const data = this.#translationNodes.get(wrapper);
     if (!data) return;
-    const { nodes } = data;
     this.#withViewportAnchor(() => {
-      this.#removeNodes(nodes, wrapper);
+      this.#removeOriginal(data, wrapper);
       const inner = wrapper.querySelector(
         `:scope > .${Translator.KISS_CLASS.inner}`
       );
@@ -3428,6 +3715,18 @@ overflow-wrap: anywhere !important;`;
   }
 
   #syncTransOnlyRevert() {
+    // 退出气泡模式或关闭“隐藏原文”时，清理仍在等待或显示的原文气泡。
+    if (!this.#shouldUseOriginalHoverBubble()) {
+      this.#clearHoverOriginalTimer();
+      if (
+        this.#hoverBubbleTarget?.classList?.contains(
+          Translator.KISS_CLASS.warpper
+        )
+      ) {
+        this.#hideHoverBubble();
+      }
+    }
+
     const shouldEnable =
       this.#rule.transOnly === "true" && this.#rule.transOnlyRevert === "true";
     if (shouldEnable && !this.#transOnlyRevertEnabled) {

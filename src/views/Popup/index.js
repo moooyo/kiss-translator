@@ -11,10 +11,10 @@ import Button from "@mui/material/Button";
 import Tab from "@mui/material/Tab";
 import Tabs from "@mui/material/Tabs";
 import { sendBgMsg } from "../../libs/msg";
-import { browser } from "../../libs/browser";
 import { useI18n } from "../../hooks/I18n";
 import Header from "./Header";
 import {
+  MSG_OPEN_OPTIONS,
   MSG_OPEN_SEPARATE_WINDOW,
   DEFAULT_SETTING,
   GLOBLA_RULE,
@@ -137,7 +137,7 @@ export default function Popup() {
   }, [isLoading, isSeparate]);
 
   const handleOpenSetting = useCallback(() => {
-    browser?.runtime.openOptionsPage();
+    sendBgMsg(MSG_OPEN_OPTIONS);
   }, []);
 
   useEffect(() => {

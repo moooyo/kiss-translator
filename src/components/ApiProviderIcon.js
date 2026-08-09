@@ -23,6 +23,7 @@ import {
   OPT_TRANS_OPENCODEGO,
   OPT_TRANS_OPENAI,
   OPT_TRANS_OPENROUTER,
+  OPT_TRANS_ORCAROUTER,
   OPT_TRANS_SILICONFLOW,
   OPT_TRANS_TENCENT,
   OPT_TRANS_VOLCENGINE,
@@ -59,6 +60,7 @@ const API_ICON_FILES = {
   [OPT_TRANS_CLOUDFLAREAI]: "CloudflareAI.svg",
   [OPT_TRANS_OLLAMA]: "Ollama.svg",
   [OPT_TRANS_OPENROUTER]: "OpenRouter.svg",
+  [OPT_TRANS_ORCAROUTER]: "OrcaRouter.svg",
 };
 
 export function getApiIconSrc(

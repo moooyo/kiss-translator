@@ -26,18 +26,23 @@ jest.mock("react-markdown", () => {
 jest.mock("./TranCont", () => {
   const React = require("react");
 
-  return ({ apiSlug, playgroundStyle }) =>
+  return ({ apiSlug, playgroundStyle, text }) =>
     React.createElement("div", {
       "data-testid": "tran-cont",
       "data-api-slug": apiSlug,
       "data-playground-style": String(Boolean(playgroundStyle)),
+      "data-text": text,
     });
 });
 
 jest.mock("./DictCont", () => {
   const React = require("react");
 
-  return () => React.createElement("div", { "data-testid": "default-dict" });
+  return ({ text }) =>
+    React.createElement("div", {
+      "data-testid": "default-dict",
+      "data-text": text,
+    });
 });
 
 jest.mock("./Zdic", () => () => null);
@@ -239,6 +244,46 @@ describe("TranForm translation service selection", () => {
   beforeEach(() => {
     apiDict.mockReset();
     document.body.innerHTML = "";
+  });
+
+  test("uses translationText for every translation service", async () => {
+    const { container, root } = renderTranForm({
+      text: "First line\nSecond line",
+      translationText: "First line Second line",
+      apiSlugs: ["google", "openai"],
+      transApis: [
+        { apiSlug: "google", apiName: "Google", apiType: "Google" },
+        { apiSlug: "openai", apiName: "OpenAI", apiType: "OpenAI" },
+      ],
+      simpleStyle: false,
+    });
+    await flushEffects();
+
+    expect(
+      [...container.querySelectorAll('[data-testid="tran-cont"]')].map(
+        (element) => element.dataset.text
+      )
+    ).toEqual(["First line Second line", "First line Second line"]);
+
+    act(() => root.unmount());
+  });
+
+  test("keeps the original text for dictionary content", async () => {
+    const { container, root } = renderTranForm({
+      text: "library",
+      translationText: "normalized library",
+      apiSlugs: ["openai"],
+    });
+    await flushEffects();
+
+    expect(
+      container.querySelector('[data-testid="tran-cont"]').dataset.text
+    ).toBe("normalized library");
+    expect(
+      container.querySelector('[data-testid="default-dict"]').dataset.text
+    ).toBe("library");
+
+    act(() => root.unmount());
   });
 
   test("keeps user-selected services when text changes", async () => {

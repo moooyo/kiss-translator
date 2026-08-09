@@ -65,6 +65,7 @@ const PRESENTATION_SETTING_NAMES = new Set([
   "showList",
   "enhanceMode",
   "hoverLookupMode",
+  "autoFavWord",
   "brandColor",
   "darkMode",
   "uiLang",
@@ -646,6 +647,9 @@ export class YouTubeCaptionProvider {
         .filter((name) => PRESENTATION_SETTING_NAMES.has(name))
         .map((name) => [name, this.#setting[name]])
     );
+    if (changedNames.has("uiLang")) {
+      settingPatch.i18n = this.#i18n;
+    }
     this.#managerInstance?.updateSetting(settingPatch);
 
     const showList = isSubtitleModeEnabled(
@@ -663,6 +667,7 @@ export class YouTubeCaptionProvider {
       [
         "uiLang",
         "hoverLookupMode",
+        "autoFavWord",
         "enhanceMode",
         "brandColor",
         "darkMode",
@@ -674,6 +679,7 @@ export class YouTubeCaptionProvider {
           this.#setting.hoverLookupMode,
           this.#setting.enhanceMode
         ),
+        autoFavWord: this.#setting.autoFavWord === true,
         theme: {
           brandColor: this.#setting.brandColor,
           darkMode: this.#setting.darkMode,
@@ -1265,6 +1271,7 @@ export class YouTubeCaptionProvider {
       formattedSubtitles: this.#subtitles,
       setting: {
         ...this.#setting,
+        i18n: this.#i18n,
         fromLang: this.#fromLang,
         docInfo: this.#docInfo,
         // 由渲染管理器按 timeupdate/seeked 上报播放窗口，provider 再决定是否触发后续 AI chunk。
@@ -1294,6 +1301,7 @@ export class YouTubeCaptionProvider {
         this.#setting.hoverLookupMode,
         this.#setting.enhanceMode
       ),
+      autoFavWord: this.#setting.autoFavWord === true,
       theme: {
         brandColor: this.#setting.brandColor,
         darkMode: this.#setting.darkMode,

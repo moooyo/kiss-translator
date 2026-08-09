@@ -1,4 +1,4 @@
-import { OPT_TRANS_GOOGLE } from "../config";
+import { OPT_TRANS_GOOGLE, OPT_TRANS_ORCAROUTER } from "../config";
 import { getApiIconSrc } from "./ApiProviderIcon";
 
 jest.mock("../libs/browser", () => ({ browser: undefined }));
@@ -23,6 +23,15 @@ describe("getApiIconSrc", () => {
         publicUrl: "/kiss-translator",
       })
     ).toBe("/kiss-translator/api/Google.svg");
+  });
+
+  test("resolves the OrcaRouter asset through the shared provider map", () => {
+    expect(
+      getApiIconSrc(OPT_TRANS_ORCAROUTER, {
+        runtime: undefined,
+        publicUrl: "/kiss-translator",
+      })
+    ).toBe("/kiss-translator/api/OrcaRouter.svg");
   });
 
   test("uses the bundled generic icon when a userscript has no asset host", () => {

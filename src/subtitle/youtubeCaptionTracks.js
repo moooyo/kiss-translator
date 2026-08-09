@@ -153,9 +153,8 @@ export function findCaptionTrack(captionTracks, lang, kind) {
   }
 
   if (!captionTrack) {
-    // REVIEW: 这里沿用原有 pop() 行为。它会修改 captionTracks 数组，
-    // 后续若要修复副作用，应单独改为下标读取或克隆数组。
-    captionTrack = captionTracks.pop();
+    // Keep cached track metadata immutable.
+    captionTrack = captionTracks[captionTracks.length - 1];
   }
 
   // Chat/弹幕字幕轨道自动降级为正常字幕轨道。
@@ -187,21 +186,12 @@ export function findCaptionTrack(captionTracks, lang, kind) {
   return captionTrack;
 }
 
-/**
- * 请求 YouTube 播放页 HTML，并解析当前视频的字幕轨列表与原始描述。
- *
- * @param {string} videoId 当前视频 ID。
- * @param {object} [options] Optional request controls.
- * @param {AbortSignal} [options.signal] Signal used to cancel stale requests.
- * @returns {Promise<{captionTracks?: Array<object>, audioTracks?: Array<object>, defaultAudioTrackIndex?: number, defaultCaptionTrackIndex?: number, fullDescription?: string}>} Parsed caption metadata and video description.
- */
-export async function getCaptionTracks(videoId, { signal } = {}) {
+let captionTracksCache = null;
+
+async function fetchCaptionTracks(videoId) {
   try {
     const url = `https://www.youtube.com/watch?v=${videoId}`;
-    // REVIEW: 每次处理字幕都会重新 fetch 播放页并正则匹配 ytInitialPlayerResponse。
-    // 这会造成二次网页下载，也可能在高频使用时被 YouTube 视为异常流量。
-    // 后续可优先从当前页面全局对象或客户端内部 API 读取。
-    const html = await fetch(url, { signal }).then((r) => r.text());
+    const html = await fetch(url).then((r) => r.text());
     const match = html.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/s);
     if (!match) return {};
     const data = JSON.parse(match[1]);
@@ -218,6 +208,65 @@ export async function getCaptionTracks(videoId, { signal } = {}) {
     logger.info("Youtube Provider: get captionTracks", err);
     return {};
   }
+}
+
+function waitForCaptionTracks(promise, signal) {
+  if (!signal) return promise;
+  if (signal.aborted) return Promise.resolve({});
+
+  return new Promise((resolve) => {
+    const handleAbort = () => {
+      cleanup();
+      resolve({});
+    };
+    const cleanup = () => {
+      signal.removeEventListener("abort", handleAbort);
+    };
+
+    signal.addEventListener("abort", handleAbort, { once: true });
+    promise.then(
+      (result) => {
+        cleanup();
+        resolve(result);
+      },
+      () => {
+        cleanup();
+        resolve({});
+      }
+    );
+  });
+}
+
+/**
+ * Fetch and cache the current video's caption metadata.
+ * The shared request is independent from each caller's abort signal so a stale
+ * recovery request cannot cancel metadata needed by a real caption intercept.
+ *
+ * @param {string} videoId Current video ID.
+ * @param {object} [options] Optional request controls.
+ * @param {AbortSignal} [options.signal] Cancels only this caller's wait.
+ * @returns {Promise<{captionTracks?: Array<object>, audioTracks?: Array<object>, defaultAudioTrackIndex?: number, defaultCaptionTrackIndex?: number, fullDescription?: string}>}
+ */
+export async function getCaptionTracks(videoId, { signal } = {}) {
+  if (signal?.aborted) return {};
+
+  let promise =
+    captionTracksCache?.videoId === videoId ? captionTracksCache.promise : null;
+
+  if (!promise) {
+    promise = fetchCaptionTracks(videoId);
+    captionTracksCache = { videoId, promise };
+    void promise.then((result) => {
+      if (
+        !result.captionTracks?.length &&
+        captionTracksCache?.promise === promise
+      ) {
+        captionTracksCache = null;
+      }
+    });
+  }
+
+  return waitForCaptionTracks(promise, signal);
 }
 
 /**

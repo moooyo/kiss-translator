@@ -347,6 +347,8 @@ export class Translator {
   #textSheet = null; // CSSStyleSheet 实例（Firefox 内容脚本中不可用时为 null）
   #textStylesRaw = ""; // 原始 CSS 文本（Firefox adoptedStyleSheets 回退备用）
   #useSheetFallback = false; // Firefox 跨作用域限制标记：adoptedStyleSheets 不可用时直接走内联 <style>
+  #adoptedStyleRoots = new Set(); // 已采用本实例样式表的根节点，销毁时需要回收
+  #fallbackStyles = new Map(); // 本实例创建的回退 <style> 节点，按根节点归属
   #apisMap = new Map(); // 用于接口快速查找
   #favWords = []; // 收藏词汇
   #favoriteHighlightScopes = new Set(); // 已进入收藏词高亮流程的扫描单元
@@ -997,38 +999,102 @@ export class Translator {
       // CSSStyleSheet 在当前环境不可用（Firefox 内容脚本等），改用内联 <style>
       this.#useSheetFallback = true;
     }
+
+    // 译文样式不再经由 emotion 注册到宿主文档，需显式注入主文档，
+    // 否则主文档（非 ShadowRoot）中的译文将失去样式。
+    this.#injectSheet(document);
   }
 
   // 注入样式（优先 adoptedStyleSheets，失败时回退到 <style>）
-  #injectSheet(shadowRoot) {
+  // root 可以是主文档，也可以是页面自身的 ShadowRoot
+  #injectSheet(root) {
     if (this.#useSheetFallback || !this.#textSheet) {
-      this.#injectSheetFallback(shadowRoot);
+      this.#injectSheetFallback(root);
       return;
     }
 
     try {
-      if (!shadowRoot.adoptedStyleSheets.includes(this.#textSheet)) {
-        shadowRoot.adoptedStyleSheets = [
-          ...shadowRoot.adoptedStyleSheets,
+      // 部分环境（如旧版 Firefox 内容脚本）根节点上没有该属性
+      if (!("adoptedStyleSheets" in root)) {
+        this.#useSheetFallback = true;
+        this.#injectSheetFallback(root);
+        return;
+      }
+      if (!(root.adoptedStyleSheets || []).includes(this.#textSheet)) {
+        root.adoptedStyleSheets = [
+          ...(root.adoptedStyleSheets || []),
           this.#textSheet,
         ];
       }
-    } catch {
+      this.#adoptedStyleRoots.add(root);
+    } catch (err) {
       // Firefox 跨作用域限制：内容脚本的 CSSStyleSheet 无法赋值给页面 ShadowRoot
+      kissLog("injectSheet: adoptedStyleSheets not available", err);
       this.#useSheetFallback = true;
-      this.#injectSheetFallback(shadowRoot);
+      this.#injectSheetFallback(root);
     }
   }
 
   // 回退方案：通过内联 <style> 元素注入样式（兼容 Firefox）
-  #injectSheetFallback(shadowRoot) {
+  // 按根节点记录本实例创建的节点，避免多实例共用 id 时互相覆盖
+  #injectSheetFallback(root) {
     const fallbackStyleId = `${APP_LCNAME}-fallback-style`;
-    if (shadowRoot.getElementById(fallbackStyleId)) return;
+    const fallbackStyleAttribute = `data-${APP_LCNAME}-fallback-style`;
+    const ownedStyle = this.#fallbackStyles.get(root);
 
-    const style = document.createElement("style");
-    style.id = fallbackStyleId;
-    style.textContent = this.#textStylesRaw || "";
-    shadowRoot.append(style);
+    // 已为该根节点创建过节点，直接复用并更新内容
+    if (ownedStyle?.getRootNode() === root) {
+      const canonicalStyle = root.getElementById?.(fallbackStyleId);
+      if (canonicalStyle && canonicalStyle !== ownedStyle) {
+        // id 已被其它实例占用，退化为 data 属性标记
+        ownedStyle.removeAttribute("id");
+        ownedStyle.setAttribute(fallbackStyleAttribute, "");
+      } else {
+        ownedStyle.id = fallbackStyleId;
+        ownedStyle.removeAttribute(fallbackStyleAttribute);
+      }
+      ownedStyle.textContent = this.#textStylesRaw;
+      return;
+    }
+
+    const ownerDocument =
+      root === document
+        ? document
+        : root.ownerDocument || root.host?.ownerDocument;
+    const style = (ownerDocument || document).createElement("style");
+    if (root.getElementById?.(fallbackStyleId)) {
+      style.setAttribute(fallbackStyleAttribute, "");
+    } else {
+      style.id = fallbackStyleId;
+    }
+    style.textContent = this.#textStylesRaw;
+    if (root === document) {
+      (document.head || document.documentElement).appendChild(style);
+    } else {
+      root.appendChild(style);
+    }
+    this.#fallbackStyles.set(root, style);
+  }
+
+  // 回收本实例注入过的所有样式（SPA 重启时避免样式表在页面中累积）
+  #removeTextStyles() {
+    this.#fallbackStyles.forEach((style) => style.remove());
+    this.#fallbackStyles.clear();
+
+    this.#adoptedStyleRoots.forEach((root) => {
+      if (!this.#textSheet) return;
+      try {
+        const adoptedStyleSheets = root.adoptedStyleSheets || [];
+        if (adoptedStyleSheets.includes(this.#textSheet)) {
+          root.adoptedStyleSheets = adoptedStyleSheets.filter(
+            (sheet) => sheet !== this.#textSheet
+          );
+        }
+      } catch (err) {
+        kissLog("removeTextStyles", err);
+      }
+    });
+    this.#adoptedStyleRoots.clear();
   }
 
   // 解析专业术语字符串
@@ -3988,6 +4054,7 @@ overflow-wrap: anywhere !important;`;
     this.#disableMouseHover();
     this.#disableTransOnlyRevert();
     this.#removeInjector();
+    this.#removeTextStyles();
     this.#isInitialized = false;
   }
 

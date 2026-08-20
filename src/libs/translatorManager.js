@@ -650,12 +650,13 @@ export default class TranslatorManager {
    *
    * 顶层页面发起的动作会同步广播给 iframe；来自扩展 background 的动作
    * 已经是统一入口，不再二次广播，避免 iframe 收到重复指令。
+   * 划词翻译框例外：选区归属于发起动作的 frame，广播会让每个 iframe 各弹一个框。
    */
   #processActions({ action, args } = {}, fromExt = false) {
     if (!action) return;
 
     // 非 background 指令需要主动同步给子 iframe，保持多 frame 页面状态一致。
-    if (!fromExt) {
+    if (!fromExt && action !== MSG_OPEN_TRANBOX) {
       sendIframeMsg(action, args);
     }
 

@@ -145,6 +145,7 @@ function PromptListItem({ prompt, selected, isPreset, onSelect }) {
     >
       <ListItemButton
         selected={selected}
+        aria-pressed={selected}
         onClick={onSelect}
         sx={{
           gap: 1,
@@ -181,6 +182,7 @@ function PromptFields({
   onCopy,
   onDelete,
   onCollapse,
+  onDirtyChange,
 }) {
   const i18n = useI18n();
   const confirm = useConfirm();
@@ -188,7 +190,7 @@ function PromptFields({
   const promptDisplayName = getPromptDisplayName(prompt, i18n);
   const systemPromptRef = useRef(null);
   const userPromptRef = useRef(null);
-  // 只有会读取 userPrompt 的链路展示第二段提示词，避免编辑无效字段。
+  // Only show the second prompt for flows that consume userPrompt.
   const showUserPrompt =
     formData.category === PROMPT_CATEGORY_USER ||
     formData.category === PROMPT_CATEGORY_DICTIONARY;
@@ -204,6 +206,10 @@ function PromptFields({
         JSON.stringify(normalizePrompt(formData)),
     [formData, isPreset, prompt]
   );
+
+  useEffect(() => {
+    onDirtyChange?.(isModified);
+  }, [isModified, onDirtyChange]);
 
   const handleChange = (event) => {
     const { name, value } = event.target;
@@ -372,6 +378,7 @@ function PromptFields({
 
 export default function Prompts() {
   const i18n = useI18n();
+  const confirm = useConfirm();
   const {
     prompts,
     addPrompt,
@@ -381,6 +388,7 @@ export default function Prompts() {
     isPresetPromptSlug,
   } = usePromptList();
   const [selectedPromptSlug, setSelectedPromptSlug] = useState("");
+  const [editorDirty, setEditorDirty] = useState(false);
   const [anchorEl, setAnchorEl] = useState(null);
   const detailPanelRef = useRef(null);
   const addMenuOpen = Boolean(anchorEl);
@@ -432,15 +440,35 @@ export default function Prompts() {
     setAnchorEl(null);
   };
 
-  const handleAddPromptFromTemplate = (template) => {
+  const confirmDiscardChanges = async () => {
+    if (!editorDirty) return true;
+    return confirm({
+      message: i18n("discard_prompt_changes_confirm"),
+      confirmText: i18n("discard_changes"),
+      cancelText: i18n("cancel"),
+    });
+  };
+
+  const handleAddPromptFromTemplate = async (template) => {
+    if (!(await confirmDiscardChanges())) return;
     const templateName = getPromptDisplayName(template, i18n);
     const promptSlug = addPrompt(template, templateName);
+    setEditorDirty(false);
     setSelectedPromptSlug(promptSlug);
     handleClose();
   };
 
   const handleCopyPrompt = (prompt, promptDisplayName) => {
     const promptSlug = copyPrompt(prompt, promptDisplayName);
+    setEditorDirty(false);
+    setSelectedPromptSlug(promptSlug);
+  };
+
+  const handleSelectPrompt = async (prompt) => {
+    const promptSlug = normalizePrompt(prompt).slug;
+    if (promptSlug === selectedPromptSlug) return;
+    if (!(await confirmDiscardChanges())) return;
+    setEditorDirty(false);
     setSelectedPromptSlug(promptSlug);
   };
 
@@ -468,92 +496,74 @@ export default function Prompts() {
             >
               {i18n("add_prompt", "新增提示词")}
             </Button>
-            <Menu
-              id="add-prompt-menu"
-              anchorEl={anchorEl}
-              open={addMenuOpen}
-              onClose={handleClose}
-              MenuListProps={{
-                "aria-labelledby": "add-prompt-button",
-              }}
-            >
-              {promptTemplateGroups.map((group) => (
-                <Fragment key={group.category}>
-                  <ListSubheader disableSticky>
-                    {getPromptCategoryDisplayName(group.category, i18n)}
-                  </ListSubheader>
-                  {group.templates.map((template) => (
-                    <MenuItem
-                      key={normalizePrompt(template).slug}
-                      onClick={() => handleAddPromptFromTemplate(template)}
-                      sx={{ gap: 1 }}
-                    >
-                      <LockIcon fontSize="small" color="action" />
-                      <Box component="span" sx={{ flex: 1 }}>
-                        {getPromptDisplayName(template, i18n)}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Fragment>
-              ))}
-            </Menu>
           </Stack>
         </Box>
 
         <Box
+          className="kt-prompt-editor kt-prompt-editor--container-responsive"
           sx={{
             display: "flex",
-            flexDirection: { xs: "column", md: "row" },
+            flexDirection: "column",
             border: 1,
             borderColor: "divider",
-            borderRadius: 1,
+            borderRadius: "20px",
             overflow: "hidden",
-            height: { md: "calc(100vh - 140px)" },
-            minHeight: { md: 450 },
+            "@container options-main (min-width: 760px)": {
+              flexDirection: "row",
+              height: "calc(100vh - 140px)",
+              minHeight: 450,
+            },
           }}
         >
           <Box
+            className="kt-prompt-editor__list-panel"
             sx={(theme) => ({
-              width: { xs: "100%", md: 280 },
-              flex: { xs: "0 0 auto", md: "0 0 280px" },
-              height: { md: "100%" },
+              width: "100%",
+              flex: "0 0 auto",
+              maxHeight: "min(40vh, 360px)",
               overflowY: "auto",
-              borderRight: {
-                xs: 0,
-                md: `1px solid ${theme.palette.divider}`,
-              },
-              borderBottom: {
-                xs: `1px solid ${theme.palette.divider}`,
-                md: 0,
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              "@container options-main (min-width: 760px)": {
+                width: 280,
+                flex: "0 0 280px",
+                height: "100%",
+                maxHeight: "none",
+                borderRight: `1px solid ${theme.palette.divider}`,
+                borderBottom: 0,
               },
             })}
           >
-            <List disablePadding>
+            <List
+              className="kt-prompt-editor__list"
+              disablePadding
+              sx={{ width: "100%", boxSizing: "border-box" }}
+            >
               {prompts.map((prompt) => (
                 <PromptListItem
                   key={normalizePrompt(prompt).slug}
                   prompt={prompt}
                   selected={normalizePrompt(prompt).slug === selectedPromptSlug}
                   isPreset={isPresetPromptSlug(normalizePrompt(prompt).slug)}
-                  onSelect={() =>
-                    setSelectedPromptSlug(normalizePrompt(prompt).slug)
-                  }
+                  onSelect={() => void handleSelectPrompt(prompt)}
                 />
               ))}
             </List>
           </Box>
 
           <Box
+            className="kt-prompt-editor__detail-panel"
             ref={detailPanelRef}
             sx={{
               flex: 1,
               minWidth: 0,
               p: 2,
               boxSizing: "border-box",
-              height: { md: "100%" },
-              overflowY: { md: "auto" },
-              scrollbarGutter: { md: "stable" },
               overscrollBehavior: "contain",
+              "@container options-main (min-width: 760px)": {
+                height: "100%",
+                overflowY: "auto",
+                scrollbarGutter: "stable",
+              },
             }}
           >
             {selectedPrompt && (
@@ -567,12 +577,46 @@ export default function Prompts() {
                 }
                 onCopy={handleCopyPrompt}
                 onDelete={deletePrompt}
-                onCollapse={() => setSelectedPromptSlug("")}
+                onDirtyChange={setEditorDirty}
+                onCollapse={() => {
+                  setEditorDirty(false);
+                  setSelectedPromptSlug("");
+                }}
               />
             )}
           </Box>
         </Box>
       </Stack>
+
+      <Menu
+        id="add-prompt-menu"
+        anchorEl={anchorEl}
+        open={addMenuOpen}
+        onClose={handleClose}
+        MenuListProps={{
+          "aria-labelledby": "add-prompt-button",
+        }}
+      >
+        {promptTemplateGroups.map((group) => (
+          <Fragment key={group.category}>
+            <ListSubheader disableSticky>
+              {getPromptCategoryDisplayName(group.category, i18n)}
+            </ListSubheader>
+            {group.templates.map((template) => (
+              <MenuItem
+                key={normalizePrompt(template).slug}
+                onClick={() => void handleAddPromptFromTemplate(template)}
+                sx={{ gap: 1 }}
+              >
+                <LockIcon fontSize="small" color="action" />
+                <Box component="span" sx={{ flex: 1 }}>
+                  {getPromptDisplayName(template, i18n)}
+                </Box>
+              </MenuItem>
+            ))}
+          </Fragment>
+        ))}
+      </Menu>
     </Box>
   );
 }

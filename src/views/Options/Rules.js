@@ -194,14 +194,17 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
     [setKeyword]
   );
 
-  // 通用的表单输入变化处理器
-  const handleChange = (e) => {
-    e.preventDefault();
-    const { name, value } = e.target;
+  const updateFormValue = (name, value) => {
     setFormValues((pre) => ({ ...pre, [name]: value }));
     if (name === "pattern" && !editMode) {
       handlePatternChange(value);
     }
+  };
+
+  // 通用的表单输入变化处理器
+  const handleChange = (e) => {
+    e.preventDefault();
+    updateFormValue(e.target.name, e.target.value);
   };
 
   // 取消按钮处理器：编辑状态下重新禁用表单并回滚修改；新增状态下直接关闭新增面板
@@ -265,7 +268,6 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
       {GLOBAL_KEY}
     </MenuItem>
   );
-
   return (
     <form onSubmit={handleSubmit}>
       <Stack spacing={2}>
@@ -337,7 +339,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
         <Box>
           <Grid container spacing={2} columns={12}>
             {/* 翻译开关设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -354,7 +356,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 翻译引擎服务设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -374,7 +376,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 源语言设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -394,7 +396,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 目标语言设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -415,7 +417,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 自动扫描页面设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -432,7 +434,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 是否翻译富文本设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -449,7 +451,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 是否支持 Shadow Root 内部文本翻译设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -466,7 +468,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 是否扫描处理页面中所有的节点设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -484,7 +486,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 是否以纯文本模式翻译 <pre> 内容 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -502,7 +504,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 仅显示译文设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -520,7 +522,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 文本顺序设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -541,48 +543,8 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
 
-            {/* 原文包裹设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
-              <TextField
-                select
-                size="small"
-                fullWidth
-                name="wrapOriginal"
-                value={wrapOriginal}
-                label={i18n("wrap_original")}
-                disabled={disabled}
-                onChange={handleChange}
-              >
-                {GlobalItem}
-                <MenuItem value={"false"}>{i18n("disable")}</MenuItem>
-                <MenuItem value={"true"}>{i18n("enable")}</MenuItem>
-              </TextField>
-            </Grid>
-
-            {effectiveWrapOriginal && (
-              <Grid item xs={12} sm={12} md={6} lg={3}>
-                <TextField
-                  select
-                  size="small"
-                  fullWidth
-                  name="originalTextStyle"
-                  value={originalTextStyle}
-                  label={i18n("original_text_style")}
-                  disabled={disabled}
-                  onChange={handleChange}
-                >
-                  {GlobalItem}
-                  {allTextStyles.map((item) => (
-                    <MenuItem key={item.styleSlug} value={item.styleSlug}>
-                      {item.styleName}
-                    </MenuItem>
-                  ))}
-                </TextField>
-              </Grid>
-            )}
-
             {/* 悬停恢复原文设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -600,7 +562,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 悬停恢复原文延迟时长配置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 size="small"
                 fullWidth
@@ -615,7 +577,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 长段落切分翻译配置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -635,7 +597,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 长段落切分翻译的触发长度阈值 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <ValidationInput
                 fullWidth
                 size="small"
@@ -650,7 +612,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               />
             </Grid>
             {/* 单词高亮标记设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -671,7 +633,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 是否翻译网页 title 标签配置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -688,7 +650,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
               </TextField>
             </Grid>
             {/* 插入译文所用的 HTML 标签设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -706,7 +668,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Grid>
 
             {/* 自定义译文样式模板设置 */}
-            <Grid item xs={12} sm={12} md={6} lg={3}>
+            <Grid item xs={12} sm={12} md={6} lg={6}>
               <TextField
                 select
                 size="small"
@@ -725,6 +687,45 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
                 ))}
               </TextField>
             </Grid>
+
+            <Grid item xs={12} sm={12} md={6} lg={6}>
+              <TextField
+                select
+                size="small"
+                fullWidth
+                name="wrapOriginal"
+                value={wrapOriginal}
+                label={i18n("wrap_original")}
+                disabled={disabled}
+                onChange={handleChange}
+              >
+                {GlobalItem}
+                <MenuItem value="false">{i18n("disable")}</MenuItem>
+                <MenuItem value="true">{i18n("enable")}</MenuItem>
+              </TextField>
+            </Grid>
+
+            {effectiveWrapOriginal && (
+              <Grid item xs={12} sm={12} md={6} lg={6}>
+                <TextField
+                  select
+                  size="small"
+                  fullWidth
+                  name="originalTextStyle"
+                  value={originalTextStyle}
+                  label={i18n("original_text_style")}
+                  disabled={disabled}
+                  onChange={handleChange}
+                >
+                  {GlobalItem}
+                  {allTextStyles.map((item) => (
+                    <MenuItem key={item.styleSlug} value={item.styleSlug}>
+                      {item.styleName}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Grid>
+            )}
           </Grid>
         </Box>
 
@@ -869,7 +870,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
         {rules &&
           (editMode ? (
             // 编辑已有规则模式
-            <Stack direction="row" spacing={2}>
+            <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
               {disabled ? (
                 <>
                   {/* 点击开启表单编辑 */}
@@ -935,7 +936,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
             </Stack>
           ) : (
             // 新建添加规则模式
-            <Stack direction="row" spacing={2}>
+            <Stack direction="row" spacing={2} useFlexGap flexWrap="wrap">
               {/* 新增规则保存 */}
               <Button
                 size="small"
@@ -1349,7 +1350,13 @@ function SubRulesItem({
   };
 
   return (
-    <Stack direction="row" alignItems="center" spacing={2}>
+    <Stack
+      direction="row"
+      alignItems="center"
+      spacing={2}
+      useFlexGap
+      flexWrap="wrap"
+    >
       {/* 规则源单选框 */}
       <FormControlLabel
         value={url}
@@ -1460,7 +1467,13 @@ function SubRulesEdit({ subList, addSub, updateDataCache }) {
 
   return (
     <>
-      <Stack direction="row" alignItems="center" spacing={2}>
+      <Stack
+        direction="row"
+        alignItems="center"
+        spacing={2}
+        useFlexGap
+        flexWrap="wrap"
+      >
         {/* 点击展开新增订阅 URL 输入框 */}
         <Button
           size="small"
@@ -1489,7 +1502,13 @@ function SubRulesEdit({ subList, addSub, updateDataCache }) {
             label={i18n("subscribe_url")}
           />
 
-          <Stack direction="row" alignItems="center" spacing={2}>
+          <Stack
+            direction="row"
+            alignItems="center"
+            spacing={2}
+            useFlexGap
+            flexWrap="wrap"
+          >
             <Button
               size="small"
               variant="contained"
@@ -1633,14 +1652,12 @@ export default function Rules() {
         </Alert>
 
         {/* 规则分类选项卡导航 */}
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={activeTab} onChange={handleTabChange}>
-            <Tab label={i18n("global_rule")} />
-            <Tab label={i18n("personal_rules")} />
-            <Tab label={i18n("subscribe_rules")} />
-            {/* <Tab label={i18n("overwrite_subscribe_rules")} /> */}
-          </Tabs>
-        </Box>
+        <Tabs value={activeTab} onChange={handleTabChange}>
+          <Tab label={i18n("global_rule")} />
+          <Tab label={i18n("personal_rules")} />
+          <Tab label={i18n("subscribe_rules")} />
+          {/* <Tab label={i18n("overwrite_subscribe_rules")} /> */}
+        </Tabs>
         {/* 全局默认规则视图 (Tab 0) */}
         <div hidden={activeTab !== 0}>
           {activeTab === 0 && <GlobalRule rules={rules} />}

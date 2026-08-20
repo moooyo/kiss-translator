@@ -5,12 +5,28 @@
  */
 export const XMLHttpRequestInjector = () => {
   try {
+    const stateKey = "__KISS_TRANSLATOR_XHR_INTERCEPTOR__";
+    const enabledAttribute = "data-kiss-subtitle-interceptor";
+    if (globalThis[stateKey]?.installed) return;
+
     const originalOpen = XMLHttpRequest.prototype.open;
-    XMLHttpRequest.prototype.open = function (...args) {
+    const wrappedOpen = function (...args) {
       const url = args[1];
       // 匹配 YouTube 的 timedtext 字幕网络请求链接
-      if (typeof url === "string" && url.includes("timedtext")) {
+      const interceptorEnabled =
+        document.documentElement?.getAttribute(enabledAttribute) !== "disabled";
+      if (
+        interceptorEnabled &&
+        typeof url === "string" &&
+        url.includes("timedtext")
+      ) {
         this.addEventListener("load", function () {
+          if (
+            document.documentElement?.getAttribute(enabledAttribute) ===
+            "disabled"
+          ) {
+            return;
+          }
           // 向主应用派发字幕数据，使用了安全的原点限制 (window.location.origin)
           // REVIEW: 接口拦截不完全风险。
           // 目前仅重写拦截了 `XMLHttpRequest` 对象，但这极易因网页底层升级或使用了 `fetch` API 获取字幕而失效。
@@ -28,6 +44,8 @@ export const XMLHttpRequestInjector = () => {
       }
       return originalOpen.apply(this, args);
     };
+    XMLHttpRequest.prototype.open = wrappedOpen;
+    globalThis[stateKey] = { installed: true, originalOpen, wrappedOpen };
   } catch (err) {
     console.log("XMLHttpRequestInjector", err);
   }

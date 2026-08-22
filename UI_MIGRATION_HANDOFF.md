@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `4c28586`
+**最后更新:** 2026-08-23 · `dev-newui` @ `39bec28`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -13,6 +13,7 @@
 | `newui` | 原始单体分支,包含完整重构。停更于 2026-08-09,**落后大量上游特性** |
 | `beta` | `newui` 的祖先(7/20 旧快照),无独有内容,**可忽略** |
 | `backup/dev-before-sync-*` | 同步前的安全快照,内容已含于 `newui`/`beta` |
+| `archive/atomic-setting-patch`(标签) | 已归档的三 commit 栈。本文档多处按 SHA 引用它,**不要删这个标签** |
 
 `dev-newui` 目前与 `upstream/dev` 齐平,无待同步的上游工作。
 
@@ -30,20 +31,32 @@
 | 字幕 CSS 往返截断修复 | `4e9f70e` | `splitCssDeclarations`,16 行。上游 bug,非本次迁移引入 |
 | 字幕设置页移植的安全网 | `283cdd7` | 6 个 i18n key + i18n 存在性守卫 + 3 条行为测试。页面未动 |
 | 字幕设置页 Material 3 移植 | `55dc0b1` / `01a8947` / `f9ab384` | 10 个控件进 M3 卡片、12 个进高级折叠、样式面板进带标题 section。**已在 dev server 浏览器中验收通过** |
+| 词典提示词过期测试修复 | `91039d0` | 测试基线转全绿,解开了 CI 的拦路石 |
+| push/PR CI | `4c28586` | `.github/workflows/test.yml`,已在 fork 实跑通过 |
+| 同步先落值后落元数据 | `ca0f1ee` | 修掉「设备永久停在旧数据且无报错」;元数据改按键合并 |
+| 设置写入改为补丁 | `39bec28` | `settingPatch.js` + `storage.patchObj`;`94fcf96` 的核心重写 |
 
 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
 ## 待办(按优先级)
 
-### 1. `agent/atomic-setting-patch` — 仅剩 `94fcf96`,建议下个版本再处理
+### ~~1. `agent/atomic-setting-patch`~~ — **三个 commit 全部有结论,分支已归档**
 
-2026-08-22 对三个 commit 逐个复审,推翻了此前「合栈顶即含全部三个」的建议 —— 那样做会踩下面的陷阱。三个 commit 得到三种不同结论:`cdf403a` 丢弃、`b47873c` 已合入、`94fcf96` 待改造。
+分支已删,内容保存在标签 **`archive/atomic-setting-patch`**。
+打标签而不是留分支,是因为本文档引用 `94fcf96` 十三处、含可执行命令
+(`git show 94fcf96:<path>`、`git merge-tree --merge-base=94fcf96^ ...`),
+而它**只能从这个 ref 到达** —— 直接删分支会让它变成不可达、迟早被 gc,那些引用全部作废。
 
-`94fcf96` 不急:它依赖的 `b47873c` 刚落地,建议先跑一个版本观察订阅在真实环境(尤其油猴和 iOS)的表现,再动设置写入的序列化。
+| commit | 结论 |
+|---|---|
+| `cdf403a` 编辑草稿保护 | **否决**。与 `a07d39f` 上曾存在的版本字节相同,后被 `ed5e79b` 有意删除 —— 是对一次决策的 revert。详见下方 |
+| `b47873c` 跨上下文存储订阅 | **已合入 `a6bf0b1`**,带三个前置修复 |
+| `94fcf96` 设置原子写入 | **核心已重写**,见下方 |
 
-#### `cdf403a` 编辑草稿保护 —— **丢弃**
+#### `cdf403a` 为什么否决(保留备查)
 
-它的核心文件与 `a07d39f`(#1004 的 M3 基线)上曾存在过的版本**字节相同**,后被 `ed5e79b`「Narrow settings UI behavior changes」整个删除。这是对一次有意决策的 revert,不是新修复:
+它的核心文件与 `a07d39f`(#1004 的 M3 基线)上曾存在过的版本**字节相同**,后被
+`ed5e79b`「Narrow settings UI behavior changes」整个删除:
 
 ```
 git rev-parse cdf403a:src/views/Options/usePersistedEntityDraft.js  → 9559628c...
@@ -51,37 +64,45 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 ```
 
 它带的 `StylesSetting.test.js` 用例也是把 `ed5e79b` 删除并反转过的断言原样复活。
+另有一处缺陷:`rebaseLocalChanges` 中 baseline 与 draft 一致的 key 走 early return、
+从不写入 `next`,persisted 侧为 `{}` 时脏草稿会塌缩成只剩被编辑的字段。
 
-另有一处 `ed5e79b` 时期没有的缺陷:`rebaseLocalChanges` 中 baseline 与 draft 一致的 key 走 early return、从不写入 `next`。当 persisted 侧为 `{}` 时(`Apis.js` 以 `usePersistedEntityDraft(api || {}, apiSlug)` 调用,`api` 来自可能瞬时落空的 `transApis.find(...)`),脏草稿会塌缩成只剩被编辑的那个字段。它替代的旧代码最多回退到已持久化的值,造不出残缺实体。
+其中唯一值得留下的是 `StylesSetting` 的草稿丢失,已用 6 行内容比对守卫单独修掉(`3876bae`)。
 
-**而它贡献了整个栈 100% 的冲突**(29 处 / 约 1000 行 / 5 文件)。`git merge-tree` 对三个 commit 分别测得的冲突数完全相同 —— 后两个 commit 自身零冲突。
+#### `94fcf96` 怎么重写的 —— 取了一半,否决了一半
 
-其中唯一值得留下的是 `StylesSetting` 的草稿丢失,已用 6 行内容比对守卫在 `dev-newui` 上单独修掉(见「已完成」),契约不变:持久化内容真的变化时草稿照样被覆盖,只是「对象换身份、内容未改」不再被误判。
+**先复现再修。** 关于这个 commit 的记录被测量推翻过两次(见文末「测量方法警告」),
+所以没有凭推理动手,而是先写测试证明残余存在:两个 hook 同一个键,一个改 `alpha`
+一个改 `beta`,断言两者都活下来。**它红了** —— `beta` 在存储里完全消失。残余是真的。
 
-#### `b47873c` 跨上下文存储订阅 —— **已合入 `a6bf0b1`**
+**取:** `settingPatch.js` 原样搬入(纯函数、零依赖、数组整体替换而非按下标合并、
+用哨兵处理删除)。`runtimeSettingPatch.js` 重写为 `storage.patchObj` —— 形状完全相同:
 
-以 `agent/storage-subscriptions-v2` 落地,三个 commit:cherry-pick 原样搬入 → 三个前置修复 → 对抗式复审揪出的四个缺陷。零冲突,和预估一致。
+| `runtimeSettingPatch.js` | `storage.patchObj`(`39bec28`) |
+|---|---|
+| `enqueueOperation` promise 队列 | `patchQueues` 按键队列 |
+| 读 → `mergeSettingPatch` → 写 | 同上,同一个 `mergeSettingPatch` |
+| `putSyncMeta(KV_SETTING_KEY)` | 现有 `debounceSyncMeta` 本来就在做(`Setting.js:99`) |
 
-复审发现的问题里有一个是**订阅本身引入的回归**,记在这里以免后人重新踩:每一次写入都会回到写入方自己(扩展走 `browser.storage.onChanged`,油猴走 `set()` 里的 `emitStorageChange`,后者在 `await setValue` resolve 之后才发)。两次写入同时在途时,第 N-1 次的回声会把状态打回去,而写盘副作用随即提前返回,新值再也写不出去。在油猴桥接上这个窗口经常超过两次击键的间隔,`syncKey` 这类字段会被看着往回跳。现在 `useStorage` 按实例记住自己写出的载荷并丢弃对应回声 —— 抑制是**按 hook 实例**且**一次性**的,兄弟 provider 照常收到变更。
+hook 只写自己改动的字段。**关键细节:** 它登记的自写载荷是**合并结果**而不是打算写的值 ——
+别人的字段可能一并落进同一次合并,回声携带的是合并形态,拿原值比对会认领不上,
+`828b1bd` 修掉的输入框回退就会复活。`patchObj` 为此留了 `onWillWrite` 同步回调
+(回声在 `setObj` 内部发出,等 promise resolve 就晚了)。
 
-另外三处:`reload()` 补上 external 标记(和挂载路径同一个毛病);`gm.js` 的 value-change handler 校验载荷形状(`listenerId` 与 `promiseGM` 的 pong 取自同一个约 1e6 名字池,而这个分支第一次让通道长期存活,撞名会把设置静默重置成默认值);`save()`/`update()` 的副作用移出 state 更新函数。
+**否决:** 后台 worker 序列化。它被 `isExt` 挡住,对油猴和 iOS 完全无效 ——
+而那正是回声窗口最宽的地方 —— 代价是一个没有重试、没有超时、失败时静默丢弃的 MV3 依赖。
+它另外那些东西(`localChangeRevisionRef` / `remoteSyncRevisionRef` / `dataRef` /
+`enqueueSettingWrite` / `applyPersistedSetting` / `isBackgroundManagedSetting`)
+全是后台通道的配套,没有后台就不需要 —— 其中那对 revision ref 正是「怎么解都是错」的合并陷阱来源。
 
-**仍未关闭 —— 写 PR/发版说明时不要说反了:** 整对象覆盖依然存在。五个 provider 各写各的整份快照,「A 改 X 的同时 B 改 Y」仍是最后写的人赢。订阅把过期窗口从数小时压到一次存储往返,概率低了几个数量级,但**后果更重**:输的一方现在带着 external 标记采纳赢家快照,不再像以前那样在下次编辑时自愈。只有 `94fcf96` 的字段级 patch 序列化能让它可交换。
+**仍开口:** 跨 realm 竞态。同 realm(内容脚本里三个 provider 同处一页,最常见)已完全关闭;
+跨 realm 的窗口从「该上下文上次加载至今」缩到**一次存储往返**。要彻底关掉需要跨 realm 的
+单一序列化点 —— 那正是后台 worker 的作用。收窄后的窗口若被证明仍会出问题,再回头看。
 
-**iOS 安装问题已排除,不必实机验证** —— 理由见下方「待实机验证」一节末尾。运行时该 app 不支持值变更监听,降级路径是安全的(`storage.js` 的 `getOptionalGmMethod` 会吞掉异常,退化成同 realm 内同步)。`src/scripts/userscriptGrants.test.js` 守着这 4 行不被误删,但 CI 不跑 jest,所以只在本地有效。
-
-#### `94fcf96` 设置原子写入 —— **重新实现,不要 cherry-pick**
-
-`settingPatch.js` 本身干净、纯函数、测试扎实(含一条移除队列就会失败的真实交错测试),零夹带。但:
-
-**测量方法警告 —— 这个 commit 上已经反转过两轮,别再用错的量法。**
-
-2026-08-23 我一度「更正」说它零冲突、且不碰 `save()`/`update()`。**那次更正本身是错的**,
-两个错误都出在测量:
+#### 测量方法警告 —— 这个 commit 上反转过两轮
 
 ```
-# 错的：旧三参形式输出的是 diff，冲突标记带 "+" 前缀，
-#       锚定 ^ 的 grep 因此计到 0
+# 错的：旧三参形式输出 diff，冲突标记带 "+" 前缀，锚定 ^ 的 grep 计到 0
 git merge-tree 94fcf96^ dev-newui 94fcf96 | grep -c '^<<<<<<<'   # → 0，假的
 
 # 对的：
@@ -90,49 +111,7 @@ git merge-tree --write-tree --merge-base=94fcf96^ dev-newui 94fcf96
 ```
 
 第二个错误是 grep 模式没覆盖实际新增的行(`localChangeRevisionRef` / `dataRef`),
-于是漏判成「没碰 save/update」。实际 `@@ -162,6 +292,10 @@` 和 `@@ -182,6 +316,10 @@`
-两个 hunk **就落在 `save()` 和 `update()` 的 setData 更新函数里**。
-
-**结论:单独 cherry-pick 它会在 `src/hooks/Storage.js` 冲突,而且那个冲突无论怎么解都是错的 ——**
-见下方「合并陷阱」。
-
-#### 共存性:两套机制不是打架,是一套静默取代另一套,而且更弱
-
-`isBackgroundManagedSetting = isExt && key === STOKEY_SETTING`(94fcf96 的 `Storage.js:66`)
-在订阅回调(`:108`)和写盘副作用(`:248`)里都**早退**,位置都在当前 `claimSelfWrite` /
-`rememberSelfWrite` 之前。也就是说:**扩展模式下的主设置键,`828b1bd` 的自回声抑制被整个绕过**,
-换成 `applyPersistedSetting` 的 rebase。
-
-但 `enqueueSettingWrite` 从不乐观推进 `persistedSettingRef`,也不记录自己发出去的 patch
-(`persistedSettingRef.current` 只在 `:83 :98 :143 :149 :159 :352` 赋值,没有一处在写入路径上)。
-所以它**分不清「用户在途中撤回了这次编辑」和「用户根本没做过这次编辑」** ——
-SW 往返期间的一次撤回会在 UI 和存储里同时被抹掉。
-那正是 `828b1bd` 要修的输入框回退 bug,在**流量最高的那个键上**复活。
-
-#### 合并陷阱:两种解法都是错的
-
-`localChangeRevisionRef.current += 1` 全文只有两处(`:296` `:320`),都在那两个冲突的更新函数里。
-而写盘副作用在 `:248` 就早退了,走不到 `:273` 的 `debouncedSync` —— 所以后台托管的设置,
-**唯一的同步触发点**是 `:224-228` 的 `localRevision > remoteSyncRevisionRef.current`,
-两个 ref 都在 `:101-102` 归零。
-
-- 解成 **OURS**(正确保留 `828b1bd`)→ 两处 `+= 1` 一起没了 → 判据永远是 `0 > 0` →
-  **会话内设置同步彻底失效,而且是静默的**(94fcf96 那四条后台路径测试没有一条断言 `syncData`)
-- 解成 **THEIRS** → 对所有键回退 `828b1bd`
-
-三处待改造:
-
-- 后台经 `getSettingWithDefault()` 读写回存,而 `storage.js:173` 上方注释明说那层归一化**只在内存中**做。持久化它会把 `config/api.js` 里 `thinkingEffort: "_default"`(「接口默认,不注入参数」)替换成具体值写死 —— 用户从未选择的推理强度参数从此被注入,且不可恢复。应改读原始 `getSetting()`
-- 「Serialize」名不副实:`sync.js:394` 和 `:519` 仍在做未入队的整对象 `setSetting` —— 这是**最大的整对象覆盖来源**,而这个 commit 完全没碰它
-- SW 往返无失败兜底。不会丢(patch 是累积的、会向前 rebase),但反过来:一个未刷出的 delta 会变成不可见、无上限的 per-tab override,遮盖其他上下文的值。需要 sendBgMsg 失败时直接写存储的 plan B
-
-#### 合并机制与陷阱
-
-`cdf403a` 是**最老**的 commit,不能「合栈顶跳过它」—— `b47873c` 已用 cherry-pick 单独取出(见上),`94fcf96` 同理。两边文件集无交集(`comm -12` 为空),后两个从不引用该 hook 或任何 Options 文件,所以这样做是安全的。
-
-**陷阱:** 直接 `git merge` 整个 `agent/atomic-setting-patch` 时 `Prompts.js` 会**无冲突标记地自动合并**,悄悄把 `ed5e79b` 从该文件移除的机制装回去,而 `Apis.js` / `StylesSetting.js` 还挂在冲突里。谁按 `dev-newui` 解完那几处冲突,就会得到三个组件用两套草稿机制、且没有任何信号。cherry-pick 可完全避开。
-
-处理完 `94fcf96` 之后,`agent/atomic-setting-patch` 这个分支就可以删了 —— 它剩下的唯一内容是已被否决的 `cdf403a`。
+漏判成「没碰 save/update」。**教训:量之前先确认量法本身。**
 
 ### 2. 字幕 — 运行时的高价值部分已做完,剩设置页
 

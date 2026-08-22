@@ -204,6 +204,37 @@ describe("useStorage remote sync", () => {
     host.unmount();
   });
 
+  test("does not write back the value it just loaded", async () => {
+    storage.getObj.mockResolvedValue({ loaded: true });
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    // 挂载时读到的值原样写回是多余的，而且会经订阅广播出去：接收方回退到这个
+    // 旧值、设上自己的 external 标记，其写盘副作用随即提前返回，于是较新的编辑
+    // 在界面和存储中同时消失且无法自愈。
+    expect(host.hookResult.data).toEqual({ loaded: true });
+    expect(storage.setObj).not.toHaveBeenCalled();
+
+    host.unmount();
+  });
+
+  test("writes the default exactly once when storage is empty", async () => {
+    storage.getObj.mockResolvedValue(undefined);
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    expect(storage.setObj).toHaveBeenCalledTimes(1);
+    expect(storage.setObj).toHaveBeenCalledWith("local-setting", {
+      local: true,
+    });
+
+    host.unmount();
+  });
+
   test("does not let a late initial read overwrite a newer event", async () => {
     let resolveInitialRead;
     storage.getObj.mockImplementationOnce(

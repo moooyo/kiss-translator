@@ -16,7 +16,6 @@ import Header from "./Header";
 import {
   MSG_OPEN_OPTIONS,
   MSG_OPEN_SEPARATE_WINDOW,
-  STOKEY_SETTING,
   DEFAULT_SETTING,
   GLOBLA_RULE,
   resolveApiPromptList,
@@ -25,7 +24,6 @@ import { kissLog } from "../../libs/log";
 import PopupCont from "./PopupCont";
 import TranForm from "../Selection/TranForm";
 import { useSetting } from "../../hooks/Setting";
-import { browser } from "../../libs/browser";
 import { isAutoTranslateClipboardSupported } from "../../libs/client";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
 import { POPUP_STYLES } from "./styles";
@@ -59,20 +57,6 @@ export function Trantab({ isSeparate = false }) {
   useEffect(() => {
     setAutoTranslateClipboard(setting?.autoTranslateClipboard ?? false);
   }, [setting?.autoTranslateClipboard]);
-
-  useEffect(() => {
-    const handleStorageChange = (changes, areaName) => {
-      if (areaName !== "local") return;
-      const nextSetting = changes?.[STOKEY_SETTING]?.newValue;
-      if (nextSetting) {
-        setAutoTranslateClipboard(nextSetting.autoTranslateClipboard ?? false);
-      }
-    };
-    browser?.storage?.onChanged?.addListener?.(handleStorageChange);
-    return () => {
-      browser?.storage?.onChanged?.removeListener?.(handleStorageChange);
-    };
-  }, []);
 
   const translateClipboard = useCallback(async () => {
     if (

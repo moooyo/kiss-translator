@@ -1,8 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { STOKEY_SETTING } from "../../config";
 import { useSetting } from "../../hooks/Setting";
-import { browser } from "../../libs/browser";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
 import { Trantab } from ".";
 
@@ -75,14 +73,18 @@ function renderTrantab(props = {}) {
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => root.render(<Trantab {...props} />));
-  return { container, root };
+  return {
+    container,
+    root,
+    rerender: (nextProps = props) => {
+      act(() => root.render(<Trantab {...nextProps} />));
+    },
+  };
 }
 
 describe("Trantab clipboard translation", () => {
   beforeEach(() => {
     document.body.innerHTML = "";
-    browser.storage.onChanged.addListener.mockClear();
-    browser.storage.onChanged.removeListener.mockClear();
     readClipboardTextIfAllowed.mockReset();
     useSetting.mockReturnValue({ setting });
   });
@@ -159,20 +161,19 @@ describe("Trantab clipboard translation", () => {
       setting: { ...setting, autoTranslateClipboard: false },
     });
     readClipboardTextIfAllowed.mockResolvedValue("new clipboard text");
-    const { container, root } = renderTrantab({ isSeparate: true });
+    const { container, root, rerender } = renderTrantab({ isSeparate: true });
     await flushEffects();
-    const storageListener =
-      browser.storage.onChanged.addListener.mock.calls[0][0];
+    expect(readClipboardTextIfAllowed).not.toHaveBeenCalled();
 
+    // 另一个扩展页面改了设置：storage 订阅把新值送进 SettingProvider，
+    // 组件从 useSetting 读到它并重新渲染。这是跨上下文变更真实走的路径 ——
+    // 此前这里手工喂给 chrome.storage.onChanged 一个对象载荷，
+    // 而 setObj 存的是 JSON 字符串，那种事件在生产中不会出现。
+    useSetting.mockReturnValue({
+      setting: { ...setting, autoTranslateClipboard: true },
+    });
     await act(async () => {
-      storageListener(
-        {
-          [STOKEY_SETTING]: {
-            newValue: { autoTranslateClipboard: true },
-          },
-        },
-        "local"
-      );
+      rerender({ isSeparate: true });
       await Promise.resolve();
       await Promise.resolve();
     });

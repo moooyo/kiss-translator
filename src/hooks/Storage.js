@@ -81,9 +81,18 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
         if (!isMounted || storageRevision !== revisionAtStart) return;
 
         if (storedVal === undefined || storedVal === null) {
-          // 如果存储中没有该值，写入初始默认值
+          // 如果存储中没有该值，写入初始默认值。
+          // 同时标记为「来自存储」，避免下方写盘副作用把刚写进去的默认值再写一遍。
+          externalStorageValueRef.current = defaultVal;
+          skipRemoteSyncValueRef.current = { value: defaultVal };
           await storage.setObj(key, defaultVal);
         } else {
+          // 刚从存储读出来的值不需要再写回去。不加这个标记的话，写盘副作用会把它
+          // 原样写回、并经订阅广播给其他上下文；接收方回退到这个旧值后会设上自己
+          // 的 external 标记，其写盘副作用随即提前返回，于是较新的编辑在界面和存
+          // 储中同时消失，且没有任何东西能把它恢复回来。
+          externalStorageValueRef.current = storedVal;
+          skipRemoteSyncValueRef.current = { value: storedVal };
           setData(storedVal);
         }
       } catch (err) {

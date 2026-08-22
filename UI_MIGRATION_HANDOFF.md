@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-22 · `dev-newui` @ `ca24567`
+**最后更新:** 2026-08-22 · `dev-newui` @ `a6bf0b1`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -24,15 +24,18 @@
 | Popup Material 3 | `a96fdf8` | PR #1013,`agent/popup-m3-redesign` |
 | 固定 pnpm 9.14.4 | `2904560` | 见下方「已知坑」 |
 | 内容页运行时样式/注入器泄漏修复 | `ffcfbb1` | PR #5(仅评审用),`fix/runtime-style-leak-dev` |
-| 设置页草稿身份抖动守卫 | 本次 | `StylesSetting.js` / `Prompts.js`,各带一条回归测试;是下方 `b47873c` 的前置条件 |
+| 设置页草稿身份抖动守卫 | `3876bae` | `StylesSetting.js` / `Prompts.js`,各带一条回归测试;是存储订阅的前置条件 |
+| 跨上下文存储订阅 | `a6bf0b1` | `agent/storage-subscriptions-v2`,三个 commit,`--no-ff` 便于整体回滚。详见下方 |
 
 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
 ## 待办(按优先级)
 
-### 1. `agent/atomic-setting-patch` — 拆开逐个 cherry-pick,**不要整合**
+### 1. `agent/atomic-setting-patch` — 仅剩 `94fcf96`,建议下个版本再处理
 
-2026-08-22 对三个 commit 逐个复审,推翻了此前「合栈顶即含全部三个」的建议 —— 那样做会踩下面的陷阱。三个 commit 应得三种不同结论。
+2026-08-22 对三个 commit 逐个复审,推翻了此前「合栈顶即含全部三个」的建议 —— 那样做会踩下面的陷阱。三个 commit 得到三种不同结论:`cdf403a` 丢弃、`b47873c` 已合入、`94fcf96` 待改造。
+
+`94fcf96` 不急:它依赖的 `b47873c` 刚落地,建议先跑一个版本观察订阅在真实环境(尤其油猴和 iOS)的表现,再动设置写入的序列化。
 
 #### `cdf403a` 编辑草稿保护 —— **丢弃**
 
@@ -51,19 +54,17 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 其中唯一值得留下的是 `StylesSetting` 的草稿丢失,已用 6 行内容比对守卫在 `dev-newui` 上单独修掉(见「已完成」),契约不变:持久化内容真的变化时草稿照样被覆盖,只是「对象换身份、内容未改」不再被误判。
 
-#### `b47873c` 跨上下文存储订阅 —— **合,但需带三个修复**
+#### `b47873c` 跨上下文存储订阅 —— **已合入 `a6bf0b1`**
 
-缺口确认存在:`src/hooks/Storage.js:31` 的 `REVIEW:` 注释就是它的 spec,`storage.js` 导出的对象里没有任何 subscribe。**零冲突** —— `dev-newui` 从未改过 `src/hooks/Storage.js` 和 `src/libs/gm.js`。这两个 commit 合起来是全栈 78% 的新增代码量。
+以 `agent/storage-subscriptions-v2` 落地,三个 commit:cherry-pick 原样搬入 → 三个前置修复 → 对抗式复审揪出的四个缺陷。零冲突,和预估一致。
 
-注意:持有独立快照的 `SettingProvider` 是**五个**(popup / fab / contentPopup / options / `TranBox.js:451` 的 tranbox),不是四个。
+复审发现的问题里有一个是**订阅本身引入的回归**,记在这里以免后人重新踩:每一次写入都会回到写入方自己(扩展走 `browser.storage.onChanged`,油猴走 `set()` 里的 `emitStorageChange`,后者在 `await setValue` resolve 之后才发)。两次写入同时在途时,第 N-1 次的回声会把状态打回去,而写盘副作用随即提前返回,新值再也写不出去。在油猴桥接上这个窗口经常超过两次击键的间隔,`syncKey` 这类字段会被看着往回跳。现在 `useStorage` 按实例记住自己写出的载荷并丢弃对应回声 —— 抑制是**按 hook 实例**且**一次性**的,兄弟 provider 照常收到变更。
 
-前两项是**前置条件而非后续优化**:
+另外三处:`reload()` 补上 external 标记(和挂载路径同一个毛病);`gm.js` 的 value-change handler 校验载荷形状(`listenerId` 与 `promiseGM` 的 pong 取自同一个约 1e6 名字池,而这个分支第一次让通道长期存活,撞名会把设置静默重置成默认值);`save()`/`update()` 的副作用移出 state 更新函数。
 
-1. `loadInitialData` 调 `setData(storedVal)` 时未设 `externalStorageValueRef`,挂载回写照发、且现在是广播。接收端会回退旧值、设上自己的 external 标记,其写 effect 随即提前 return —— 新编辑从 UI 和存储同时消失,没有东西能自愈。**比现状更差。**`Storage.js:8` 已有 `isSameStorageValue` 可用
-2. `StylesSetting` / `Prompts` 的草稿守卫必须先落地 —— **已完成**。订阅一上,每次外部写入都会重建实体身份,把今天很难触发的草稿丢失变成常态
-3. 删掉 `src/views/Popup/index.js:63-75` 那个失效的手写监听器及其测试(`setObj` 存的是 JSON 字符串,监听器却对它取 `.autoTranslateClipboard`)
+**仍未关闭 —— 写 PR/发版说明时不要说反了:** 整对象覆盖依然存在。五个 provider 各写各的整份快照,「A 改 X 的同时 B 改 Y」仍是最后写的人赢。订阅把过期窗口从数小时压到一次存储往返,概率低了几个数量级,但**后果更重**:输的一方现在带着 external 标记采纳赢家快照,不再像以前那样在下次编辑时自愈。只有 `94fcf96` 的字段级 patch 序列化能让它可交换。
 
-`config-overrides.js` / `package.json` 加的 4 行 `@grant` 是**必需的**,没有它整个 GM 分支在油猴下是永久静默 no-op。`userscript-metadata.mjs` 那 105 行工具可丢(CI 不跑测试)。待验证:iOS Safari 的 Userscripts app 是否会因不认识这些 grant 而拒装 —— 运行时降级是安全的(`getOptionalGmMethod` 会吞掉异常),但安装时行为需实机试一次。
+**待实机验证:** iOS Safari 的 Userscripts app 会不会因不认识新加的 4 行 `@grant` 而拒装。运行时降级是安全的(`storage.js` 的 `getOptionalGmMethod` 会吞掉异常,退化成同 realm 内同步),但安装时的行为查不了。`src/scripts/userscriptGrants.test.js` 守着这 4 行不被误删,但 CI 不跑 jest(`release.yml` 只有 build+zip),所以只在本地有效。
 
 #### `94fcf96` 设置原子写入 —— **先改造再合**
 
@@ -77,9 +78,11 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 #### 合并机制与陷阱
 
-`cdf403a` 是**最老**的 commit,不能「合栈顶跳过它」——必须逐个 cherry-pick `b47873c`、`94fcf96`。两边文件集无交集(`comm -12` 为空),后两个从不引用该 hook 或任何 Options 文件,所以这样做是安全的。
+`cdf403a` 是**最老**的 commit,不能「合栈顶跳过它」—— `b47873c` 已用 cherry-pick 单独取出(见上),`94fcf96` 同理。两边文件集无交集(`comm -12` 为空),后两个从不引用该 hook 或任何 Options 文件,所以这样做是安全的。
 
-**陷阱:** 直接 `git merge` 整个分支时 `Prompts.js` 会**无冲突标记地自动合并**,悄悄把 `ed5e79b` 从该文件移除的机制装回去,而 `Apis.js` / `StylesSetting.js` 还挂在冲突里。谁按 `dev-newui` 解完那几处冲突,就会得到三个组件用两套草稿机制、且没有任何信号。cherry-pick 可完全避开。
+**陷阱:** 直接 `git merge` 整个 `agent/atomic-setting-patch` 时 `Prompts.js` 会**无冲突标记地自动合并**,悄悄把 `ed5e79b` 从该文件移除的机制装回去,而 `Apis.js` / `StylesSetting.js` 还挂在冲突里。谁按 `dev-newui` 解完那几处冲突,就会得到三个组件用两套草稿机制、且没有任何信号。cherry-pick 可完全避开。
+
+处理完 `94fcf96` 之后,`agent/atomic-setting-patch` 这个分支就可以删了 —— 它剩下的唯一内容是已被否决的 `cdf403a`。
 
 ### 2. 字幕 — 最大剩余块,需先拆分
 

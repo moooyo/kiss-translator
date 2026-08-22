@@ -1,0 +1,48 @@
+name: test and build
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      # 这里刻意不写死 pnpm 版本：action-setup v4 会读 package.json 的
+      # packageManager 字段（pnpm@9.14.4）。版本本身是有要求的 —— pnpm 10+
+      # 不再读 package.json 的 pnpm.overrides，会把 pnpm-lock.yaml 里的
+      # overrides 块整个删掉，那是针对 CVE-2026-54466 的三个 pin
+      # (fast-xml-parser / shell-quote / websocket-driver)。
+      # release.yml 目前把 9.14.4 硬编码在自己文件里，升级时两处都要动。
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "pnpm"
+
+      - run: pnpm install
+
+      # 安装不得改动 lockfile。这条直接守上面那个坑：一旦有人把 pnpm 版本
+      # 提上去，overrides 块被删会在这里立刻变红，而不是等到发版才发现。
+      - name: Lockfile must be untouched by install
+        run: git diff --exit-code pnpm-lock.yaml
+
+      - name: Test
+        run: pnpm exec react-app-rewired test --watchAll=false
+        env:
+          CI: true
+
+      # 测试跑在 jsdom 里，构建才会真正过一遍 webpack 和所有入口。
+      # 两个 target 覆盖两条不同的打包路径：扩展和油猴脚本。
+      - name: Build extension
+        run: pnpm run build:chrome
+        env:
+          CI: true
+
+      - name: Build userscript
+        run: pnpm run build:web
+        env:
+          CI: true

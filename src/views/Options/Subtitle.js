@@ -403,10 +403,16 @@ export default function SubtitleSetting() {
   const transCssRef = useRef(parseCssToObject(localTransStyle));
   const windowCssRef = useRef(parseCssToObject(localWindowStyle));
 
-  // 组件卸载时销毁所有动画帧与防抖定时器
+  // 组件卸载时销毁所有动画帧，并把仍在等待的防抖写入立即落盘
   useEffect(() => {
     return () => {
-      Object.values(debounceTimers.current).forEach(clearTimeout);
+      // 必须 flush 而不是丢弃：本文件没有任何 onChangeCommitted，
+      // 200ms 防抖是样式改动唯一的持久化路径。直接 clearTimeout 会让
+      // 「拖完滑块立刻切到别的设置分页」的改动凭空消失。
+      Object.values(debounceTimers.current).forEach((pending) => {
+        clearTimeout(pending.timer);
+        pending.flush();
+      });
       debounceTimers.current = {};
       Object.values(rafIds.current).forEach(
         (id) => id && cancelAnimationFrame(id)
@@ -418,12 +424,18 @@ export default function SubtitleSetting() {
   // 防抖保存最终 CSS 样式至 Chrome 扩展的持久存储中，避免拖动滑块时高频读写造成卡顿
   const debouncedUpdate = useCallback(
     (name, value) => {
-      if (debounceTimers.current[name]) {
-        clearTimeout(debounceTimers.current[name]);
+      const pending = debounceTimers.current[name];
+      if (pending) {
+        clearTimeout(pending.timer);
       }
-      debounceTimers.current[name] = setTimeout(() => {
+      const flush = () => {
+        delete debounceTimers.current[name];
         updateSubtitle({ [name]: value });
-      }, 200);
+      };
+      debounceTimers.current[name] = {
+        flush,
+        timer: setTimeout(flush, 200),
+      };
     },
     [updateSubtitle]
   );

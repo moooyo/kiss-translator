@@ -106,6 +106,9 @@ export class BilingualSubtitleManager {
       this.#seekSyncRafId = null;
     }
     // 移除字幕渲染容器
+    // 先恢复播放：容器就在光标底下，一旦移除 pointerleave 永远不会触发，
+    // 悬浮查词暂停的视频会一直停着，而字幕窗口已经消失、用户无从恢复。
+    this.#resumeVideoPausedForHover();
     this.#captionWindowEl?.parentElement?.parentElement?.remove();
     // 释放 MutationObserver 监听器
     this.#playerControlBarObserver?.disconnect();
@@ -114,6 +117,26 @@ export class BilingualSubtitleManager {
     this.#formattedSubtitles = [];
     this.#wordTooltipController?.destroy();
     this.#wordTooltipController = null;
+  }
+
+  /**
+   * 恢复被悬浮查词暂停的视频播放。
+   *
+   * 标志位在这里统一清除，所以重复调用是安全的：无论是鼠标正常移出字幕窗口，
+   * 还是字幕窗口在光标底下被整个拆掉（此时 pointerleave 不会触发），
+   * 都能保证视频不会被留在暂停状态。
+   */
+  #resumeVideoPausedForHover() {
+    const shouldResume = this.#wasPlayingBeforeHover;
+    this.#wasPlayingBeforeHover = false;
+    if (!shouldResume || !this.#videoEl?.paused) return;
+
+    try {
+      // 播放器可能正在被移除，play() 既可能同步抛错也可能返回 rejected promise
+      this.#videoEl.play()?.catch?.(() => undefined);
+    } catch (err) {
+      logger.info("Bilingual Subtitle Manager: resume after hover failed", err);
+    }
   }
 
   /**
@@ -241,14 +264,7 @@ export class BilingualSubtitleManager {
 
       this.#captionWindowEl.addEventListener("pointerleave", (e) => {
         if (e.target === this.#captionWindowEl) {
-          if (
-            this.#wasPlayingBeforeHover &&
-            this.#videoEl &&
-            this.#videoEl.paused
-          ) {
-            this.#videoEl.play();
-          }
-          this.#wasPlayingBeforeHover = false;
+          this.#resumeVideoPausedForHover();
           this.#hoverTarget = null;
         }
       });

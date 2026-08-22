@@ -137,6 +137,23 @@ export function wrapWordsWithSpans(text) {
   );
 }
 
+/**
+ * 判断词典结果里是否真的有可展示的内容。
+ *
+ * trs / aus / sentences 由 apiMicrosoftDict 以 `const trs = []` 起头再 push 填充，
+ * 因此「查到词条但没有释义」返回的是空数组——而空数组是真值，直接用 `||` 串联
+ * 会把查无结果判成查到了：既渲染出一个没有内容的释义框，也会把空词条自动收藏。
+ *
+ * @param {Object|null} dictResult 词典接口返回值
+ * @returns {boolean} 是否含有可展示内容
+ */
+function hasDictionaryPayload(dictResult) {
+  if (!dictResult) return false;
+  return [dictResult.trs, dictResult.aus, dictResult.sentences].some((field) =>
+    Array.isArray(field) ? field.length > 0 : Boolean(field)
+  );
+}
+
 export class WordTooltipController {
   constructor({
     getVideoContainer,
@@ -231,6 +248,16 @@ export class WordTooltipController {
       '<div class="kiss-word-loading">Looking up...</div>'
     );
 
+    // 关闭按钮用事件委托，不能写成内联 onclick：所有 innerHTML 都要过
+    // trustedTypesHelper.createHTML，而它的两条分支都是无配置的
+    // DOMPurify.sanitize，会把 on* 属性一律剥掉。监听器挂在 tooltip 元素
+    // 自身，随元素一起销毁，无需手动解绑。
+    this.tooltipEl.addEventListener("click", (event) => {
+      if (event.target?.closest?.(".kiss-word-tooltip-close")) {
+        this.hideWordTooltip();
+      }
+    });
+
     const videoContainer = this.getVideoContainer?.();
     if (videoContainer) {
       const containerRect = videoContainer.getBoundingClientRect();
@@ -263,9 +290,7 @@ export class WordTooltipController {
         timestamp,
       });
       const wordData = { timestamp, phonetic, definition, examples };
-      const hasDictionaryResult = Boolean(
-        dictResult && (dictResult.trs || dictResult.aus || dictResult.sentences)
-      );
+      const hasDictionaryResult = hasDictionaryPayload(dictResult);
       if (this.autoFavWord && hasDictionaryResult) {
         await saveFavoriteWordIfMissing(word, wordData);
       }
@@ -284,7 +309,7 @@ export class WordTooltipController {
         this.tooltipEl.innerHTML =
           trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
         <span>${word}</span>
-        <button class="kiss-word-tooltip-close" onclick="this.closest('.kiss-word-tooltip').remove()">×</button>
+        <button type="button" class="kiss-word-tooltip-close">×</button>
       </div>
       <div class="kiss-word-definition">Failed to load definition</div>`);
         this.#addFavoriteButton(word, { timestamp });
@@ -345,13 +370,10 @@ export class WordTooltipController {
   }
 
   #renderDictionaryResult(word, dictResult, wordData) {
-    if (
-      dictResult &&
-      (dictResult.trs || dictResult.aus || dictResult.sentences)
-    ) {
+    if (hasDictionaryPayload(dictResult)) {
       let content = `<div class="kiss-word-tooltip-header">
           <span>${word}</span>
-          <button class="kiss-word-tooltip-close" onclick="this.closest('.kiss-word-tooltip').remove()">×</button>
+          <button type="button" class="kiss-word-tooltip-close">×</button>
         </div>`;
 
       if (dictResult.aus && dictResult.aus.length > 0) {
@@ -391,7 +413,7 @@ export class WordTooltipController {
       this.tooltipEl.innerHTML =
         trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
           <span>${word}</span>
-          <button class="kiss-word-tooltip-close" onclick="this.closest('.kiss-word-tooltip').remove()">×</button>
+          <button type="button" class="kiss-word-tooltip-close">×</button>
         </div>
         <div class="kiss-word-definition">No definition found</div>`);
       this.#addFavoriteButton(word, wordData);

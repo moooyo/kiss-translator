@@ -114,6 +114,26 @@ async function waitForMutationObserver() {
   await Promise.resolve();
 }
 
+/**
+ * jsdom 的 HTMLMediaElement.play/pause 未实现且 paused 只读，
+ * 这里替换成可控的桩，以便断言悬浮暂停/恢复的行为。
+ */
+function makeVideoControllable(videoEl, { paused = false } = {}) {
+  let isPaused = paused;
+  Object.defineProperty(videoEl, "paused", {
+    get: () => isPaused,
+    configurable: true,
+  });
+  videoEl.pause = jest.fn(() => {
+    isPaused = true;
+  });
+  videoEl.play = jest.fn(() => {
+    isPaused = false;
+    return Promise.resolve();
+  });
+  return videoEl;
+}
+
 describe("BilingualSubtitleManager", () => {
   beforeEach(() => {
     apiTranslate.mockReset();
@@ -149,6 +169,50 @@ describe("BilingualSubtitleManager", () => {
       )
     ).toEqual(["hello", "world"]);
     manager.destroy();
+  });
+
+  test("resumes hover-paused playback when the caption window is torn down", async () => {
+    const videoEl = makeVideoControllable(createVideoElement());
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting: { ...setting, hoverLookupMode: "on" },
+    });
+
+    manager.start();
+
+    const captionWindow = document.querySelector(".kiss-caption-window");
+    captionWindow.dispatchEvent(new Event("pointerenter"));
+    expect(videoEl.pause).toHaveBeenCalledTimes(1);
+    expect(videoEl.paused).toBe(true);
+
+    // destroy() 会移除光标底下的容器，pointerleave 因此永远不会触发。
+    // 若不在这里主动恢复，视频会永远停着，而字幕窗口已经消失、用户无从操作。
+    manager.destroy();
+
+    expect(videoEl.play).toHaveBeenCalledTimes(1);
+    expect(videoEl.paused).toBe(false);
+  });
+
+  test("does not resume a video the user had already paused", async () => {
+    const videoEl = makeVideoControllable(createVideoElement(), {
+      paused: true,
+    });
+    const manager = new BilingualSubtitleManager({
+      videoEl,
+      formattedSubtitles: [{ ...subtitle, translation: "你好世界" }],
+      setting: { ...setting, hoverLookupMode: "on" },
+    });
+
+    manager.start();
+
+    document
+      .querySelector(".kiss-caption-window")
+      .dispatchEvent(new Event("pointerenter"));
+    manager.destroy();
+
+    expect(videoEl.play).not.toHaveBeenCalled();
+    expect(videoEl.paused).toBe(true);
   });
 
   test("renders translation before original when display order is translation first", () => {

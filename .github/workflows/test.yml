@@ -46,3 +46,8 @@ jobs:
         run: pnpm run build:web
         env:
           CI: true
+
+      # 构建退出码为 0 不代表产物是完整的。manifest 里声明的 content script、
+      # 图标、options 页路径若没被打进产物，构建照样成功,只在用户安装扩展时炸。
+      - name: Verify manifest artifacts exist
+        run: node src/scripts/verify-manifest.mjs build/chrome

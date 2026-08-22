@@ -1,7 +1,10 @@
+import fs from "fs";
+import path from "path";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import SubtitleSetting from "./Subtitle";
 import { useSubtitle } from "../../hooks/Subtitle";
+import { I18N, UI_LANGS, DEFAULT_SUBTITLE_SETTING } from "../../config";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -23,21 +26,17 @@ jest.mock("../../hooks/Prompt", () => ({
 
 jest.mock("../../hooks/ValidationInput", () => () => null);
 
-function renderSubtitle() {
+function renderSubtitle(overrides = {}) {
+  const updateSubtitle = jest.fn();
   useSubtitle.mockReturnValue({
     subtitleSetting: {
-      enabled: true,
-      apiSlug: "",
-      segSlug: "-",
-      chunkLength: 500,
-      toLang: "zh-CN",
-      isBilingual: true,
+      ...DEFAULT_SUBTITLE_SETTING,
+      // showLoadNotification 不在 DEFAULT_SUBTITLE_SETTING 里，
+      // 它的默认值只存在于 Subtitle.js 的解构默认值中。
       enhanceMode: "desktop",
-      windowStyle: "",
-      originStyle: "",
-      translationStyle: "",
+      ...overrides,
     },
-    updateSubtitle: jest.fn(),
+    updateSubtitle,
   });
 
   const container = document.createElement("div");
@@ -50,11 +49,22 @@ function renderSubtitle() {
 
   return {
     container,
+    updateSubtitle,
     unmount: () => {
       act(() => root.unmount());
       container.remove();
     },
   };
+}
+
+function setSliderValue(input, value) {
+  act(() => {
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      "value"
+    ).set.call(input, String(value));
+    input.dispatchEvent(new Event("change", { bubbles: true }));
+  });
 }
 
 describe("Subtitle style editor layout", () => {
@@ -71,5 +81,104 @@ describe("Subtitle style editor layout", () => {
     expect(window.getComputedStyle(grid).marginTop).toBe("-16px");
 
     view.unmount();
+  });
+});
+
+describe("Subtitle style persistence", () => {
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  // 本文件里没有任何 onChangeCommitted，200ms 防抖是样式改动唯一的持久化路径。
+  // 卸载时若直接 clearTimeout 而不 flush，「拖完滑块立刻切走」的改动就没了。
+  test("flushes a pending style write when the page unmounts", () => {
+    jest.useFakeTimers();
+    const view = renderSubtitle();
+    const slider = view.container.querySelector(".MuiSlider-root input");
+    expect(slider).not.toBeNull();
+
+    setSliderValue(slider, 24);
+    act(() => {
+      jest.advanceTimersByTime(199);
+    });
+    expect(view.updateSubtitle).not.toHaveBeenCalled();
+
+    view.unmount();
+
+    expect(view.updateSubtitle).toHaveBeenCalledTimes(1);
+  });
+
+  test("coalesces rapid style edits into a single write", () => {
+    jest.useFakeTimers();
+    const view = renderSubtitle();
+    const slider = view.container.querySelector(".MuiSlider-root input");
+
+    setSliderValue(slider, 20);
+    setSliderValue(slider, 22);
+    setSliderValue(slider, 24);
+
+    act(() => {
+      jest.advanceTimersByTime(199);
+    });
+    expect(view.updateSubtitle).not.toHaveBeenCalled();
+
+    act(() => {
+      jest.advanceTimersByTime(1);
+    });
+    expect(view.updateSubtitle).toHaveBeenCalledTimes(1);
+
+    view.unmount();
+  });
+});
+
+describe("Subtitle segmentation warning", () => {
+  // 三向门控：只有在强制重翻译、启用了 AI 断句、且断句服务与翻译服务不同时才警告。
+  // 这条文案的历史值得留意：b436d5b 加入，a07d39f 删除，1b10d45 有意恢复。
+  const warned = (overrides) => {
+    const view = renderSubtitle(overrides);
+    const hit = view.container.textContent.includes("seg_trans_diff_warning");
+    view.unmount();
+    return hit;
+  };
+
+  test("warns only when the segmentation service differs from the translator", () => {
+    expect(
+      warned({
+        forceSubtitleRetranslate: true,
+        segSlug: "openai",
+        apiSlug: "microsoft",
+      })
+    ).toBe(true);
+  });
+
+  test.each([
+    ["retranslation is off", { forceSubtitleRetranslate: false, segSlug: "openai", apiSlug: "microsoft" }],
+    ["AI segmentation is disabled", { forceSubtitleRetranslate: true, segSlug: "-", apiSlug: "microsoft" }],
+    ["both services match", { forceSubtitleRetranslate: true, segSlug: "openai", apiSlug: "openai" }],
+  ])("stays silent when %s", (_case, overrides) => {
+    expect(warned(overrides)).toBe(false);
+  });
+});
+
+describe("Subtitle page copy", () => {
+  // 缺失的 i18n key 会渲染成空字符串而不是 key 名（hooks/I18n.js 的 defaultText 是 ""），
+  // 而本文件把 useI18n mock 成了恒等函数，所以渲染断言完全看不出来。
+  // 只能从源码提取 key 再对着 I18N 校验。
+  test("covers every page copy key in all supported UI languages", () => {
+    const source = fs.readFileSync(path.join(__dirname, "Subtitle.js"), "utf8");
+    const keys = new Set(
+      Array.from(
+        source.matchAll(/\bi18n\(\s*["'`]([a-zA-Z0-9_]+)["'`]\s*\)/g),
+        (match) => match[1]
+      )
+    );
+
+    expect(keys.size).toBeGreaterThan(0);
+    for (const key of keys) {
+      for (const [language] of UI_LANGS) {
+        expect(I18N[key]?.[language]).toEqual(expect.any(String));
+        expect(I18N[key][language]).not.toBe("");
+      }
+    }
   });
 });

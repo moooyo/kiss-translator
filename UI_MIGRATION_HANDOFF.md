@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `31dcaab`
+**最后更新:** 2026-08-23 · `dev-newui` @ `91039d0`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -172,7 +172,9 @@ newui        : 578b2b76...
 
 `.pnpm-version` 文件记录了同一版本号,但**仓库里没有任何地方读取它**,升级时注意两处同步(或收敛到单一来源)。
 
-**测试基线不是全绿。** 在 `dev-newui` 上 `src/apis/trans.dict.test.js` 有 1 个用例失败,是既有问题,与本轮改动无关。在 `dev` 基线上则是 4 个套件 / 2 个用例失败(`trans.dict`、`batchQueue`、`BilingualSubtitleManager`、`Options/Layout`)。评估新改动时请对照基线,而不是期望全绿。
+**测试基线现在是全绿的**(2026-08-23 起,`91039d0`)。此前 `src/apis/trans.dict.test.js` 长期有 1 条失败,本文档一度把它当成「可接受的非全绿基线」——其实那是一条过期测试:上游 `2432ec1`(#1022)有意把词典提示词的标签从「所在段落:」改成英文,测试没跟着改。现在断言改为从 `defaultDictUserPrompt` 模板自身推导,文案再变也不会误报。
+
+**所以 push/PR CI 的拦路石已经清掉了。** 在此之前新加的 workflow 一上来就是红的,现在可以加了 —— 见下方。
 
 **根本没有 push/PR 阶段的 CI。** `.github/workflows/` 里只有 `release.yml`,且触发条件是 `on: push: tags: v*`。也就是说 **jest 在打 tag 之前一次都不会跑** —— `a6bf0b1` 专门加的 `src/scripts/userscriptGrants.test.js`(守着那 4 行 `@grant` 不被误删)实际上只在本地有效。要补一个 push/PR workflow 的话,得先处理上面那条非全绿基线,否则新 workflow 一上来就是红的。
 

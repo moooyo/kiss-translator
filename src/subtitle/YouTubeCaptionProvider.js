@@ -446,6 +446,7 @@ export class YouTubeCaptionProvider {
       blurTranslation,
       autoTranslate,
       aiContextSlug,
+      displayOrder,
     } = this.#setting;
     return {
       i18n: this.#i18n,
@@ -460,6 +461,7 @@ export class YouTubeCaptionProvider {
         blurTranslation,
         autoTranslate,
         aiContextSlug,
+        displayOrder,
       },
     };
   }

@@ -287,6 +287,15 @@ export function Menus({
     return options;
   }, [aiEnabledApis, i18n]);
 
+  // 双语字幕显示顺序的固定两项
+  const displayOrderOptions = useMemo(
+    () => [
+      { value: "original-first", label: i18n("original_first") },
+      { value: "translation-first", label: i18n("translation_first") },
+    ],
+    [i18n]
+  );
+
   // 根据当前字幕处理/翻译进度值，动态计算快捷菜单底部的下载按钮状态文案
   const status = useMemo(() => {
     if (progressed === 0) return i18n("waiting_subtitles");
@@ -300,6 +309,7 @@ export function Menus({
     skipAd, // 是否开启自动跳过广告
     isBilingual, // 是否采用双语对照视图显示
     blurTranslation, // 是否启用模糊隐藏译文，悬浮时显示的背词模式
+    displayOrder, // 双语字幕的显示顺序：原文在前或译文在前
     autoTranslate, // 当前视频是否开启字幕翻译
     aiContextSlug, // 选中的上下文增强服务 apiSlug
   } = formData;
@@ -349,6 +359,15 @@ export function Menus({
         name="isBilingual"
         value={isBilingual}
         label={i18n("is_bilingual_view")}
+      />
+      {/* 双语字幕显示顺序：管路本来就是通的（provider 路由、manager 读取），
+          此前只是菜单里没有这个控件 */}
+      <Select
+        onChange={handleChange}
+        name="displayOrder"
+        value={displayOrder || "original-first"}
+        options={displayOrderOptions}
+        label={i18n("trans_order")}
       />
       {/* 译文模糊背词开关 */}
       <Switch

@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `81fdf08`
+**最后更新:** 2026-08-23 · `dev-newui` @ `016971c5`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -40,25 +40,44 @@
 
 ## 待办
 
-### 1. 三项实机验证 —— **唯一的阻塞项**
+### 1. 三项实机验证 —— 暂缓
 
-见文末附录。
+按 2026-08-23 的决定,推迟到**代码工作全部结束后统一做**。步骤见文末附录。
 
-### 2. 字幕运行时:`0d533e8` / `cadfde2`
+### 2. `0d533e8` 字幕轨道恢复 / 播放期重配置
 
-字幕轨道恢复、播放期设置热更新。都是针对 `newui` 重构过的文件的重写,且无法脱离真实 YouTube 会话验证。**建议压在第 1 项之后。**
+**前置阻塞:`wordHover.js`。** `96d8c1d` 重写过它,它在 merge 冲突集里。newui 的
+`YouTubeSubtitleList.js` 调用 `_wordTooltipController.updateSetting(...)`(:221)和
+`pruneDetachedSpanListeners()`(:578),而 `dev-newui` 的 controller 公开面只有
+`attachSpanListeners` / `destroy` / `clearHoverState` / `hideWordTooltip` —— **两个都不存在**。
+`:578` 那处的 `?.` 挡的是 controller 为 null、不是方法缺失,所以悬停查词开着时每次虚拟渲染都会抛。
 
-其中「播放期设置热更新」有战略价值而不只是锦上添花:`a6bf0b1` 的存储订阅目前**只接了一半线** —— 内容脚本消费不了批量设置变更,因为 `YouTubeInitializer` 是一次性的 `if (initialized) return;`,拿着新 setting 对象再调一次会被静默丢弃。
+**注意 `spanListeners` 是回归不是修复:** `dev-newui` 用 `span.dataset.kissListenerAttached`,
+监听器随 span 消亡;newui 换成以 span 为键的强引用 Map,`pruneDetachedSpanListeners`
+存在的唯一目的就是擦它自己造的泄漏。引入等于给一个不存在的问题加上泄漏和每帧开销。
 
-### 3. 已知开口:跨 realm 设置写入竞态
+**另有一处静默失败:** newui `YTSL:219` 调 `addWordHoverStyles(this.theme)`,而 `dev-newui` 的
+`wordHover.js:12` 是 `export const addWordHoverStyles = () => {` —— 零参数,还有幂等早退。
+参数被接受并丢弃,整套 brandColor/darkMode 管线**看起来接好了,实际什么也不做**。
+
+### 3. `cadfde2` 字幕背景预设 / M3 改版 —— **卡在一个产品决定上**
+
+它重写 `src/views/Options/subtitleStyleUtils.js`(+236)—— 而那正是 `1b10d45` 因为
+「PR #1004 把字幕排除在 M3 改版之外」而**有意删掉**的 533 行。要动它,先得决定
+**要不要推翻那个范围决定**。这不是合并问题。
+
+若两个都要做,**顺序是 `0d533e8` 在前** —— 它带着 provider 的 reconciliation 块,
+而 `cadfde2` 的 `Menus.js` 改动假定它已存在。
+
+### 4. 已知开口:跨 realm 设置写入竞态
 
 同 realm(内容脚本里三个 provider 同处一页,最常见)已由 `39bec28` 完全关闭;跨 realm 的窗口从「该上下文上次加载至今」缩到**一次存储往返**。要彻底关掉需要跨 realm 的单一序列化点 —— 那正是被否决的后台 worker 的作用。收窄后的窗口若被证明仍会出问题,再回头看。
 
-### 4. 零散
+### 5. 零散(互不阻塞,随时可做)
 
-- `release.yml` 仍把 pnpm 版本硬编码为 9.14.4,而 `test.yml` 已改为从 `packageManager` 读。收敛掉可消除「两处同步」的坑
+- `release.yml` 仍把 pnpm 版本硬编码为 9.14.4,而 `test.yml` 已改为从 `packageManager` 读
 - `.pnpm-version` 记录了同一版本号,但**仓库里没有任何地方读取它**
-- 并发的 `trySyncSetting/Rules/Words` 仍可能在 `putSyncMeta` 的读-改-写之间交错(窗口已是微秒级)。串行化那几个入口可彻底关闭
+- 并发的 `trySyncSetting/Rules/Words` 仍可能在 `putSyncMeta` 的读-改-写之间交错(窗口已是微秒级)
 
 ## 已完成
 
@@ -78,6 +97,8 @@
 | push/PR CI | `4c28586` | `.github/workflows/test.yml`,已在 fork 实跑通过 |
 | 同步先落值后落元数据 | `ca0f1ee` | 修掉「设备永久停在旧数据且无报错」 |
 | 设置写入改为补丁 | `39bec28` | `settingPatch.js` + `storage.patchObj`;`94fcf96` 的核心重写 |
+| 播放器内菜单加显示顺序 | `7355d2a1` | 从 `Menus.js` 提取的唯一一块;管路本来就通,只缺控件 |
+| CI 校验 manifest 产物 | `016971c5` | `manifest-artifacts.mjs` + `verify-manifest.mjs`,已在 CI 实跑 |
 
 > 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
@@ -174,6 +195,31 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 引入它们的真实风险:`serializeFontSize` 改变字号滑块在出厂默认 `clamp(1rem, 2cqw, 3rem)` 上的语义。用 673 行加一个行为变更换一个 16 行能解决的问题,不划算。
 
 **该 CSS 往返 bug 不是本次迁移引入的** —— `upstream/dev` 的 `Subtitle.js` 同样第 39、58 行、同样 12 处 Slider。
+
+### `src/subtitle/YouTubeSubtitleList.js` 单独取
+
+不是一个独立的文件问题 —— 它的实质改动是 `0d533e8` 的客户端一半。同一个 commit
+同时引入 `setVisible` **和它唯一的调用者**(provider 的 changedNames reconciliation),
+`dev-newui` 的 provider 对这两个符号都是零命中。单独取这个文件会得到死代码,
+外加悬停查词开着时每次虚拟渲染必抛的 `pruneDetachedSpanListeners`。
+按文件逐个决策在这里是个分类错误 —— 它归 `0d533e8` 管,见「待办 2」。
+
+### `src/scripts/verify-build.mjs` 整体取
+
+脚本本身在 `dev-newui` 上跑不起来:引用 4 个 `pnpm build` 从不产出的 safari 路径,
+`--release` 那半边编码了 newui 自己的归档命名与目录约定,而 CI 只构建 7 个 target 中的 2 个。
+其中唯一有价值且无对应物的是 `manifest-artifacts.mjs`,已单独提取(`016971c5`)。
+
+### `src/subtitle/Menus.js` 整体取
+
+600 行里只有 `displayOrder` 值得单独取(已做,`7355d2a1`)。其余是 M3 改版加背景预设,
+归 `cadfde2` —— 见「待办 3」的产品决定。逐个控件追过出处才敢单独取:
+`displayOrder` / `apiSlug` 来自 `1efda9d`,`fontScale` 来自 `348c090`,只有 `windowStyle` 在 `cadfde2` 里。
+
+**一个曾被标记、但查证后不成立的风险:** 怀疑 newui 的 `Menus.js` 会绕过悬停暂停修复
+依赖的拆除路径。**不成立** —— 它整个写入面只有 3 行,全是同一个 `updateSetting` prop,
+没有写存储、没有 hook、没有直接调 manager;而 `96d8c1d` 动的 5 个文件里既没有
+`Menus.js` 也没有 `YouTubeCaptionProvider.js`。
 
 ### `9fe10d6`「Align subtitle interactions with upstream behavior」
 

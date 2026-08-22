@@ -10,9 +10,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+      # 版本不写死：action-setup v4 会读 package.json 的 packageManager。
+      # 必须是 9.14.4 —— pnpm 10+ 不再读 pnpm.overrides，会把 pnpm-lock.yaml
+      # 里的 overrides 块整个删掉，那是 CVE-2026-54466 的三个 pin。
       - uses: pnpm/action-setup@v4
-        with:
-          version: 9.14.4
       - uses: actions/setup-node@v4
         with:
           node-version: 24

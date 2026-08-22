@@ -55,7 +55,13 @@ jest.mock("./syncCrypto", () => ({
   decryptSyncValue: jest.fn(),
 }));
 
-import { changeSyncEncryptKey, syncData, syncSettingAndRules } from "./sync";
+import {
+  changeSyncEncryptKey,
+  syncData,
+  syncSettingAndRules,
+  trySyncRules,
+  trySyncSetting,
+} from "./sync";
 import {
   apiCreateGist,
   apiGetGist,
@@ -633,5 +639,46 @@ describe("GitHub Gist sync", () => {
       JSON.stringify({ setting: true }),
       "stale-local-passphrase"
     );
+  });
+  // Options 页首屏就是 Promise.all([trySyncSetting(), trySyncRules()])
+  // （views/Options/index.js:60）。两次同步各自读 syncMeta、发一次网络请求、
+  // 再写回自己那个键；交错时会丢掉另一个键的 syncAt，而 syncAt 一旦归零，
+  // syncData 会强制 updateAt = 0，此后远端无条件获胜，本地编辑再也传不上去。
+  //
+  // 断言的是最终顺序而不是中间状态：串行时 a 必须整个跑完 b 才开始，
+  // 并发时会出现 a:start, b:start, ... 的交错。
+  test("runs concurrent syncs one at a time", async () => {
+    const order = [];
+    getSyncWithDefault.mockResolvedValue({
+      syncType: "GitHub Gist",
+      syncUrl: "existing-gist",
+      syncKey: SYNC_KEY,
+      syncEncryptKey: SYNC_ENCRYPT_KEY,
+      syncMeta: {},
+    });
+    getSettingWithDefault.mockResolvedValue({ setting: true });
+    getRulesWithDefault.mockResolvedValue([]);
+
+    let release;
+    const gate = new Promise((resolve) => {
+      release = resolve;
+    });
+    let seen = 0;
+    apiGetGist.mockImplementation(async () => {
+      const label = seen++ === 0 ? "a" : "b";
+      order.push(`${label}:start`);
+      // 只让第一次停住，制造出足够宽的交错窗口
+      if (label === "a") await gate;
+      order.push(`${label}:end`);
+      return { files: {} };
+    });
+
+    const running = Promise.all([trySyncSetting(), trySyncRules()]);
+    // 给未串行化的第二次同步足够的机会挤进来
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    release();
+    await running;
+
+    expect(order).toEqual(["a:start", "a:end", "b:start", "b:end"]);
   });
 });

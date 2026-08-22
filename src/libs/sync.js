@@ -35,6 +35,30 @@ import { encryptSyncValue, decryptSyncValue } from "./syncCrypto";
 
 let webdavRequestPatched = false;
 
+// 所有同步操作串行执行。
+//
+// syncMeta 是一个整体对象，每次同步都要读它、发一次网络请求、再写回自己那个键。
+// putSyncMeta 已经改成写前重读 + 按键合并，把窗口从「一次网络往返」缩到了
+// 读-改-写之间的微秒级，但并发时仍会交错 —— 而 Options 页首屏就是
+// `Promise.all([trySyncSetting(), trySyncRules()])`（views/Options/index.js:60）。
+// 一旦交错丢掉某个键的 syncAt，syncData 会强制 updateAt = 0，此后远端无条件
+// 获胜，本地编辑再也传不上去。
+//
+// 代价是几个同步串行跑而不是并行，多花一两个网络往返的时间；换来的是这个键
+// 不会被悄悄写坏。注意队列里的任务不得再调用入队函数，否则死锁 ——
+// 当前 changeSyncEncryptKey / syncSettingAndRules 都在队列之外。
+let syncQueue = Promise.resolve();
+
+const enqueueSync = (task) => {
+  // 前一次失败也要继续排队，否则一次网络错误会永久堵死同步
+  const result = syncQueue.then(task, task);
+  syncQueue = result.then(
+    () => undefined,
+    () => undefined
+  );
+  return result;
+};
+
 // 同步键 -> 本地写入器。见 syncData 里「先落值再落元数据」那段说明：
 // 映射放在这里，是为了让写入顺序由 syncData 一处保证，而不是散在每个调用方。
 const REMOTE_VALUE_WRITERS = {
@@ -257,51 +281,52 @@ const migratePlainSyncData = async (syncType, data, args, syncEncryptKey) => {
  * @param {string} syncEncryptKey 新同步加密口令
  * @returns {Promise<void>}
  */
-const forceSyncDataWithEncryptKey = async (key, value, syncEncryptKey) => {
-  const {
-    syncType,
-    syncUrl,
-    syncUser,
-    syncKey,
-    syncMeta = {},
-  } = await getSyncWithDefault();
+const forceSyncDataWithEncryptKey = (key, value, syncEncryptKey) =>
+  enqueueSync(async () => {
+    const {
+      syncType,
+      syncUrl,
+      syncUser,
+      syncKey,
+      syncMeta = {},
+    } = await getSyncWithDefault();
 
-  if (
-    !syncKey ||
-    !syncEncryptKey ||
-    (syncType !== OPT_SYNCTYPE_GIST && !syncUrl) ||
-    (syncType === OPT_SYNCTYPE_WEBDAV && !syncUser)
-  ) {
-    throw new Error("sync setting is incomplete");
-  }
+    if (
+      !syncKey ||
+      !syncEncryptKey ||
+      (syncType !== OPT_SYNCTYPE_GIST && !syncUrl) ||
+      (syncType === OPT_SYNCTYPE_WEBDAV && !syncUser)
+    ) {
+      throw new Error("sync setting is incomplete");
+    }
 
-  // 口令轮换会改变密文内容，必须提升 updateAt 让其他设备感知新版本。
-  const updateAt = Date.now();
-  const args = {
-    syncUrl,
-    syncUser,
-    syncKey,
-  };
-  const data = await encryptSyncData(
-    {
-      key,
-      value: JSON.stringify(value),
+    // 口令轮换会改变密文内容，必须提升 updateAt 让其他设备感知新版本。
+    const updateAt = Date.now();
+    const args = {
+      syncUrl,
+      syncUser,
+      syncKey,
+    };
+    const data = await encryptSyncData(
+      {
+        key,
+        value: JSON.stringify(value),
+        updateAt,
+      },
+      syncEncryptKey
+    );
+
+    const res = await syncByType(syncType, data, args, { forceWrite: true });
+    if (!res) {
+      throw new Error("sync data got err", key);
+    }
+
+    syncMeta[key] = {
       updateAt,
-    },
-    syncEncryptKey
-  );
-
-  const res = await syncByType(syncType, data, args, { forceWrite: true });
-  if (!res) {
-    throw new Error("sync data got err", key);
-  }
-
-  syncMeta[key] = {
-    updateAt,
-    syncAt: Date.now(),
-  };
-  await putSyncMeta(key, syncMeta[key]);
-};
+      syncAt: Date.now(),
+    };
+    await putSyncMeta(key, syncMeta[key]);
+  });
 
 /**
  * 核心同步调度器。根据配置的 syncType（WebDAV / Worker）执行对应的网络同步，
@@ -410,11 +435,12 @@ export const syncData = async (
 /**
  * 同步用户设置 (Setting)。若云端设置更新，则覆盖本地设置。
  */
-const syncSetting = async (options) => {
-  const value = await getSettingWithDefault();
-  // 本地落值由 syncData 负责，以保证它先于元数据写入
-  return syncData(KV_SETTING_KEY, value, options);
-};
+const syncSetting = (options) =>
+  enqueueSync(async () => {
+    const value = await getSettingWithDefault();
+    // 本地落值由 syncData 负责，以保证它先于元数据写入
+    return syncData(KV_SETTING_KEY, value, options);
+  });
 
 /**
  * 包装错误捕获的设置同步入口，避免网络错误阻断其他逻辑。
@@ -430,11 +456,12 @@ export const trySyncSetting = async () => {
 /**
  * 同步规则 (Rules)。若云端规则更新，则覆盖本地规则。
  */
-const syncRules = async (options) => {
-  const value = await getRulesWithDefault();
-  // 本地落值由 syncData 负责，以保证它先于元数据写入
-  return syncData(KV_RULES_KEY, value, options);
-};
+const syncRules = (options) =>
+  enqueueSync(async () => {
+    const value = await getRulesWithDefault();
+    // 本地落值由 syncData 负责，以保证它先于元数据写入
+    return syncData(KV_RULES_KEY, value, options);
+  });
 
 /**
  * 包装错误捕获的规则同步入口。
@@ -450,11 +477,12 @@ export const trySyncRules = async () => {
 /**
  * 同步生词本词汇 (Fav Words)。若云端有更新，则覆盖本地。
  */
-const syncWords = async (options) => {
-  const value = await getWordsWithDefault();
-  // 本地落值由 syncData 负责，以保证它先于元数据写入
-  return syncData(KV_WORDS_KEY, value, options);
-};
+const syncWords = (options) =>
+  enqueueSync(async () => {
+    const value = await getWordsWithDefault();
+    // 本地落值由 syncData 负责，以保证它先于元数据写入
+    return syncData(KV_WORDS_KEY, value, options);
+  });
 
 /**
  * 包装错误捕获的生词本同步入口。

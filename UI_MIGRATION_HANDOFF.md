@@ -74,15 +74,24 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 `settingPatch.js` 本身干净、纯函数、测试扎实(含一条移除队列就会失败的真实交错测试),零夹带。但:
 
-**它现在会冲突了,而且冲突是语义分歧而非漂移。**`a6bf0b1` 之后实测:
+**更正(2026-08-23):此前本文档说它「现在会冲突」「两个 hunk 会把副作用装回 setData 更新函数」——**
+**两条都是错的,是我量错和转述未核实所致。** 实测:
 
 ```
-git merge-tree --write-tree --name-only dev-newui 94fcf96
-→ CONFLICT (content): Merge conflict in src/hooks/Storage.js
-→ CONFLICT (content): Merge conflict in src/hooks/Storage.test.js
+git merge-tree 94fcf96^ dev-newui 94fcf96   # 只 cherry-pick 它自己
+→ 零冲突标记
 ```
 
-它的 hunk 写在 `b47873c` 那版 hook 之上,而 `828b1bd` 又改了同一处。其中两个 hunk 会把副作用装回 `setData` 更新函数里 —— 那正是 `828b1bd` 有意移出去的(原因见 `src/hooks/Storage.js` 里 `save()` 上方的注释:React 会主动调用更新函数,返回原值时直接退出、既不重渲染也不提交,而 `hooks/Rules.js` 的 `add`/`del`/`merge` 正是这么写的)。所以**照着当前文件重写,别解冲突**。
+之前那次量的是 `git merge-tree dev-newui 94fcf96`,合的是**整个栈**(连带已否决的 `cdf403a`),
+所以看到 10 个文件冲突;而且当时用 `head -20` 截断了输出,只看到前两个。
+它也**没有碰 `save()` / `update()`** —— `git show 94fcf96 -- src/hooks/Storage.js` 里
+涉及那两个 ref 的只有一行 `skipRemoteSyncValueRef`。
+
+**但「合得干净」不等于「合了正确」,而且干净反而更危险 —— git 不会警告。**
+真正待评估的是语义:`94fcf96` 是写在 `b47873c` 那版 hook 之上的,而 `828b1bd` 之后
+改了同一个 hook 的不变量(自回声抑制 `selfWrittenPayloadsRef`、
+`loadInitialData`/`reload` 的 external 标记)。文本上不打架,不代表两套机制放在一起还成立。
+动它之前先回答这个,别拿冲突数当判断依据。
 
 三处待改造:
 

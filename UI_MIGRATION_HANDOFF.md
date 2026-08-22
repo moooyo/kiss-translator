@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-22 · `dev-newui` @ `a6bf0b1`
+**最后更新:** 2026-08-22 · `dev-newui` @ `96d8c1d`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -26,6 +26,7 @@
 | 内容页运行时样式/注入器泄漏修复 | `ffcfbb1` | PR #5(仅评审用),`fix/runtime-style-leak-dev` |
 | 设置页草稿身份抖动守卫 | `3876bae` | `StylesSetting.js` / `Prompts.js`,各带一条回归测试;是存储订阅的前置条件 |
 | 跨上下文存储订阅 | `a6bf0b1` | `agent/storage-subscriptions-v2`,三个 commit,`--no-ff` 便于整体回滚。详见下方 |
+| 字幕运行时四处修复 | `96d8c1d` | 关闭按钮失效 / 悬停暂停卡住 / 空数组当结果 / 样式改动丢失。**均需实机确认** |
 
 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
@@ -66,15 +67,25 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 **待实机验证:** iOS Safari 的 Userscripts app 会不会因不认识新加的 4 行 `@grant` 而拒装。运行时降级是安全的(`storage.js` 的 `getOptionalGmMethod` 会吞掉异常,退化成同 realm 内同步),但安装时的行为查不了。`src/scripts/userscriptGrants.test.js` 守着这 4 行不被误删,但 CI 不跑 jest(`release.yml` 只有 build+zip),所以只在本地有效。
 
-#### `94fcf96` 设置原子写入 —— **先改造再合**
+#### `94fcf96` 设置原子写入 —— **重新实现,不要 cherry-pick**
 
-`settingPatch.js` 本身干净、纯函数、测试扎实(含一条移除队列就会失败的真实交错测试),零冲突,零夹带。但三处要先改:
+`settingPatch.js` 本身干净、纯函数、测试扎实(含一条移除队列就会失败的真实交错测试),零夹带。但:
+
+**它现在会冲突了,而且冲突是语义分歧而非漂移。**`a6bf0b1` 之后实测:
+
+```
+git merge-tree --write-tree --name-only dev-newui 94fcf96
+→ CONFLICT (content): Merge conflict in src/hooks/Storage.js
+→ CONFLICT (content): Merge conflict in src/hooks/Storage.test.js
+```
+
+它的 hunk 写在 `b47873c` 那版 hook 之上,而 `828b1bd` 又改了同一处。其中两个 hunk 会把副作用装回 `setData` 更新函数里 —— 那正是 `828b1bd` 有意移出去的(原因见 `src/hooks/Storage.js` 里 `save()` 上方的注释:React 会主动调用更新函数,返回原值时直接退出、既不重渲染也不提交,而 `hooks/Rules.js` 的 `add`/`del`/`merge` 正是这么写的)。所以**照着当前文件重写,别解冲突**。
+
+三处待改造:
 
 - 后台经 `getSettingWithDefault()` 读写回存,而 `storage.js:173` 上方注释明说那层归一化**只在内存中**做。持久化它会把 `config/api.js` 里 `thinkingEffort: "_default"`(「接口默认,不注入参数」)替换成具体值写死 —— 用户从未选择的推理强度参数从此被注入,且不可恢复。应改读原始 `getSetting()`
-- 「Serialize」名不副实:`sync.js:394` 和 `:519` 仍在做未入队的整对象 `setSetting`
+- 「Serialize」名不副实:`sync.js:394` 和 `:519` 仍在做未入队的整对象 `setSetting` —— 这是**最大的整对象覆盖来源**,而这个 commit 完全没碰它
 - SW 往返无失败兜底。不会丢(patch 是累积的、会向前 rebase),但反过来:一个未刷出的 delta 会变成不可见、无上限的 per-tab override,遮盖其他上下文的值。需要 sendBgMsg 失败时直接写存储的 plan B
-
-**无法单独 cherry-pick** —— 其 `Storage.js` hunk 是写在 `b47873c` 重写后的 hook 之上的(`subscribeObj` / `externalStorageValueRef` / `revisionAtStart`),且没有 `subscribeObj` 时约 40% 的新增行是没有东西驱动的 revision 机制。
 
 #### 合并机制与陷阱
 
@@ -84,24 +95,40 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 处理完 `94fcf96` 之后,`agent/atomic-setting-patch` 这个分支就可以删了 —— 它剩下的唯一内容是已被否决的 `cdf403a`。
 
-### 2. 字幕 — 最大剩余块,需先拆分
+### 2. 字幕 — 运行时的高价值部分已做完,剩设置页
 
-约 2000 行源码 / 11 文件,`src/views/Options/Subtitle.js` 单文件 +755/-990。混杂两类内容,建议拆成两个 PR:
+**已完成(`96d8c1d`):** 划词提示框关闭按钮失效、悬停暂停后视频卡住、空数组被当成查到词、字幕样式改动 200ms 内切页丢失。四处都配了回归测试,`wordHover.js` 从零覆盖变成有覆盖。
 
-- **运行时修复**(可先做):`YouTubeCaptionProvider.js` +499、`BilingualSubtitleManager.js` +178、`wordHover.js` +163、`youtubeCaptionTracks.js` +121。相关 commit:`0d533e8` / `cadfde2` / `9fe10d6`
-- **设置页 UI**:`Subtitle.js`、`subtitleStyleUtils.js`(+533)、`useSubtitleStyleEditor.js`(+140)
+**`9fe10d6`「Align subtitle interactions with upstream behavior」零价值,已划掉。** 它是对 `newui` 自己新增内容的纯 revert(`isPinned`、`#handleWordClick`、`#setRovingTabStop`、`spanListeners` Map),这些在 `dev-newui` 上根本不存在。特别注意:**不要把 `pruneDetachedSpanListeners` 当泄漏修复搬过来** —— 它修的是 `newui` 自己引入的泄漏,`dev-newui` 用 `span.dataset.kissListenerAttached`,监听器随 span 一起消亡。
 
-PR #1004 当初显式排除了字幕(`1b10d45`),所以这块与已合入内容重叠最少。
+**剩余运行时部分(`0d533e8` / `cadfde2`):** 字幕轨道恢复、播放期设置热更新。都是针对 `newui` 重构过的文件的重写,且无法脱离真实 YouTube 会话验证,优先级低于设置页。
 
-### 3. `hooks/Alert.js` — 小而独立,约 90 行
+其中「播放期设置热更新」有战略价值而不只是锦上添花:`a6bf0b1` 的存储订阅目前**只接了一半线** —— 内容脚本消费不了批量设置变更,因为 `YouTubeInitializer` 是一次性的 `if (initialized) return;`,拿着新 setting 对象再调一次会被静默丢弃。
 
-`dev-newui` 现状的 `setTimeout(..., 0)` 在组件快速卸载时回调仍会触发(该文件注释已自认)。`newui` 改为单 state + `useRef` 递增 id。无依赖,随时可做。
+**设置页 UI(`Subtitle.js`、`subtitleStyleUtils.js`、`useSubtitleStyleEditor.js`):** PR #1004 显式排除了字幕(`1b10d45`),所以 `dev-newui` 的 `Subtitle.js` 至今仍是 pre-M3 的栅格布局,没用 `SettingsCard`/`SettingsRow`/`SettingsSection`。这块没有腐坏,但需要 9 个 i18n key 和重写 `Subtitle.test.js`。
+
+**`fontScale` 不做**(2026-08-22 决定)。它是 `newui` 独有特性,`dev-newui` 全库零引用,做它要连带拉进 7 个文件的运行时改动。设置页移植时直接去掉这个滑块。
+
+`Subtitle.js` 在 `dev-newui` 上已有 37 个提交 —— 上游还在往这个 pre-M3 栅格里加控件,拖越久移植面越大。
+
+### 3. `hooks/Alert.js` — **不要动**
+
+`dev-newui` 的版本与 `upstream/dev` **字节完全相同**,而且 merge-base 也相同:
+
+```
+merge-base   : 528c7617...
+dev-newui    : 528c7617...
+upstream/dev : 528c7617...    ← 三者一致
+newui        : 578b2b76...
+```
+
+`base == ours` 意味着三方合并会**无冲突标记地静默采用 `newui` 那版**,顺手丢掉上游的 `ab93d1f`(alert 的 wordBreak/maxWidth)、把 `autoHideDuration` 从 5000 退回 2600(反 `0fe680b`)、去掉 Snackbar 退出动画和 `elevation={6}`。文件里那条 `setTimeout(..., 0)` 的 REVIEW 注释是真的,但换来的是把一个和上游同步的文件变成永久冲突点,不值。要修就在 `dev-newui` 上单独小改。
 
 ## 暂缓
 
 - **`hooks/Theme.js`**(+200/-39)— 依赖 `brandColor` 新设置项(`dev-newui` 全库无此字段),属于「加功能」而非「修 bug」;其中抽取 `useSystemDarkPreference` 的部分已随 #1004 合入,是重复的
 - **划词面板 / 悬浮球** — 详见下方「已调研」
-- **CI / 发布流程** — **不建议合**。`dev-newui` 已从上游拿到 `91a5976 Automate KISS Translator release workflow`(96 行 `release.yml`),`newui` 那套是另一套竞争实现(+159/-69),合入会覆盖上游成果
+- **CI / 发布流程** — **不建议合**。`dev-newui` 的 `.github/` 与 `upstream/dev` 字节完全一致,`newui` 那套是另一套竞争实现(+159/-69),合入会覆盖上游成果。(更正:此处原先把 `release.yml` 记在 `91a5976` 名下,那个 commit 只动了 `.agents/skills/`、`src/config/api.js` 和 `Apis.test.js`,从未碰过 `.github/`。工作流来自更早的一串 `add workflow` 提交。结论不变,但别照着错的引用去追溯。)
 - **`hooks/I18n.js`、`useTranBoxState.js`、`tranboxPosition.js`、`subtitleIndexAlign.js`** — 上述几块的附属,或零行为变化的重构
 
 ## 已调研(结论备查,避免重复劳动)
@@ -124,6 +151,19 @@ PR #1004 当初显式排除了字幕(`1b10d45`),所以这块与已合入内容�
 `.pnpm-version` 文件记录了同一版本号,但**仓库里没有任何地方读取它**,升级时注意两处同步(或收敛到单一来源)。
 
 **测试基线不是全绿。** 在 `dev-newui` 上 `src/apis/trans.dict.test.js` 有 1 个用例失败,是既有问题,与本轮改动无关。在 `dev` 基线上则是 4 个套件 / 2 个用例失败(`trans.dict`、`batchQueue`、`BilingualSubtitleManager`、`Options/Layout`)。评估新改动时请对照基线,而不是期望全绿。
+
+**根本没有 push/PR 阶段的 CI。** `.github/workflows/` 里只有 `release.yml`,且触发条件是 `on: push: tags: v*`。也就是说 **jest 在打 tag 之前一次都不会跑** —— `a6bf0b1` 专门加的 `src/scripts/userscriptGrants.test.js`(守着那 4 行 `@grant` 不被误删)实际上只在本地有效。要补一个 push/PR workflow 的话,得先处理上面那条非全绿基线,否则新 workflow 一上来就是红的。
+
+## 待实机验证(没有测试能覆盖,按风险从高到低)
+
+| 项 | 怎么验 | 来源 |
+|---|---|---|
+| 划词提示框的 × 能关掉 | 真实 YouTube 视频,悬停单词出提示框后点 × | `96d8c1d` |
+| 悬停暂停后能恢复播放 | 悬停某个字幕单词的同时,从播放器内菜单改分段或 AI 上下文设置,确认视频恢复播放 | `96d8c1d` |
+| SPA 反复导航下样式不再累积 | 装未打包扩展,在 YouTube 上反复导航,观察 shadow root 的 `adoptedStyleSheets` 是否仍在增长。`translator.js` 的 `#removeTextStyles` 只有一个调用点,单测只能验证过滤逻辑、验不了生命周期 | `ffcfbb1` |
+| iOS Safari 装得上带新 `@grant` 的脚本 | 实机安装 | `a6bf0b1` |
+
+前两项无法在仓库内证明:`YouTubeCaptionProvider.test.js` 把 XHR 拦截整个 mock 掉了,也没有 headless YouTube。
 
 **仓库无 lint script、CI 无 lint/test 步骤**(只有 `release.yml`),所以测试和 lint 需要本地手动跑:
 

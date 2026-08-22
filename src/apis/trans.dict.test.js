@@ -22,7 +22,12 @@ jest.mock("../libs/stream", () => ({
 
 import { fetchData, fetchStream } from "../libs/fetch";
 import { getStreamDelta } from "../libs/stream";
-import { DEFAULT_API_LIST, OPT_TRANS_OPENAI } from "../config";
+import {
+  DEFAULT_API_LIST,
+  INPUT_PLACE_CONTEXT,
+  OPT_TRANS_OPENAI,
+  defaultDictUserPrompt,
+} from "../config";
 import { handleDict } from "./trans";
 
 const openaiApi = {
@@ -93,12 +98,20 @@ describe("handleDict", () => {
 
     expect(body.messages[0].content).toBe("Dictionary rules for library.");
     expect(body.messages[0].content).not.toContain("# Context");
-    expect(body.messages[body.messages.length - 1].content).toContain(
-      "所在段落：The library closes at six."
-    );
-    expect(body.messages[body.messages.length - 1].content).toContain(
-      "library"
-    );
+
+    // 从模板本身推导出这一行，而不是把标签文案抄进断言：
+    // 2432ec1(上游 #1022)把它从「所在段落:」改成了英文,这条测试当时没跟着改,
+    // 从此一直红着。抄文案的话下次改文案还会再红一次;从模板推导则只在
+    // context 没被代入、或代错槽位时才失败——那才是这条测试要守的东西。
+    const contextLine = defaultDictUserPrompt
+      .split("\n")
+      .find((line) => line.includes(INPUT_PLACE_CONTEXT))
+      .replace(INPUT_PLACE_CONTEXT, "The library closes at six.");
+
+    const lastMessage = body.messages[body.messages.length - 1].content;
+    expect(lastMessage).toContain(contextLine);
+    expect(lastMessage).not.toContain(INPUT_PLACE_CONTEXT);
+    expect(lastMessage).toContain("library");
   });
 
   test("allows empty dictionary user prompt", async () => {

@@ -65,7 +65,7 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 **仍未关闭 —— 写 PR/发版说明时不要说反了:** 整对象覆盖依然存在。五个 provider 各写各的整份快照,「A 改 X 的同时 B 改 Y」仍是最后写的人赢。订阅把过期窗口从数小时压到一次存储往返,概率低了几个数量级,但**后果更重**:输的一方现在带着 external 标记采纳赢家快照,不再像以前那样在下次编辑时自愈。只有 `94fcf96` 的字段级 patch 序列化能让它可交换。
 
-**待实机验证:** iOS Safari 的 Userscripts app 会不会因不认识新加的 4 行 `@grant` 而拒装。运行时降级是安全的(`storage.js` 的 `getOptionalGmMethod` 会吞掉异常,退化成同 realm 内同步),但安装时的行为查不了。`src/scripts/userscriptGrants.test.js` 守着这 4 行不被误删,但 CI 不跑 jest(`release.yml` 只有 build+zip),所以只在本地有效。
+**iOS 安装问题已排除,不必实机验证** —— 理由见下方「待实机验证」一节末尾。运行时该 app 不支持值变更监听,降级路径是安全的(`storage.js` 的 `getOptionalGmMethod` 会吞掉异常,退化成同 realm 内同步)。`src/scripts/userscriptGrants.test.js` 守着这 4 行不被误删,但 CI 不跑 jest,所以只在本地有效。
 
 #### `94fcf96` 设置原子写入 —— **重新实现,不要 cherry-pick**
 
@@ -161,9 +161,22 @@ newui        : 578b2b76...
 | 划词提示框的 × 能关掉 | 真实 YouTube 视频,悬停单词出提示框后点 × | `96d8c1d` |
 | 悬停暂停后能恢复播放 | 悬停某个字幕单词的同时,从播放器内菜单改分段或 AI 上下文设置,确认视频恢复播放 | `96d8c1d` |
 | SPA 反复导航下样式不再累积 | 装未打包扩展,在 YouTube 上反复导航,观察 shadow root 的 `adoptedStyleSheets` 是否仍在增长。`translator.js` 的 `#removeTextStyles` 只有一个调用点,单测只能验证过滤逻辑、验不了生命周期 | `ffcfbb1` |
-| iOS Safari 装得上带新 `@grant` 的脚本 | 实机安装 | `a6bf0b1` |
 
 前两项无法在仓库内证明:`YouTubeCaptionProvider.test.js` 把 XHR 拦截整个 mock 掉了,也没有 headless YouTube。
+
+**iOS 的 `@grant` 安装问题已排除,无需实机验证**(2026-08-22 查证)。理由不是「大概没事」,而是这个仓库自己就是现成的对照实验:
+
+`build-ios.mjs` 只改 banner 里的**一行**(`// @grant unsafeWindow` → `// @inject-into content`),其余 18 条原样发往 iOS。而 Userscripts app 的 `validGrants`(`src/ext/shared/utils.js`)是个 15 项的 Set,只收点号拼写的值存储 API。对照下来,**这 7 条现在就在往 iOS 发且都不在白名单里**:
+
+```
+GM.registerMenuCommand    GM_registerMenuCommand
+GM.unregisterMenuCommand  GM_unregisterMenuCommand
+GM_setValue   GM_getValue   GM_deleteValue
+```
+
+iOS 版是 Options 页的一级入口且一直装得上,所以不认识的 grant 显然不会导致拒装 —— 新加的 4 条与这 7 条性质完全相同。(该 app 的原生解析器只在缺 `==UserScript==` 块或缺 `@name` 时失败,grant 是 `.filter` 掉的,不是 `guard`。)
+
+**运行时该 app 不支持值变更监听**,两种拼写都没有,也没有 stub。所以 iOS 用户拿不到跨标签页设置同步 —— 这正是我们预期的降级路径,`storage.js` 的 `getOptionalGmMethod` 会吞掉缺失方法,无需额外处理。唯一可见影响是 macOS 端在 app 内置编辑器里手工粘贴脚本时会看到 4 条黄色 lint 提示(`severity: "warning"`,不阻止保存)。
 
 **仓库无 lint script、CI 无 lint/test 步骤**(只有 `release.yml`),所以测试和 lint 需要本地手动跑:
 

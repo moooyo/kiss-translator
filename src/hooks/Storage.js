@@ -25,6 +25,40 @@ function isSameStorageValue(a, b) {
   return false;
 }
 
+// 记住多少条自己写出去的载荷。回声通常一拍就回来，队列只是给桥接环境下
+// 连续写入留出余量；写入失败时不会有回声，靠这个上限防止无限增长。
+const SELF_WRITE_MEMORY = 8;
+
+function serializeStorageValue(value) {
+  try {
+    return JSON.stringify(value);
+  } catch (err) {
+    return undefined;
+  }
+}
+
+function rememberSelfWrite(queue, value) {
+  const payload = serializeStorageValue(value);
+  if (payload === undefined) return;
+  queue.push(payload);
+  if (queue.length > SELF_WRITE_MEMORY) {
+    queue.shift();
+  }
+}
+
+/**
+ * 认领并消费一条自己写出去的回声。返回 true 表示这次通知是本上下文自己造成的，
+ * 调用方应当直接忽略。
+ */
+function claimSelfWrite(queue, value) {
+  const payload = serializeStorageValue(value);
+  if (payload === undefined) return false;
+  const index = queue.indexOf(payload);
+  if (index === -1) return false;
+  queue.splice(index, 1);
+  return true;
+}
+
 /**
  * 自定义 Storage 同步 Hook，用于在 React 组件生命周期中存取本地 Storage 状态
  *
@@ -52,6 +86,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const [data, setData] = useState(defaultVal);
   const skipRemoteSyncValueRef = useRef();
   const externalStorageValueRef = useRef();
+  const selfWrittenPayloadsRef = useRef([]);
 
   // Subscribe before reading so a late initial read cannot overwrite a newer
   // value delivered by the storage change channel.
@@ -60,12 +95,23 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     let storageRevision = 0;
     externalStorageValueRef.current = undefined;
     skipRemoteSyncValueRef.current = undefined;
+    selfWrittenPayloadsRef.current = [];
 
     const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
       if (!isMounted) return;
       storageRevision += 1;
 
       const nextValue = storedValue ?? defaultVal;
+
+      // 本上下文自己的写入也会经订阅回声回来（扩展走 browser.storage.onChanged，
+      // 油猴走 emitStorageChange）。回声携带的是写入当时的快照——在 CustomEvent
+      // 桥接环境下它可能比当前状态旧好几拍。照单全收会把正在输入的字段回退，
+      // 其间敲下的字符随后被永久覆盖，同步凭据这类字段尤其危险。
+      // 同一页面里的其他 provider 不受影响：它们各自的队列里没有这条载荷。
+      if (claimSelfWrite(selfWrittenPayloadsRef.current, nextValue)) {
+        return;
+      }
+
       setData((currentValue) => {
         if (isSameStorageValue(currentValue, nextValue)) return currentValue;
         externalStorageValueRef.current = nextValue;
@@ -143,6 +189,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       return;
     }
 
+    rememberSelfWrite(selfWrittenPayloadsRef.current, data);
     storage.setObj(key, data).catch((err) => {
       kissLog(`storage save error for key: ${key}`, err);
     });
@@ -166,13 +213,14 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
    * @param {any | ((prevData: any) => any)} valueOrFn 新的值或一个返回新值的函数。
    */
   const save = useCallback((valueOrFn) => {
-    setData((prevData) => {
-      const nextData =
-        typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn;
-      externalStorageValueRef.current = undefined;
-      skipRemoteSyncValueRef.current = undefined;
-      return nextData;
-    });
+    // 标记清除放在更新函数外面：React 会主动调用更新函数，若它返回原值则直接
+    // 退出、既不重渲染也不提交，而此时副作用已经发生。src/hooks/Rules.js 的
+    // add / del / merge 在无操作时正是返回原值。
+    externalStorageValueRef.current = undefined;
+    skipRemoteSyncValueRef.current = undefined;
+    setData((prevData) =>
+      typeof valueOrFn === "function" ? valueOrFn(prevData) : valueOrFn
+    );
   }, []);
 
   /**
@@ -180,6 +228,8 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
    * @param {object | ((prevData: object) => object)} partialDataOrFn 要合并的对象或一个返回该对象的函数。
    */
   const update = useCallback((partialDataOrFn) => {
+    externalStorageValueRef.current = undefined;
+    skipRemoteSyncValueRef.current = undefined;
     setData((prevData) => {
       const partialData =
         typeof partialDataOrFn === "function"
@@ -188,10 +238,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       // 确保 preData 是一个对象，避免展开 null 或 undefined
       const baseObj =
         typeof prevData === "object" && prevData !== null ? prevData : {};
-      const nextData = { ...baseObj, ...partialData };
-      externalStorageValueRef.current = undefined;
-      skipRemoteSyncValueRef.current = undefined;
-      return nextData;
+      return { ...baseObj, ...partialData };
     });
   }, []);
 
@@ -224,6 +271,9 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       if (!Object.is(data, nextData)) {
         skipRemoteSyncValueRef.current = { value: nextData };
       }
+      // 与 loadInitialData 同理：刚从存储读出来的值不需要再写回去，否则会经
+      // 订阅广播出去，把其他上下文回退到这个刚被读取前的快照。
+      externalStorageValueRef.current = nextData;
       setData(nextData);
     } catch (err) {
       kissLog(`storage reload error for key: ${key}`, err);

@@ -216,6 +216,91 @@ describe("useStorage remote sync", () => {
     // 在界面和存储中同时消失且无法自愈。
     expect(host.hookResult.data).toEqual({ loaded: true });
     expect(storage.setObj).not.toHaveBeenCalled();
+    expect(syncData).not.toHaveBeenCalled();
+
+    host.unmount();
+  });
+
+  test("does not write back a value pulled in by reload", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    storage.setObj.mockClear();
+    storage.getObj.mockResolvedValueOnce({ reloaded: true });
+
+    await act(async () => {
+      await host.hookResult.reload();
+    });
+    await flushEffects();
+
+    // 与挂载路径同理：刚读出来的值再写回去会经订阅广播，把其他上下文回退。
+    expect(host.hookResult.data).toEqual({ reloaded: true });
+    expect(storage.setObj).not.toHaveBeenCalled();
+
+    host.unmount();
+  });
+
+  test("ignores the echo of a write this context issued", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    await act(async () => {
+      host.hookResult.save({ typed: "ab" });
+    });
+    await flushEffects();
+    await act(async () => {
+      host.hookResult.save({ typed: "abc" });
+    });
+    await flushEffects();
+    expect(host.hookResult.data).toEqual({ typed: "abc" });
+
+    // 桥接环境下第一次写入的回声可能在第二次之后才回来。照单全收会把正在
+    // 输入的字段回退两个字符，随后敲下的内容再把较新的值永久覆盖掉。
+    act(() => {
+      storageListeners.forEach((listener) => listener({ typed: "ab" }));
+    });
+    await flushEffects();
+
+    expect(host.hookResult.data).toEqual({ typed: "abc" });
+
+    host.unmount();
+  });
+
+  test("stops suppressing an echoed value once it has been consumed", async () => {
+    const host = createHookHost();
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    await act(async () => {
+      host.hookResult.save({ typed: "ab" });
+    });
+    await flushEffects();
+
+    // 第一次投递是自己的回声，丢弃。
+    act(() => {
+      storageListeners.forEach((listener) => listener({ typed: "ab" }));
+    });
+    await flushEffects();
+
+    await act(async () => {
+      host.hookResult.save({ typed: "xyz" });
+    });
+    await flushEffects();
+    expect(host.hookResult.data).toEqual({ typed: "xyz" });
+
+    // 抑制是一次性的，不是永久黑名单：别的上下文之后真的写出同样的值，
+    // 必须照常采纳。
+    act(() => {
+      storageListeners.forEach((listener) => listener({ typed: "ab" }));
+    });
+    await flushEffects();
+
+    expect(host.hookResult.data).toEqual({ typed: "ab" });
 
     host.unmount();
   });

@@ -210,7 +210,12 @@ export const adaptScript = (ping) => {
         return;
       }
 
-      if (!data) return;
+      // 载荷形状校验。listenerId 由 genEventName() 生成，与 promiseGM 的 pong
+      // 回调通道同源；pong 是短命的，而值变更监听的通道要存活整个订阅周期。
+      // 两者撞名时 pong 的载荷（一个字符串）会被当成值变更事件，各字段读出
+      // undefined，最终把 hook 重置成默认设置——用户下一次编辑就会把默认值
+      // 覆盖写到自己真实的接口密钥和提示词上，且全程无任何报错。
+      if (!data || typeof data !== "object" || data.name !== key) return;
       listener(data.name, data.oldValue, data.newValue, data.remote);
     };
 

@@ -7,7 +7,7 @@ import path from "path";
  *
  * 这几条 @grant 一旦从脚本头部丢失，整条链路会退化成永久静默的 no-op：
  * 不报错、不提示、也不降级，只是设置在多个标签页之间不再同步。
- * src/libs/gm.js 的 getOptionalGmMethod 会吞掉缺失方法的异常，
+ * src/libs/storage.js 的 getOptionalGmMethod 会吞掉缺失方法的异常，
  * 所以运行时不会有任何迹象——只能靠这里守住。
  */
 const REQUIRED_VALUE_CHANGE_GRANTS = [

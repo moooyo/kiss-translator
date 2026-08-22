@@ -159,6 +159,59 @@ describe("gm userscript bridge", () => {
     window.removeEventListener("kiss-value-change-ping", pingHandler);
   });
 
+  test("ignores a pong-shaped payload that collides with a value-change channel", async () => {
+    globalThis.GM = {
+      addValueChangeListener: jest.fn(async () => 7),
+      removeValueChangeListener: jest.fn(async () => {}),
+    };
+    utils.genEventName.mockReturnValue("kiss-collided");
+    const pingHandler = (event) => {
+      void handlePing(event);
+    };
+    window.addEventListener("kiss-collision-ping", pingHandler);
+
+    adaptScript("kiss-collision-ping");
+    const listener = jest.fn();
+    const listenerId = window.KISS_GM.addValueChangeListener(
+      "setting",
+      listener
+    );
+    expect(listenerId).toBe("kiss-collided");
+
+    // genEventName 的名字池只有约 1e6，而值变更通道要存活整个订阅周期——
+    // 每一次 promiseGM 调用的 pong 都有机会撞上它。撞上时 pong 的载荷
+    // （一个字符串）会被投递到这里；不做形状校验就会被当成一次值变更，
+    // 各字段读出 undefined，最终把设置重置成默认值。
+    window.dispatchEvent(
+      new CustomEvent("kiss-collided", {
+        detail: { data: '{"transApis":[]}' },
+      })
+    );
+    expect(listener).not.toHaveBeenCalled();
+
+    // 另一个 key 的事件同样不该串台。
+    window.dispatchEvent(
+      new CustomEvent("kiss-collided", {
+        detail: {
+          data: { name: "rules", oldValue: "a", newValue: "b", remote: true },
+        },
+      })
+    );
+    expect(listener).not.toHaveBeenCalled();
+
+    // 真正属于本 key 的值变更必须照常送达。
+    window.dispatchEvent(
+      new CustomEvent("kiss-collided", {
+        detail: {
+          data: { name: "setting", oldValue: "a", newValue: "b", remote: true },
+        },
+      })
+    );
+    expect(listener).toHaveBeenCalledWith("setting", "a", "b", true);
+
+    window.removeEventListener("kiss-collision-ping", pingHandler);
+  });
+
   test("cleans the persistent channel when native registration fails", async () => {
     const registrationError = new Error("registration failed");
     globalThis.GM = {

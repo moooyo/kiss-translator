@@ -33,6 +33,7 @@ import ValidationInput from "../../hooks/ValidationInput";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { normalizeSubtitleMode } from "../../subtitle/modes";
 import {
+  SettingsAdvanced,
   SettingsCard,
   SettingsRow,
   SettingsSection,
@@ -834,8 +835,8 @@ export default function SubtitleSetting() {
           </SettingsCard>
         </SettingsSection>
 
-        {/* 字幕分句分词策略、超前预翻译等长尾参数配置网格区域 */}
-        <Box>
+        {/* 字幕分句分词策略、超前预翻译等长尾参数 */}
+        <SettingsAdvanced label={i18n("settings_detailed_controls")}>
           <Grid container spacing={2} columns={12}>
             {segSlug !== "-" && (
               <Grid item xs={12} sm={12} md={6} lg={6}>
@@ -1036,7 +1037,7 @@ export default function SubtitleSetting() {
               </TextField>
             </Grid>
           </Grid>
-        </Box>
+        </SettingsAdvanced>
 
         {/* 字幕外观样式设计及预览器板块 */}
         <Box

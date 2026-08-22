@@ -208,6 +208,31 @@ font-size: 2rem;`;
   });
 });
 
+describe("Subtitle advanced controls", () => {
+  // 2e45756 的两条房规：Grid container 必须是折叠内容的直接子节点（用 Fragment
+  // 而不是 Box 包一层），且项目已全局删除 lg={3}。
+  test("keeps the long-tail grid directly inside the accordion at lg=6", () => {
+    const view = renderSubtitle();
+
+    act(() =>
+      view.container.querySelector(".MuiAccordionSummary-root").click()
+    );
+    const content = view.container.querySelector(
+      ".kt-settings-advanced__content"
+    );
+
+    expect(content.firstElementChild.classList.contains("MuiGrid-container")).toBe(
+      true
+    );
+    expect(content.querySelectorAll(".MuiGrid-grid-lg-6").length).toBeGreaterThan(
+      0
+    );
+    expect(content.querySelector(".MuiGrid-grid-lg-3")).toBeNull();
+
+    view.unmount();
+  });
+});
+
 describe("Subtitle page copy", () => {
   // 缺失的 i18n key 会渲染成空字符串而不是 key 名（hooks/I18n.js 的 defaultText 是 ""），
   // 而本文件把 useI18n mock 成了恒等函数，所以渲染断言完全看不出来。

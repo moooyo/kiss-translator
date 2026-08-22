@@ -8,7 +8,7 @@ import {
   OPT_TRANS_OPENAI,
   OPT_TRANS_TENCENT,
 } from "../config";
-import { getSettingWithDefault, runDataMigration } from "./storage";
+import { getSettingWithDefault, runDataMigration, storage } from "./storage";
 
 // 存储测试不涉及流式解析，隔离 ESM-only 依赖以免 Jest 27 在加载阶段失败。
 jest.mock("@streamparser/json", () => ({ JSONParser: jest.fn() }));
@@ -29,6 +29,37 @@ function loadGmStorageModule() {
   jest.dontMock("./client");
   return storageModule;
 }
+
+// patchObj 的意义全在「串行」二字：读-改-写不是原子的，两次并发调用
+// 会各自读到补丁应用前的值，后写的那次连同别人改过的字段一起抹掉。
+describe("patchObj serialization", () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  test("keeps both fields when two patches race", async () => {
+    await storage.setObj("race-key", { alpha: 1, beta: 1 });
+
+    await Promise.all([
+      storage.patchObj("race-key", { alpha: 2 }),
+      storage.patchObj("race-key", { beta: 2 }),
+    ]);
+
+    expect(readStoredJson("race-key")).toEqual({ alpha: 2, beta: 2 });
+  });
+
+  test("a failed patch does not wedge later patches on the same key", async () => {
+    await storage.setObj("race-key", { alpha: 1 });
+
+    const failing = storage.patchObj("race-key", null).catch(() => "failed");
+    const following = storage.patchObj("race-key", { alpha: 2 });
+
+    await failing;
+    await following;
+
+    expect(readStoredJson("race-key")).toEqual({ alpha: 2 });
+  });
+});
 
 describe("settings storage migration", () => {
   beforeEach(() => {

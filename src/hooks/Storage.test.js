@@ -13,6 +13,7 @@ jest.mock("../libs/storage", () => ({
     setObj: jest.fn(() => Promise.resolve()),
     del: jest.fn(() => Promise.resolve()),
     subscribeObj: jest.fn(),
+    patchObj: jest.fn(),
   },
 }));
 
@@ -67,6 +68,32 @@ function createHookHost({
   };
 }
 
+// CRA 的 jest 配置默认 resetMocks: true，会连 jest.fn() 的默认实现一起清掉，
+// 所以实现必须在每个用例里重设 —— 现有的 getObj/setObj 也是这么做的。
+// 这里刻意用真实的 mergeSettingPatch：合并语义本身就是被测行为的一部分。
+function wirePatchObj() {
+  const { mergeSettingPatch } = jest.requireActual("../libs/settingPatch");
+  // 真实实现按键串行（见 libs/storage.js 与 storage.test.js 的
+  // "patchObj serialization"）。mock 必须忠实于同一契约，否则两次并发补丁
+  // 会读到同一个初值，测出来的就不是 hook 的行为而是 mock 的缺陷。
+  let queue = Promise.resolve();
+  storage.patchObj.mockImplementation((key, patch, { onWillWrite } = {}) => {
+    const run = async () => {
+      const cur = (await storage.getObj(key)) ?? {};
+      const next = mergeSettingPatch(cur, patch);
+      onWillWrite?.(next);
+      await storage.setObj(key, next);
+      return next;
+    };
+    const result = queue.then(run, run);
+    queue = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  });
+}
+
 async function flushEffects() {
   await act(async () => {
     await Promise.resolve();
@@ -81,16 +108,98 @@ async function waitForLoaded(hookResult) {
   }
 }
 
-describe("useStorage remote sync", () => {
-  let storageListeners;
+// 两个 SettingProvider 各改一份整对象快照里的不同字段，看订阅落地后
+// 还剩不剩得下彼此的修改。这是 94fcf96（设置写入序列化）声称要解决的场景，
+// 在这里用测试而不是推理把它钉下来：跑得通说明残余不存在，跑不通说明它是真的。
+describe("useStorage concurrent whole-object writes", () => {
+  let listeners;
+  let store;
+
+  // 让 mock 真的存值并广播，否则测不出「谁覆盖谁」
+  const wireLiveStorage = (initial) => {
+    store = initial;
+    listeners = new Set();
+
+    storage.getObj.mockImplementation(async () => store);
+    storage.subscribeObj.mockImplementation((_key, listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    });
+    storage.setObj.mockImplementation(async (_key, value) => {
+      store = value;
+      // 订阅通道把写入回放给所有上下文，含写入方自己
+      listeners.forEach((listener) => listener(value));
+    });
+    wirePatchObj();
+  };
 
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
     globalThis.__KISS_CONTEXT__ = "options";
-    storage.getObj.mockResolvedValue({ local: true });
-    storage.setObj.mockResolvedValue(undefined);
     storage.del.mockResolvedValue(undefined);
+    syncData.mockResolvedValue(undefined);
+    isOptions.mockReturnValue(false); // 关掉远端同步，只看本地写入
+  });
+
+  afterEach(() => {
+    delete globalThis.__KISS_CONTEXT__;
+    jest.useRealTimers();
+  });
+
+  test("keeps both fields when two providers edit different keys", async () => {
+    wireLiveStorage({ alpha: 1, beta: 1 });
+
+    const a = createHookHost({ key: "shared", syncKey: "" });
+    const b = createHookHost({ key: "shared", syncKey: "" });
+    a.render();
+    b.render();
+    await waitForLoaded(a.hookResult);
+    await waitForLoaded(b.hookResult);
+    await flushEffects();
+
+    expect(a.hookResult.data).toEqual({ alpha: 1, beta: 1 });
+    expect(b.hookResult.data).toEqual({ alpha: 1, beta: 1 });
+
+    // 两边几乎同时各改一个字段，各自都写出整份快照
+    await act(async () => {
+      a.hookResult.update({ alpha: 2 });
+      b.hookResult.update({ beta: 2 });
+    });
+    await flushEffects();
+    await flushEffects();
+
+    expect(store).toEqual({ alpha: 2, beta: 2 });
+
+    a.unmount();
+    b.unmount();
+  });
+});
+
+describe("useStorage remote sync", () => {
+  let storageListeners;
+  let store;
+
+  // 模拟外部变更：生产里订阅之所以触发，是因为存储真的变了。
+  // 只调监听器而不动 store，会让随后的 patchObj 读到过期值。
+  const deliverExternal = (value) => {
+    store = value;
+    storageListeners.forEach((listener) => listener(value));
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    globalThis.__KISS_CONTEXT__ = "options";
+    // getObj 必须反映已写入的值：patchObj 是读-改-写，若读到的永远是初始快照，
+    // 合并结果会带上早已被覆盖的幽灵字段，测出来的就不是产品行为。
+    store = { local: true };
+    storage.getObj.mockImplementation(async () => store);
+    storage.setObj.mockImplementation(async (_key, value) => {
+      store = value;
+    });
+    storage.del.mockResolvedValue(undefined);
+    wirePatchObj();
     storageListeners = new Set();
     storage.subscribeObj.mockImplementation((_key, listener) => {
       storageListeners.add(listener);
@@ -191,7 +300,7 @@ describe("useStorage remote sync", () => {
     storage.setObj.mockClear();
     syncData.mockClear();
     act(() => {
-      storageListeners.forEach((listener) => listener({ remote: true }));
+      deliverExternal({ remote: true });
     });
     await flushEffects();
 
@@ -261,7 +370,7 @@ describe("useStorage remote sync", () => {
     // 桥接环境下第一次写入的回声可能在第二次之后才回来。照单全收会把正在
     // 输入的字段回退两个字符，随后敲下的内容再把较新的值永久覆盖掉。
     act(() => {
-      storageListeners.forEach((listener) => listener({ typed: "ab" }));
+      deliverExternal({ typed: "ab" });
     });
     await flushEffects();
 
@@ -283,7 +392,7 @@ describe("useStorage remote sync", () => {
 
     // 第一次投递是自己的回声，丢弃。
     act(() => {
-      storageListeners.forEach((listener) => listener({ typed: "ab" }));
+      deliverExternal({ typed: "ab" });
     });
     await flushEffects();
 
@@ -296,7 +405,7 @@ describe("useStorage remote sync", () => {
     // 抑制是一次性的，不是永久黑名单：别的上下文之后真的写出同样的值，
     // 必须照常采纳。
     act(() => {
-      storageListeners.forEach((listener) => listener({ typed: "ab" }));
+      deliverExternal({ typed: "ab" });
     });
     await flushEffects();
 
@@ -333,7 +442,7 @@ describe("useStorage remote sync", () => {
     await flushEffects();
 
     act(() => {
-      storageListeners.forEach((listener) => listener({ remote: "new" }));
+      deliverExternal({ remote: "new" });
     });
     await act(async () => {
       resolveInitialRead({ local: "stale" });
@@ -354,7 +463,7 @@ describe("useStorage remote sync", () => {
     storage.setObj.mockClear();
     syncData.mockClear();
     act(() => {
-      storageListeners.forEach((listener) => listener({ source: "remote" }));
+      deliverExternal({ source: "remote" });
       host.hookResult.save({ source: "local" });
     });
     await flushEffects();

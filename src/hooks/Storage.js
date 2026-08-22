@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { storage } from "../libs/storage";
+import { createSettingPatch } from "../libs/settingPatch";
 import { kissLog } from "../libs/log";
 import { syncData } from "../libs/sync";
 import { useDebouncedCallback } from "./DebouncedCallback";
@@ -87,6 +88,8 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const skipRemoteSyncValueRef = useRef();
   const externalStorageValueRef = useRef();
   const selfWrittenPayloadsRef = useRef([]);
+  // 本上下文已知的落盘值。写入时据它算出补丁，只写自己真正改过的字段。
+  const persistedValueRef = useRef(undefined);
 
   // Subscribe before reading so a late initial read cannot overwrite a newer
   // value delivered by the storage change channel.
@@ -96,6 +99,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     externalStorageValueRef.current = undefined;
     skipRemoteSyncValueRef.current = undefined;
     selfWrittenPayloadsRef.current = [];
+    persistedValueRef.current = undefined;
 
     const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
       if (!isMounted) return;
@@ -112,6 +116,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
         return;
       }
 
+      persistedValueRef.current = nextValue;
       setData((currentValue) => {
         if (isSameStorageValue(currentValue, nextValue)) return currentValue;
         externalStorageValueRef.current = nextValue;
@@ -131,6 +136,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
           // 同时标记为「来自存储」，避免下方写盘副作用把刚写进去的默认值再写一遍。
           externalStorageValueRef.current = defaultVal;
           skipRemoteSyncValueRef.current = { value: defaultVal };
+          persistedValueRef.current = defaultVal;
           await storage.setObj(key, defaultVal);
         } else {
           // 刚从存储读出来的值不需要再写回去。不加这个标记的话，写盘副作用会把它
@@ -139,6 +145,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
           // 储中同时消失，且没有任何东西能把它恢复回来。
           externalStorageValueRef.current = storedVal;
           skipRemoteSyncValueRef.current = { value: storedVal };
+          persistedValueRef.current = storedVal;
           setData(storedVal);
         }
       } catch (err) {
@@ -189,10 +196,25 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       return;
     }
 
-    rememberSelfWrite(selfWrittenPayloadsRef.current, data);
-    storage.setObj(key, data).catch((err) => {
-      kissLog(`storage save error for key: ${key}`, err);
-    });
+    // 只写自己真正改动的字段，而不是整份快照。
+    // 每个上下文都持有一份独立快照，整体写回时后写的会连同别人刚改过的字段
+    // 一起抹掉（「A 改 X 的同时 B 改 Y」丢一个）。补丁 + 存储层的按键串行
+    // 让这种情况可交换。
+    const patch = createSettingPatch(persistedValueRef.current, data);
+    if (patch !== undefined) {
+      storage
+        .patchObj(key, patch, {
+          onWillWrite: (merged) => {
+            // 登记的是**合并结果**而不是 data：别人的字段可能一并落了进来，
+            // 回声携带的是合并结果，用 data 去比对会认领不上。
+            persistedValueRef.current = merged;
+            rememberSelfWrite(selfWrittenPayloadsRef.current, merged);
+          },
+        })
+        .catch((err) => {
+          kissLog(`storage save error for key: ${key}`, err);
+        });
+    }
 
     if (
       skipRemoteSyncValueRef.current &&
@@ -274,6 +296,7 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       // 与 loadInitialData 同理：刚从存储读出来的值不需要再写回去，否则会经
       // 订阅广播出去，把其他上下文回退到这个刚被读取前的快照。
       externalStorageValueRef.current = nextData;
+      persistedValueRef.current = nextData;
       setData(nextData);
     } catch (err) {
       kissLog(`storage reload error for key: ${key}`, err);

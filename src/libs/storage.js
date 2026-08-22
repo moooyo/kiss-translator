@@ -28,6 +28,7 @@ import { browser } from "./browser";
 import { kissLog } from "./log";
 import { debounce } from "./utils";
 import { getGmMethod } from "./gm";
+import { mergeSettingPatch } from "./settingPatch";
 
 const localStorageListeners = new Map();
 
@@ -281,6 +282,51 @@ async function putObj(key, obj) {
   await setObj(key, { ...cur, ...obj });
 }
 
+// 按键串行化补丁写入。读-改-写本身不是原子的，两次并发的 patchObj
+// 会各自读到补丁应用前的值，后写的那次抹掉先写的那次 —— 正是它要修的问题。
+// 同一 realm 内（内容脚本里 fab / contentPopup / tranbox 三个 provider 同处一页）
+// 这条链把交错完全消除；跨 realm（选项页 vs 弹窗 vs 各标签页）仍有窗口，
+// 但从「该上下文上次加载至今」缩短为一次存储往返。
+const patchQueues = new Map();
+
+/**
+ * 把补丁合并进已存储的对象，而不是覆盖整份快照。
+ *
+ * 每个上下文都持有一份整对象快照，各自整体写回时，后写的会连同别人改过的
+ * 字段一起抹掉。只写自己真正改动的字段可以让「A 改 X 的同时 B 改 Y」可交换。
+ *
+ * @param {string} key 键名
+ * @param {Object} patch createSettingPatch 产出的补丁
+ * @param {Object} [options]
+ * @param {Function} [options.onWillWrite] 在实际落盘**之前**同步收到合并结果。
+ *   订阅回声是在 setObj 内部发出的，等 patchObj 的 promise resolve 再登记自写载荷
+ *   就可能已经晚了，所以留这个同步时机给调用方。
+ * @returns {Promise<Object>} 合并后实际落盘的值
+ */
+async function patchObj(key, patch, { onWillWrite } = {}) {
+  const run = async () => {
+    const cur = (await getObj(key)) ?? {};
+    const next = mergeSettingPatch(cur, patch);
+    onWillWrite?.(next);
+    await setObj(key, next);
+    return next;
+  };
+
+  const previous = patchQueues.get(key) ?? Promise.resolve();
+  // 前一次失败也要继续排队，否则一次网络/存储错误会永久堵死这个键
+  const result = previous.then(run, run);
+  const chain = result.then(
+    () => undefined,
+    () => undefined
+  );
+  patchQueues.set(key, chain);
+  chain.then(() => {
+    // 队列排空后移除条目，避免 Map 无限增长
+    if (patchQueues.get(key) === chain) patchQueues.delete(key);
+  });
+  return result;
+}
+
 /**
  * 对外暴露的底层通用 storage 接口封装
  */
@@ -292,6 +338,7 @@ export const storage = {
   trySetObj,
   getObj,
   putObj,
+  patchObj,
   subscribe,
   subscribeObj,
 };

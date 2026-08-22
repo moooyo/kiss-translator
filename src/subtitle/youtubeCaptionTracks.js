@@ -202,6 +202,11 @@ export async function getCaptionTracks(videoId) {
  */
 export async function getSubtitleEvents(capUrl, potUrl, responseText) {
   if (
+    // 没有响应体时不能走解析快路径：JSON.parse(null) 得到 null，
+    // json?.events 是 undefined，调用方据此判定「没有字幕」而不是去取。
+    // 恢复路径(拦截器装载晚于 timedtext 请求)就是没有响应体的。
+    typeof responseText === "string" &&
+    responseText.length > 0 &&
     !potUrl.searchParams.get("tlang") &&
     potUrl.searchParams.get("kind") === capUrl.searchParams.get("kind") &&
     isSameLang(potUrl.searchParams.get("lang"), capUrl.searchParams.get("lang"))

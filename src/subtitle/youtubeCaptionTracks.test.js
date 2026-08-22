@@ -2,6 +2,7 @@ import {
   buildTrackKey,
   findCaptionTrack,
   getCaptionTracks,
+  getSubtitleEvents,
   isChatCaptionTrack,
   isSameLang,
 } from "./youtubeCaptionTracks.js";
@@ -26,6 +27,52 @@ describe("youtubeCaptionTracks", () => {
     } else {
       delete global.fetch;
     }
+  });
+
+  // getSubtitleEvents 此前完全没有测试。这三条钉的是「有没有响应体」这个分叉：
+  // 拦截器装载晚于 timedtext 请求时就没有响应体，而解析快路径对 null 的处理
+  // 是静默返回 undefined —— 调用方会把它当成「这条轨没有字幕」。
+  describe("getSubtitleEvents", () => {
+    const capUrl = () =>
+      new URL("https://www.youtube.com/api/timedtext?v=abc&lang=en&fmt=json3");
+    const potUrl = () =>
+      new URL("https://www.youtube.com/api/timedtext?v=abc&lang=en");
+
+    test("parses the intercepted body without fetching", async () => {
+      const events = [{ segs: [{ utf8: "hello" }] }];
+      const result = await getSubtitleEvents(
+        capUrl(),
+        potUrl(),
+        JSON.stringify({ events })
+      );
+
+      expect(result).toEqual(events);
+      expect(global.fetch).not.toHaveBeenCalled();
+    });
+
+    test.each([
+      ["a null body", null],
+      ["an empty body", ""],
+      ["a non-string body", undefined],
+    ])("fetches the track when there is %s", async (_case, body) => {
+      const events = [{ segs: [{ utf8: "fetched" }] }];
+      global.fetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ events }),
+      });
+
+      const result = await getSubtitleEvents(capUrl(), potUrl(), body);
+
+      expect(result).toEqual(events);
+      expect(global.fetch).toHaveBeenCalledTimes(1);
+      expect(global.fetch.mock.calls[0][0]).toContain("fmt=json3");
+    });
+
+    test("returns null when the fallback fetch fails", async () => {
+      global.fetch.mockResolvedValue({ ok: false, status: 404 });
+
+      expect(await getSubtitleEvents(capUrl(), potUrl(), null)).toBeNull();
+    });
   });
 
   test("matches caption tracks by normalized language family", () => {

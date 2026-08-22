@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-22 · `dev-newui` @ `96d8c1d`
+**最后更新:** 2026-08-22 · `dev-newui` @ `4e9f70e`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -27,6 +27,8 @@
 | 设置页草稿身份抖动守卫 | `3876bae` | `StylesSetting.js` / `Prompts.js`,各带一条回归测试;是存储订阅的前置条件 |
 | 跨上下文存储订阅 | `a6bf0b1` | `agent/storage-subscriptions-v2`,三个 commit,`--no-ff` 便于整体回滚。详见下方 |
 | 字幕运行时四处修复 | `96d8c1d` | 关闭按钮失效 / 悬停暂停卡住 / 空数组当结果 / 样式改动丢失。**均需实机确认** |
+| 字幕 CSS 往返截断修复 | `4e9f70e` | `splitCssDeclarations`,16 行。上游 bug,非本次迁移引入 |
+| 字幕设置页移植的安全网 | `283cdd7` | 6 个 i18n key + i18n 存在性守卫 + 3 条行为测试。页面未动 |
 
 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
@@ -105,7 +107,18 @@ git merge-tree --write-tree --name-only dev-newui 94fcf96
 
 其中「播放期设置热更新」有战略价值而不只是锦上添花:`a6bf0b1` 的存储订阅目前**只接了一半线** —— 内容脚本消费不了批量设置变更,因为 `YouTubeInitializer` 是一次性的 `if (initialized) return;`,拿着新 setting 对象再调一次会被静默丢弃。
 
-**设置页 UI(`Subtitle.js`、`subtitleStyleUtils.js`、`useSubtitleStyleEditor.js`):** PR #1004 显式排除了字幕(`1b10d45`),所以 `dev-newui` 的 `Subtitle.js` 至今仍是 pre-M3 的栅格布局,没用 `SettingsCard`/`SettingsRow`/`SettingsSection`。这块没有腐坏,但需要 9 个 i18n key 和重写 `Subtitle.test.js`。
+**设置页 UI(`Subtitle.js`):** PR #1004 显式排除了字幕(`1b10d45`),所以 `dev-newui` 的 `Subtitle.js` 至今仍是 pre-M3 的栅格布局,没用 `SettingsCard`/`SettingsRow`/`SettingsSection`。这块没有腐坏。进行中,见下方「字幕设置页 M3 移植」。
+
+**`subtitleStyleUtils.js` / `useSubtitleStyleEditor.js` 已否决,不要再评估。** 这两个模块(673 行)号称修复 CSS 往返的四类问题,实测只有一类是真的:
+
+- ~~摧毁手写注释~~ —— 假的,注释被吸收进 key 名后原样写回,含冒号的注释也完好
+- ~~丢掉没有冒号的声明~~ —— 假的,内容完整保留
+- ~~每次滑块 tick 重排整个块~~ —— 假的,`Object.entries` 保序
+- **分号出现在引号/括号/注释内部时值被截断** —— 真的,已用 16 行的 `splitCssDeclarations` 修掉(`4e9f70e`)
+
+而引入它们会带来真实风险:`serializeFontSize` 改变字号滑块在出厂默认 `clamp(1rem, 2cqw, 3rem)` 上的语义。用 673 行和一个行为变更去换一个 16 行能解决的问题,不划算。
+
+**另注:该 CSS 往返 bug 不是本次迁移引入的。** `upstream/dev` 的 `Subtitle.js` 同样第 39、58 行、同样 12 处 Slider。评估这块时别把它当成新 UI 的债。
 
 **`fontScale` 不做**(2026-08-22 决定)。它是 `newui` 独有特性,`dev-newui` 全库零引用,做它要连带拉进 7 个文件的运行时改动。设置页移植时直接去掉这个滑块。
 

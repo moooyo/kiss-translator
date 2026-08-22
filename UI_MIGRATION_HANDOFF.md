@@ -195,7 +195,9 @@ Chrome → `chrome://extensions` → 打开「开发者模式」→「加载已�
 
 - 字幕翻译已启用、`Start automatically` 已开(第 2 项依赖 `autoTranslate`,
   `#reProcessEvents()` 开头就是 `if (!this.#setting.autoTranslate) return;`)
-- 悬停查词设为 `on`(设置项 `hoverLookupMode`,取值 `on` / `off` / `mobile_off`)
+- 悬停查词**没被关掉**。默认值 `mobile_off` 在桌面端就是启用的
+  (`isSubtitleModeEnabled`:`mobile_off && !isMobile` → true),所以不用改;
+  只要确认它不是 `off` 即可。设为 `on` 也行,效果相同。
 
 ### 1. 划词提示框的 × 能关掉 — `96d8c1d`
 

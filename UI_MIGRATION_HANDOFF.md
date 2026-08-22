@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `016971c5`
+**最后更新:** 2026-08-23 · `dev-newui` @ `a12f05ab`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -44,30 +44,40 @@
 
 按 2026-08-23 的决定,推迟到**代码工作全部结束后统一做**。步骤见文末附录。
 
-### 2. `0d533e8` 字幕轨道恢复 / 播放期重配置
+### ~~2. `0d533e8`~~ / ~~3. `cadfde2`~~ — 两个都处理完了,只取了值得取的部分
 
-**前置阻塞:`wordHover.js`。** `96d8c1d` 重写过它,它在 merge 冲突集里。newui 的
-`YouTubeSubtitleList.js` 调用 `_wordTooltipController.updateSetting(...)`(:221)和
-`pruneDetachedSpanListeners()`(:578),而 `dev-newui` 的 controller 公开面只有
-`attachSpanListeners` / `destroy` / `clearHoverState` / `hideWordTooltip` —— **两个都不存在**。
-`:578` 那处的 `?.` 挡的是 controller 为 null、不是方法缺失,所以悬停查词开着时每次虚拟渲染都会抛。
+两个 commit 都不是整体移植,而是按**行为**逐条查证后只做缺的那几条。
+拆开后 `0d533e8` 的 7 条行为里只有 2 条该做,`cadfde2` 的 3 组里只有 1 组该做。
 
-**注意 `spanListeners` 是回归不是修复:** `dev-newui` 用 `span.dataset.kissListenerAttached`,
-监听器随 span 消亡;newui 换成以 span 为键的强引用 Map,`pruneDetachedSpanListeners`
-存在的唯一目的就是擦它自己造的泄漏。引入等于给一个不存在的问题加上泄漏和每帧开销。
+| 行为 | 结论 |
+|---|---|
+| 悬停播放:destroy 时恢复播放 / 不误播用户已暂停的视频 | **`96d8c1d` 早已做过**,连测试名都几乎一样 |
+| 展示类设置不重建 manager | **本来就有** —— provider 对 `isBilingual`/`blurTranslation`/`displayOrder` 已走 live update |
+| 字幕列表在设置变更中存活 | 随上一条免费得到 |
+| 悬停查词实时切换 | **不可达** —— 不在播放器内菜单,设置页的变更又被一次性的 `YouTubeInitializer` 丢弃 |
+| 面板可见性不丢状态 | 是 dev-newui 的**独立 bug**,但移植 `setVisible` 修不了 —— 没有重开面板的入口 |
+| 挂起期间导航后加载 | 其测试调 `YouTubeInitializer.suspend()`,dev-newui 没有 |
+| **无响应体时回退取轨** | **已做** `870b7d72` |
+| **拦截器晚装时恢复轨道** | **已做** `cca901af` |
+| **按默认轨元数据选轨** | **已做** `a12f05ab` |
+| 设置页样式编辑(`subtitleStyleUtils.js`) | 属于已否决的模块,见「已否决」 |
 
-**另有一处静默失败:** newui `YTSL:219` 调 `addWordHoverStyles(this.theme)`,而 `dev-newui` 的
-`wordHover.js:12` 是 `export const addWordHoverStyles = () => {` —— 零参数,还有幂等早退。
-参数被接受并丢弃,整套 brandColor/darkMode 管线**看起来接好了,实际什么也不做**。
+**更正:此前本文档说 `cadfde2` 卡在一个产品决定上(要不要推翻 `1b10d45`)。那是错的。**
+它确实有一部分依赖那个决定 —— 但那部分早就决定了(否决);而值得取的轨道选取部分
+**从来不依赖它**,`findDefaultCaptionTrack` 是纯函数,不 import 设置页那半边任何东西。
 
-### 3. `cadfde2` 字幕背景预设 / M3 改版 —— **卡在一个产品决定上**
+**恢复路径的两个设计要点**(改这块前请保留):
 
-它重写 `src/views/Options/subtitleStyleUtils.js`(+236)—— 而那正是 `1b10d45` 因为
-「PR #1004 把字幕排除在 M3 改版之外」而**有意删掉**的 533 行。要动它,先得决定
-**要不要推翻那个范围决定**。这不是合并问题。
+- **门控必须实时查询按钮且缺失即关闭。** 不能用 `#isYtSubtitleEnabled()` —— 它在按钮
+  不存在时返回 `true`(失败开放),而下游是取轨 → AI 上下文增强 → 翻译,没有任何成本门槛;
+  也不能缓存按钮引用 —— 导航后 YouTube 重建控制栏,旧节点已游离,`aria-pressed` 还停在
+  导航前的值(这是测试抓出来的真 bug,不是假想)
+- **拿不准就不恢复。** `findDefaultCaptionTrack` 在多轨且元数据不足时返回 `null`。
+  等真实拦截没有代价(恢复本就是兜底),猜错的代价是加载并翻译一条用户没选的轨
 
-若两个都要做,**顺序是 `0d533e8` 在前** —— 它带着 provider 的 reconciliation 块,
-而 `cadfde2` 的 `Menus.js` 改动假定它已存在。
+**测试脚手架限制:** `YouTubeCaptionProvider` 没有销毁入口,每次 `initialize()` 挂的
+`window` 监听器都留着,provider 在用例间累积。新加的 describe 因此放在文件末尾,
+且自身断言避免绝对调用次数。
 
 ### 4. 已知开口:跨 realm 设置写入竞态
 
@@ -99,6 +109,7 @@
 | 设置写入改为补丁 | `39bec28` | `settingPatch.js` + `storage.patchObj`;`94fcf96` 的核心重写 |
 | 播放器内菜单加显示顺序 | `7355d2a1` | 从 `Menus.js` 提取的唯一一块;管路本来就通,只缺控件 |
 | CI 校验 manifest 产物 | `016971c5` | `manifest-artifacts.mjs` + `verify-manifest.mjs`,已在 CI 实跑 |
+| 字幕轨恢复 | `870b7d72` / `cca901af` / `a12f05ab` | 拦截器晚装时不再永远无字幕;按 YouTube 默认轨元数据选轨,拿不准就不猜 |
 
 > 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 

@@ -12,6 +12,7 @@ jest.mock("../config", () => ({
 jest.mock("./storage", () => ({
   getSyncWithDefault: jest.fn(),
   putSync: jest.fn(),
+  putSyncMeta: jest.fn(),
   getSettingWithDefault: jest.fn(),
   getRulesWithDefault: jest.fn(),
   getWordsWithDefault: jest.fn(),
@@ -67,6 +68,7 @@ import {
   getSyncWithDefault,
   getWordsWithDefault,
   putSync,
+  putSyncMeta,
   setSetting,
 } from "./storage";
 import { decryptSyncValue, encryptSyncValue } from "./syncCrypto";
@@ -253,6 +255,65 @@ describe("GitHub Gist sync", () => {
     expect(apiListGists).not.toHaveBeenCalled();
     expect(apiUpdateGistFile).not.toHaveBeenCalled();
     expect(result).toEqual({ value: { remote: true }, isNew: true });
+  });
+
+  // 这条测的是**顺序**，不是「有没有写」。元数据一旦先于本地值落盘，
+  // 中间被打断（进程被杀、MV3 worker 被回收、断电）就会让 syncMeta 记下
+  // 「已同步到 updateAt=X」而本地值仍是旧的；之后 isNew 恒为 false（X > X 不成立），
+  // 设备永久停在旧数据上，且没有任何报错。
+  test("writes the remote value before the metadata that describes it", async () => {
+    const order = [];
+    setSetting.mockImplementation(() => {
+      order.push("value");
+      return Promise.resolve();
+    });
+    putSyncMeta.mockImplementation(() => {
+      order.push("meta");
+      return Promise.resolve();
+    });
+
+    getSyncWithDefault.mockResolvedValue({
+      syncType: "GitHub Gist",
+      syncUrl: "existing-gist",
+      syncKey: SYNC_KEY,
+      syncEncryptKey: SYNC_ENCRYPT_KEY,
+      syncMeta: { [SETTING_KEY]: { updateAt: 10, syncAt: 1 } },
+    });
+    apiGetGist.mockResolvedValue({
+      files: {
+        [SETTING_KEY]: {
+          content: encryptedGistFileContent({ remote: true }, 50),
+        },
+      },
+    });
+
+    await syncData(SETTING_KEY, { local: true });
+
+    expect(setSetting).toHaveBeenCalledWith({ remote: true });
+    expect(order).toEqual(["value", "meta"]);
+  });
+
+  test("does not write the local value when the remote is not newer", async () => {
+    getSyncWithDefault.mockResolvedValue({
+      syncType: "GitHub Gist",
+      syncUrl: "existing-gist",
+      syncKey: SYNC_KEY,
+      syncEncryptKey: SYNC_ENCRYPT_KEY,
+      syncMeta: { [SETTING_KEY]: { updateAt: 50, syncAt: 1 } },
+    });
+    apiGetGist.mockResolvedValue({
+      files: {
+        [SETTING_KEY]: {
+          content: encryptedGistFileContent({ remote: true }, 50),
+        },
+      },
+    });
+
+    const result = await syncData(SETTING_KEY, { local: true });
+
+    expect(result.isNew).toBe(false);
+    expect(setSetting).not.toHaveBeenCalled();
+    expect(putSyncMeta).toHaveBeenCalled();
   });
 
   test("decrypts encrypted remote value when an existing gist file is newer", async () => {
@@ -503,30 +564,14 @@ describe("GitHub Gist sync", () => {
     expect(uploadedSetting.updateAt).toBe(9999);
     expect(uploadedRules.updateAt).toBe(9999);
     expect(uploadedWords.updateAt).toBe(9999);
-    expect(putSync).toHaveBeenCalledWith({
-      syncMeta: expect.objectContaining({
-        [SETTING_KEY]: {
-          updateAt: 9999,
-          syncAt: 9999,
-        },
-      }),
-    });
-    expect(putSync).toHaveBeenCalledWith({
-      syncMeta: expect.objectContaining({
-        [RULES_KEY]: {
-          updateAt: 9999,
-          syncAt: 9999,
-        },
-      }),
-    });
-    expect(putSync).toHaveBeenCalledWith({
-      syncMeta: expect.objectContaining({
-        [WORDS_KEY]: {
-          updateAt: 9999,
-          syncAt: 9999,
-        },
-      }),
-    });
+    // 元数据改由 putSyncMeta 按键写入：它会重新读取 syncMeta 再合并，
+    // 而不是拿一份读于网络往返之前的旧快照整体覆盖。
+    for (const key of [SETTING_KEY, RULES_KEY, WORDS_KEY]) {
+      expect(putSyncMeta).toHaveBeenCalledWith(key, {
+        updateAt: 9999,
+        syncAt: 9999,
+      });
+    }
     expect(putSync).toHaveBeenLastCalledWith({
       syncEncryptKey: NEW_SYNC_ENCRYPT_KEY,
     });

@@ -11,6 +11,7 @@ import {
 import {
   getSyncWithDefault,
   putSync,
+  putSyncMeta,
   getSettingWithDefault,
   getRulesWithDefault,
   getWordsWithDefault,
@@ -33,6 +34,14 @@ import { kissLog } from "./log";
 import { encryptSyncValue, decryptSyncValue } from "./syncCrypto";
 
 let webdavRequestPatched = false;
+
+// 同步键 -> 本地写入器。见 syncData 里「先落值再落元数据」那段说明：
+// 映射放在这里，是为了让写入顺序由 syncData 一处保证，而不是散在每个调用方。
+const REMOTE_VALUE_WRITERS = {
+  [KV_SETTING_KEY]: setSetting,
+  [KV_RULES_KEY]: setRules,
+  [KV_WORDS_KEY]: setWords,
+};
 const GIST_SYNC_DESCRIPTION = "kiss translator sync files";
 
 /**
@@ -291,7 +300,7 @@ const forceSyncDataWithEncryptKey = async (key, value, syncEncryptKey) => {
     updateAt,
     syncAt: Date.now(),
   };
-  await putSync({ syncMeta });
+  await putSyncMeta(key, syncMeta[key]);
 };
 
 /**
@@ -309,6 +318,7 @@ export const syncData = async (
     syncEncryptKey: syncEncryptKeyOverride,
     forceRemoteRead = false,
     persistMeta = true,
+    applyRemote = true,
   } = {}
 ) => {
   // 获取同步服务配置
@@ -372,13 +382,26 @@ export const syncData = async (
     await migratePlainSyncData(syncType, res, args, syncEncryptKey);
   }
 
+  // 先落值，再落元数据。顺序反过来会造成不可恢复的静默故障：
+  // 元数据一旦记下「已同步到 updateAt=X」而本地值还是旧的，
+  // 下一次同步算出的 isNew 就恒为 false（X > X 不成立），从此再也不会拉取，
+  // 设备永久停在旧数据上，且全程没有任何报错。
+  // 中间被打断（进程被杀、MV3 worker 被回收、断电）就会落进这个窗口。
+  //
+  // 落值放在这里而不是交给调用方，是为了让这个顺序无法被绕过 ——
+  // 此前 syncSetting/syncRules/syncWords 和 hooks/Storage.js 的 runSync
+  // 各自在 syncData 返回**之后**才写本地值，四个调用点都带着同一个窗口，
+  // 其中 runSync 那条还要多跨一次 React 渲染。
+  if (isNew && applyRemote) {
+    await REMOTE_VALUE_WRITERS[key]?.(newVal);
+  }
+
   // 更新本地同步元数据，包含云端的最新修改时间及当前的同步操作时间
   if (persistMeta) {
-    syncMeta[key] = {
+    await putSyncMeta(key, {
       updateAt: res.updateAt,
       syncAt: Date.now(),
-    };
-    await putSync({ syncMeta });
+    });
   }
 
   return { value: newVal, isNew };
@@ -389,11 +412,8 @@ export const syncData = async (
  */
 const syncSetting = async (options) => {
   const value = await getSettingWithDefault();
-  const res = await syncData(KV_SETTING_KEY, value, options);
-  if (res?.isNew && options?.applyRemote !== false) {
-    await setSetting(res.value);
-  }
-  return res;
+  // 本地落值由 syncData 负责，以保证它先于元数据写入
+  return syncData(KV_SETTING_KEY, value, options);
 };
 
 /**
@@ -412,11 +432,8 @@ export const trySyncSetting = async () => {
  */
 const syncRules = async (options) => {
   const value = await getRulesWithDefault();
-  const res = await syncData(KV_RULES_KEY, value, options);
-  if (res?.isNew && options?.applyRemote !== false) {
-    await setRules(res.value);
-  }
-  return res;
+  // 本地落值由 syncData 负责，以保证它先于元数据写入
+  return syncData(KV_RULES_KEY, value, options);
 };
 
 /**
@@ -435,11 +452,8 @@ export const trySyncRules = async () => {
  */
 const syncWords = async (options) => {
   const value = await getWordsWithDefault();
-  const res = await syncData(KV_WORDS_KEY, value, options);
-  if (res?.isNew && options?.applyRemote !== false) {
-    await setWords(res.value);
-  }
-  return res;
+  // 本地落值由 syncData 负责，以保证它先于元数据写入
+  return syncData(KV_WORDS_KEY, value, options);
 };
 
 /**

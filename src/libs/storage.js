@@ -446,9 +446,24 @@ export const debouncePutTranBox = debounce(putTranBox, 300);
 export const getSync = () => getObj(STOKEY_SYNC);
 export const getSyncWithDefault = async () => (await getSync()) || DEFAULT_SYNC;
 export const putSync = (obj) => putObj(STOKEY_SYNC, obj);
-export const putSyncMeta = async (key) => {
+/**
+ * 更新单个键的同步元数据。
+ *
+ * 这里刻意**重新读取** syncMeta 再按键合并，而不是拿调用方手上那份旧快照整体覆盖：
+ * putSync 走 putObj，是顶层浅合并，传进去的 syncMeta 会替换掉整个属性。
+ * 若另一次同步在此期间更新了别的键，整体覆盖会把它的 updateAt/syncAt 打回去；
+ * 一旦 syncAt 被打回 0，syncData 会强制 updateAt = 0，从此远端无条件获胜，
+ * 本地编辑再也传不上去。
+ *
+ * @param {string} key 同步键名
+ * @param {Object} [meta] 要合并进去的元数据；省略时表示「本地刚改过」，只推进 updateAt
+ */
+export const putSyncMeta = async (key, meta) => {
   const { syncMeta = {} } = await getSyncWithDefault();
-  syncMeta[key] = { ...(syncMeta[key] || {}), updateAt: Date.now() };
+  syncMeta[key] = {
+    ...(syncMeta[key] || {}),
+    ...(meta || { updateAt: Date.now() }),
+  };
   await putSync({ syncMeta });
 };
 // 节流处理同步时间元数据的更新

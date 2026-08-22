@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-22 · `dev-newui` @ `4e9f70e`
+**最后更新:** 2026-08-22 · `dev-newui` @ `f9ab384`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -29,6 +29,7 @@
 | 字幕运行时四处修复 | `96d8c1d` | 关闭按钮失效 / 悬停暂停卡住 / 空数组当结果 / 样式改动丢失。**均需实机确认** |
 | 字幕 CSS 往返截断修复 | `4e9f70e` | `splitCssDeclarations`,16 行。上游 bug,非本次迁移引入 |
 | 字幕设置页移植的安全网 | `283cdd7` | 6 个 i18n key + i18n 存在性守卫 + 3 条行为测试。页面未动 |
+| 字幕设置页 Material 3 移植 | `55dc0b1` / `01a8947` / `f9ab384` | 10 个控件进 M3 卡片、12 个进高级折叠、样式面板进带标题 section。**需在浏览器里目视确认** |
 
 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
@@ -107,7 +108,15 @@ git merge-tree --write-tree --name-only dev-newui 94fcf96
 
 其中「播放期设置热更新」有战略价值而不只是锦上添花:`a6bf0b1` 的存储订阅目前**只接了一半线** —— 内容脚本消费不了批量设置变更,因为 `YouTubeInitializer` 是一次性的 `if (initialized) return;`,拿着新 setting 对象再调一次会被静默丢弃。
 
-**设置页 UI(`Subtitle.js`):** PR #1004 显式排除了字幕(`1b10d45`),所以 `dev-newui` 的 `Subtitle.js` 至今仍是 pre-M3 的栅格布局,没用 `SettingsCard`/`SettingsRow`/`SettingsSection`。这块没有腐坏。进行中,见下方「字幕设置页 M3 移植」。
+**设置页 UI(`Subtitle.js`)—— 已完成。** 见「已完成」表。移植中确立的几条约束,后人改这个页面时请保留:
+
+- **`segSlug` 保留原生 `TextField`** 而非 `SettingsSelect` —— 后者不暴露 `helperText`/`error`,而 `seg_trans_diff_warning` 那条红字必须活着(`b436d5b` 加入 → `a07d39f` 删除 → `1b10d45` 有意恢复,这是本次迁移第二次撞上「撤销的撤销」)
+- **`useAlgorithmBreaker` 必须是独立可达的控件**,不要像 `newui` 那样并进 `segSlug`。选了 AI 断句时它仍是活的兜底,`youtubeAiSegmentation.js` 在三条路径上读它,`SubtitleSegmentationPlayground.js` 也读
+- **样式面板的滑块不能换成 `SettingsRange`** —— 它只在 `onChangeCommitted` 提交并在拖动期间只更新本地 `draftValue`,会杀掉 rAF 实时预览
+- **样式面板不能放进 `SettingsAdvanced`** —— 那是惰性挂载,首屏不渲染,`Subtitle.test.js` 的 `useFlexGap` 守卫会以 `.closest()` of undefined 抛 TypeError 而不是给出可读的断言失败
+- **`handleChange` 的事件签名不能改** —— 三个 `CodeField` 依赖 `e.target.name`,而所有 M3 原语的 `onChange` 都只给裸值
+
+**另一个继承来的 bug,未修:** `SubtitleStylePreview` 把解析出的 CSS 对象直接摊进 `style={{...}}`,而 React 只认 camelCase —— 预览面板**静默丢弃** `font-size`、`background-color`、`line-height`、`text-shadow`。`upstream/dev` 在同样三个位置做同样的事,不是新 UI 的债。修法很小(转 camelCase),但会**改变预览的视觉表现**:修完预览才第一次真实反映设置,属于行为变更,需要单独决定。
 
 **`subtitleStyleUtils.js` / `useSubtitleStyleEditor.js` 已否决,不要再评估。** 这两个模块(673 行)号称修复 CSS 往返的四类问题,实测只有一类是真的:
 
@@ -173,6 +182,7 @@ newui        : 578b2b76...
 |---|---|---|
 | 划词提示框的 × 能关掉 | 真实 YouTube 视频,悬停单词出提示框后点 × | `96d8c1d` |
 | 悬停暂停后能恢复播放 | 悬停某个字幕单词的同时,从播放器内菜单改分段或 AI 上下文设置,确认视频恢复播放 | `96d8c1d` |
+| 字幕设置页 M3 布局目视确认 | 打开设置 → 字幕页,确认三张卡片、高级折叠展开后 12 项齐全、样式面板拖滑块预览实时跟随 | `f9ab384` |
 | SPA 反复导航下样式不再累积 | 装未打包扩展,在 YouTube 上反复导航,观察 shadow root 的 `adoptedStyleSheets` 是否仍在增长。`translator.js` 的 `#removeTextStyles` 只有一个调用点,单测只能验证过滤逻辑、验不了生命周期 | `ffcfbb1` |
 
 前两项无法在仓库内证明:`YouTubeCaptionProvider.test.js` 把 XHR 拦截整个 mock 掉了,也没有 headless YouTube。

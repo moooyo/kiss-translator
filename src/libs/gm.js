@@ -7,6 +7,8 @@ const MSG_GM_xmlHttpRequestAbort = "xmlHttpRequestAbort";
 const MSG_GM_setValue = "setValue";
 const MSG_GM_getValue = "getValue";
 const MSG_GM_deleteValue = "deleteValue";
+const MSG_GM_addValueChangeListener = "addValueChangeListener";
+const MSG_GM_removeValueChangeListener = "removeValueChangeListener";
 const MSG_GM_info = "info";
 const GM_XHR_CALLBACKS = [
   "onloadstart",
@@ -24,6 +26,7 @@ const GM_XHR_TERMINAL_CALLBACKS = new Set([
   "ontimeout",
 ]);
 const gmRequestHandles = new Map();
+const gmValueChangeListenerHandles = new Map();
 
 /**
  * 获取原生的 GM (Greasemonkey) 对象。
@@ -96,6 +99,8 @@ export const injectScript = (ping) => {
  * @param {string} ping 接受页面请求的 CustomEvent 监听事件名称
  */
 export const adaptScript = (ping) => {
+  const valueChangeListeners = new Map();
+
   /**
    * 通用的 CustomEvent 异步请求封装。
    * @param {string} action 需要执行的 GM 操作
@@ -190,6 +195,54 @@ export const adaptScript = (ping) => {
     };
   };
 
+  const addValueChangeListener = (key, listener) => {
+    if (typeof listener !== "function") {
+      throw new TypeError("GM value change listener must be a function");
+    }
+
+    const listenerId = genEventName();
+    const handleValueChange = (event) => {
+      const { data, error } = event.detail || {};
+      if (error) {
+        window.removeEventListener(listenerId, handleValueChange);
+        valueChangeListeners.delete(listenerId);
+        console.error("GM value change listener bridge error:", error);
+        return;
+      }
+
+      // 载荷形状校验。listenerId 由 genEventName() 生成，与 promiseGM 的 pong
+      // 回调通道同源；pong 是短命的，而值变更监听的通道要存活整个订阅周期。
+      // 两者撞名时 pong 的载荷（一个字符串）会被当成值变更事件，各字段读出
+      // undefined，最终把 hook 重置成默认设置——用户下一次编辑就会把默认值
+      // 覆盖写到自己真实的接口密钥和提示词上，且全程无任何报错。
+      if (!data || typeof data !== "object" || data.name !== key) return;
+      listener(data.name, data.oldValue, data.newValue, data.remote);
+    };
+
+    valueChangeListeners.set(listenerId, handleValueChange);
+    window.addEventListener(listenerId, handleValueChange);
+    window.dispatchEvent(
+      new CustomEvent(ping, {
+        detail: {
+          action: MSG_GM_addValueChangeListener,
+          args: { key, listenerId },
+        },
+      })
+    );
+
+    return listenerId;
+  };
+
+  const removeValueChangeListener = (listenerId) => {
+    const handleValueChange = valueChangeListeners.get(listenerId);
+    if (handleValueChange) {
+      window.removeEventListener(listenerId, handleValueChange);
+      valueChangeListeners.delete(listenerId);
+    }
+
+    return promiseGM(MSG_GM_removeValueChangeListener, { listenerId });
+  };
+
   // 挂载垫片到宿主页面 window，使运行在普通页面沙盒中的 React / Web 业务代码可以像调用原生 GM 般顺畅
   window.KISS_GM = {
     fetch: (input, init) => promiseGM(MSG_GM_xmlHttpRequest, { input, init }),
@@ -197,6 +250,8 @@ export const adaptScript = (ping) => {
     setValue: (key, val) => promiseGM(MSG_GM_setValue, { key, val }),
     getValue: (key) => promiseGM(MSG_GM_getValue, { key }),
     deleteValue: (key) => promiseGM(MSG_GM_deleteValue, { key }),
+    addValueChangeListener,
+    removeValueChangeListener,
     getInfo: async () => {
       if (!window.GM_info) {
         window.GM_info = await promiseGM(MSG_GM_info);
@@ -275,6 +330,84 @@ export const handlePing = async (e) => {
         await getGmMethod("deleteValue", "GM_deleteValue")(args.key);
         res = "ok";
         break;
+      case MSG_GM_addValueChangeListener: {
+        const { key, listenerId } = args;
+        if (!listenerId) {
+          throw new Error("GM value change listener ID is required");
+        }
+
+        const state = {
+          active: true,
+          registrationComplete: false,
+          nativeListenerId: undefined,
+        };
+        gmValueChangeListenerHandles.set(listenerId, state);
+
+        try {
+          const addValueChangeListener = getGmMethod(
+            "addValueChangeListener",
+            "GM_addValueChangeListener"
+          );
+          const nativeListenerId = await addValueChangeListener(
+            key,
+            (name, oldValue, newValue, remote) => {
+              if (
+                !state.active ||
+                gmValueChangeListenerHandles.get(listenerId) !== state
+              ) {
+                return;
+              }
+
+              window.dispatchEvent(
+                new CustomEvent(listenerId, {
+                  detail: {
+                    data: { name, oldValue, newValue, remote },
+                  },
+                })
+              );
+            }
+          );
+
+          state.registrationComplete = true;
+          state.nativeListenerId = nativeListenerId;
+          if (
+            !state.active ||
+            gmValueChangeListenerHandles.get(listenerId) !== state
+          ) {
+            const removeValueChangeListener = getGmMethod(
+              "removeValueChangeListener",
+              "GM_removeValueChangeListener"
+            );
+            await removeValueChangeListener(nativeListenerId);
+          }
+        } catch (error) {
+          if (gmValueChangeListenerHandles.get(listenerId) === state) {
+            gmValueChangeListenerHandles.delete(listenerId);
+          }
+          window.dispatchEvent(
+            new CustomEvent(listenerId, {
+              detail: { error: error.message },
+            })
+          );
+        }
+        return;
+      }
+      case MSG_GM_removeValueChangeListener: {
+        const state = gmValueChangeListenerHandles.get(args.listenerId);
+        if (state) {
+          state.active = false;
+          gmValueChangeListenerHandles.delete(args.listenerId);
+          if (state.registrationComplete) {
+            const removeValueChangeListener = getGmMethod(
+              "removeValueChangeListener",
+              "GM_removeValueChangeListener"
+            );
+            await removeValueChangeListener(state.nativeListenerId);
+          }
+        }
+        res = "ok";
+        break;
+      }
       case MSG_GM_info:
         res = getGmInfo();
         break;

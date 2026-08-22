@@ -29,6 +29,48 @@ import { kissLog } from "./log";
 import { debounce } from "./utils";
 import { getGmMethod } from "./gm";
 
+const localStorageListeners = new Map();
+
+function emitStorageChange(key, value) {
+  const listeners = localStorageListeners.get(key);
+  listeners?.forEach((listener) => {
+    try {
+      listener(value);
+    } catch (error) {
+      kissLog("storage listener error: ", key, error);
+    }
+  });
+}
+
+function addLocalStorageListener(key, listener) {
+  const listeners = localStorageListeners.get(key) || new Set();
+  listeners.add(listener);
+  localStorageListeners.set(key, listeners);
+
+  return () => {
+    listeners.delete(listener);
+    if (listeners.size === 0) {
+      localStorageListeners.delete(key);
+    }
+  };
+}
+
+function hasExtensionStorageChangeChannel() {
+  return (
+    isExt && typeof browser?.storage?.onChanged?.addListener === "function"
+  );
+}
+
+function getOptionalGmMethod(method, legacyMethod) {
+  try {
+    const fallbackObjects =
+      typeof window === "undefined" ? [] : [window.KISS_GM];
+    return getGmMethod(method, legacyMethod, fallbackObjects);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * 获取适用于当前环境的 GM (Greasemonkey) 存储引擎方法集合。
  * 返回的对象包含跨环境安全调用的 setValue, getValue, deleteValue 方法。
@@ -54,12 +96,17 @@ function getGmStorage() {
  * @param {*} val 待写入的字符串数据
  */
 async function set(key, val) {
+  let changeWillBeEmittedExternally = false;
   if (isExt) {
     await browser.storage.local.set({ [key]: val });
+    changeWillBeEmittedExternally = hasExtensionStorageChangeChannel();
   } else if (isGm) {
     await getGmStorage().setValue(key, val);
   } else {
     window.localStorage.setItem(key, val);
+  }
+  if (!changeWillBeEmittedExternally) {
+    emitStorageChange(key, val);
   }
 }
 
@@ -84,13 +131,106 @@ async function get(key) {
  * @param {string} key 键名
  */
 async function del(key) {
+  let changeWillBeEmittedExternally = false;
   if (isExt) {
     await browser.storage.local.remove([key]);
+    changeWillBeEmittedExternally = hasExtensionStorageChangeChannel();
   } else if (isGm) {
     await getGmStorage().deleteValue(key);
   } else {
     window.localStorage.removeItem(key);
   }
+  if (!changeWillBeEmittedExternally) {
+    emitStorageChange(key, null);
+  }
+}
+
+function subscribe(key, listener) {
+  const removeLocalListener = addLocalStorageListener(key, listener);
+  let removeExternalListener = () => {};
+
+  if (hasExtensionStorageChangeChannel()) {
+    const handleChanged = (changes, areaName) => {
+      if (areaName !== "local" || !changes[key]) return;
+      listener(changes[key].newValue ?? null);
+    };
+    browser.storage.onChanged.addListener(handleChanged);
+    removeExternalListener = () => {
+      try {
+        browser.storage.onChanged.removeListener(handleChanged);
+      } catch (error) {
+        kissLog("remove extension storage listener error: ", key, error);
+      }
+    };
+  } else if (isGm) {
+    const addValueChangeListener = getOptionalGmMethod(
+      "addValueChangeListener",
+      "GM_addValueChangeListener"
+    );
+    const removeValueChangeListener = getOptionalGmMethod(
+      "removeValueChangeListener",
+      "GM_removeValueChangeListener"
+    );
+
+    if (addValueChangeListener) {
+      let subscriptionActive = true;
+      const listenerId = Promise.resolve().then(() =>
+        addValueChangeListener(key, (_name, _oldValue, newValue, remote) => {
+          if (!subscriptionActive || remote === false) return;
+          listener(newValue ?? null);
+        })
+      );
+      void listenerId.catch((error) => {
+        kissLog("add GM storage listener error: ", key, error);
+      });
+      removeExternalListener = () => {
+        subscriptionActive = false;
+        void listenerId
+          .then(async (id) => {
+            if (id === undefined || !removeValueChangeListener) return;
+            try {
+              await removeValueChangeListener(id);
+            } catch (error) {
+              kissLog("remove GM storage listener error: ", key, error);
+            }
+          })
+          .catch(() => undefined);
+      };
+    }
+  } else if (typeof window !== "undefined") {
+    const handleStorage = (event) => {
+      if (event.storageArea !== window.localStorage || event.key !== key) {
+        return;
+      }
+      listener(event.newValue);
+    };
+    window.addEventListener("storage", handleStorage);
+    removeExternalListener = () =>
+      window.removeEventListener("storage", handleStorage);
+  }
+
+  let unsubscribed = false;
+  return () => {
+    if (unsubscribed) return;
+    unsubscribed = true;
+    removeLocalListener();
+    removeExternalListener();
+  };
+}
+
+function subscribeObj(key, listener) {
+  return subscribe(key, (rawValue) => {
+    if (rawValue === null || rawValue === undefined) {
+      listener(null);
+      return;
+    }
+
+    try {
+      listener(JSON.parse(rawValue));
+    } catch (error) {
+      kissLog("parse subscribed storage json error: ", key, error);
+    }
+  });
 }
 
 /**
@@ -152,6 +292,8 @@ export const storage = {
   trySetObj,
   getObj,
   putObj,
+  subscribe,
+  subscribeObj,
 };
 
 // --- 应用设置 (Settings) 数据存取 ---

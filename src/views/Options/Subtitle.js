@@ -34,13 +34,68 @@ import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { normalizeSubtitleMode } from "../../subtitle/modes";
 
 /**
+ * 按声明边界切分 CSS 字符串。
+ *
+ * 不能直接 split(";")：分号也会合法地出现在引号、括号和注释内部，
+ * 最典型的是 `url("data:image/svg+xml;utf8,...")`。裸切会把值拦腰截断，
+ * 而只要用户之后碰任意一个样式滑块，截断结果就会被写回存储、无法恢复。
+ *
+ * @param {string} cssString CSS 源码
+ * @returns {string[]} 各条声明（未 trim，保留原始空白与注释）
+ */
+const splitCssDeclarations = (cssString) => {
+  const parts = [];
+  let buffer = "";
+  let depth = 0;
+  let quote = null;
+  let inComment = false;
+
+  for (let i = 0; i < cssString.length; i++) {
+    const char = cssString[i];
+
+    if (inComment) {
+      buffer += char;
+      if (char === "/" && cssString[i - 1] === "*") inComment = false;
+      continue;
+    }
+    if (quote) {
+      buffer += char;
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "/" && cssString[i + 1] === "*") {
+      inComment = true;
+      buffer += char;
+      continue;
+    }
+    if (char === '"' || char === "'") {
+      quote = char;
+      buffer += char;
+      continue;
+    }
+    if (char === "(") depth++;
+    else if (char === ")") depth = Math.max(0, depth - 1);
+
+    if (char === ";" && depth === 0) {
+      parts.push(buffer);
+      buffer = "";
+      continue;
+    }
+    buffer += char;
+  }
+
+  parts.push(buffer);
+  return parts;
+};
+
+/**
  * 将 CSS 字符串解析成键值对 JavaScript 对象
  */
-const parseCssToObject = (cssString) => {
+export const parseCssToObject = (cssString) => {
   const result = {};
   if (!cssString) return result;
 
-  const properties = cssString.split(";").filter((p) => p.trim());
+  const properties = splitCssDeclarations(cssString).filter((p) => p.trim());
   properties.forEach((prop) => {
     const colonIndex = prop.indexOf(":");
     if (colonIndex > 0) {
@@ -55,7 +110,7 @@ const parseCssToObject = (cssString) => {
 /**
  * 将 JavaScript CSS 样式对象转换回标准 CSS 字符串
  */
-const objectToCss = (obj) => {
+export const objectToCss = (obj) => {
   const entries = Object.entries(obj).filter(
     ([, value]) => value !== undefined && value !== ""
   );

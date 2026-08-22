@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import SubtitleSetting from "./Subtitle";
+import SubtitleSetting, { parseCssToObject, objectToCss } from "./Subtitle";
 import { useSubtitle } from "../../hooks/Subtitle";
 import { I18N, UI_LANGS, DEFAULT_SUBTITLE_SETTING } from "../../config";
 
@@ -157,6 +157,54 @@ describe("Subtitle segmentation warning", () => {
     ["both services match", { forceSubtitleRetranslate: true, segSlug: "openai", apiSlug: "openai" }],
   ])("stays silent when %s", (_case, overrides) => {
     expect(warned(overrides)).toBe(false);
+  });
+});
+
+describe("Subtitle CSS round-trip", () => {
+  // 拖动任意样式滑块都会把整块 CSS 经 parse -> object -> serialize 重写一遍。
+  // 分号会合法地出现在引号、括号和注释内部，裸 split(";") 会把值拦腰截断，
+  // 而截断结果会被写回存储，无法恢复。这是上游 dev 上就存在的问题，不是本分支引入的。
+  const roundTrip = (css) => objectToCss(parseCssToObject(css));
+  const normalize = (css) => css.trim().replace(/;$/, "");
+
+  test.each([
+    [
+      "the shipped window default",
+      `padding: 0.5em 1em;
+background-color: rgba(0, 0, 0, 0.5);
+color: white;
+line-height: 1.3;
+text-shadow: 1px 1px 2px black;
+display: inline-block`,
+    ],
+    ["the shipped origin default", `font-size: clamp(1rem, 2cqw, 3rem);`],
+    [
+      "a data URI containing semicolons",
+      `background-image: url("data:image/svg+xml;utf8,<svg/>");
+color: white;`,
+    ],
+    ["a comment containing a semicolon", `/* a;b */
+color: red;`],
+    [
+      "nested parentheses and quotes",
+      `background: linear-gradient(90deg, rgba(0,0,0,.5), url("a;b"));
+color: red;`,
+    ],
+    ["a single-quoted value", `content: 'a;b';
+color: red;`],
+  ])("survives %s", (_case, css) => {
+    expect(normalize(roundTrip(css))).toBe(normalize(css));
+  });
+
+  test("keeps an edited property without shredding its siblings", () => {
+    const css = `background-image: url("data:image/svg+xml;utf8,<svg/>");
+font-size: 2rem;`;
+    const parsed = parseCssToObject(css);
+    parsed["font-size"] = "2.5rem";
+
+    const next = objectToCss(parsed);
+    expect(next).toContain(`url("data:image/svg+xml;utf8,<svg/>")`);
+    expect(next).toContain("font-size: 2.5rem");
   });
 });
 

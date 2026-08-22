@@ -812,9 +812,7 @@ export default function SubtitleSetting() {
               <SettingsSegmented
                 value={hoverLookupModeValue}
                 label={i18n("subtitle_hover_lookup")}
-                onChange={(value) =>
-                  updateSubtitle({ hoverLookupMode: value })
-                }
+                onChange={(value) => updateSubtitle({ hoverLookupMode: value })}
                 items={[
                   { value: OPT_ENHANCE_ON, label: i18n("enable") },
                   { value: OPT_ENHANCE_OFF, label: i18n("disable") },
@@ -1040,260 +1038,265 @@ export default function SubtitleSetting() {
         </SettingsAdvanced>
 
         {/* 字幕外观样式设计及预览器板块 */}
-        <Box
-          sx={{
-            border: "1px solid",
-            borderColor: "divider",
-            borderRadius: 1,
-            p: 2,
-          }}
-        >
-          <Stack spacing={2} useFlexGap>
-            {/* 字幕预览展示窗 */}
-            <SubtitleStylePreview
-              windowStyle={localWindowStyle}
-              originStyle={localOriginStyle}
-              translationStyle={localTransStyle}
-              displayOrder={displayOrder}
-            />
+        <SettingsSection title={i18n("settings_appearance_group")}>
+          <Box
+            sx={{
+              border: "1px solid",
+              borderColor: "divider",
+              borderRadius: 1,
+              p: 2,
+            }}
+          >
+            <Stack spacing={2} useFlexGap>
+              {/* 字幕预览展示窗 */}
+              <SubtitleStylePreview
+                windowStyle={localWindowStyle}
+                originStyle={localOriginStyle}
+                translationStyle={localTransStyle}
+                displayOrder={displayOrder}
+              />
 
-            <Divider />
+              <Divider />
 
-            {/* 字号与字体颜色修改 */}
-            <Grid container spacing={2}>
-              <Grid item xs={12} sm={6}>
-                {textStyleControls(
-                  i18n("origin_styles"),
-                  originFontSize,
-                  originCssObj,
-                  updateOriginCss
-                )}
+              {/* 字号与字体颜色修改 */}
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  {textStyleControls(
+                    i18n("origin_styles"),
+                    originFontSize,
+                    originCssObj,
+                    updateOriginCss
+                  )}
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  {textStyleControls(
+                    i18n("translation_styles"),
+                    transFontSize,
+                    transCssObj,
+                    updateTranslationCss
+                  )}
+                </Grid>
               </Grid>
-              <Grid item xs={12} sm={6}>
-                {textStyleControls(
-                  i18n("translation_styles"),
-                  transFontSize,
-                  transCssObj,
-                  updateTranslationCss
-                )}
-              </Grid>
-            </Grid>
 
-            <Divider />
+              <Divider />
 
-            {/* 字幕窗格背景样式控制区域 */}
-            <Box>
-              <Typography variant="subtitle2" gutterBottom>
-                {i18n("background_styles")}
-              </Typography>
-              <Grid container spacing={1.5} alignItems="center">
-                {/* 窗格背景底色与透明度滑动条 */}
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ minWidth: 56, flexShrink: 0 }}
-                    >
-                      {i18n("background_color") || "背景颜色"}
-                    </Typography>
-                    <Box
-                      component="input"
-                      type="color"
-                      value={windowBgHex}
-                      onChange={(e) => {
-                        const rgb = hexToRgb(e.target.value);
-                        updateWindowCss(
-                          "background-color",
-                          `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${windowBgRgba.a})`
-                        );
-                      }}
-                      sx={{
-                        width: 28,
-                        height: 28,
-                        border: "none",
-                        cursor: "pointer",
-                        p: 0,
-                        bgcolor: "transparent",
-                      }}
-                    />
-                    <Typography variant="body2" sx={{ minWidth: 48 }}>
-                      {i18n("opacity") || "透明度"}
-                    </Typography>
-                    <Slider
-                      size="small"
-                      value={windowBgRgba.a}
-                      min={0}
-                      max={1}
-                      step={0.05}
-                      onChange={(e, val) => {
-                        updateWindowCss(
-                          "background-color",
-                          `rgba(${windowBgRgba.r}, ${windowBgRgba.g}, ${windowBgRgba.b}, ${val})`
-                        );
-                      }}
-                      sx={{ flex: 1 }}
-                    />
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 36, textAlign: "right" }}
-                    >
-                      {Math.round(windowBgRgba.a * 100)}%
-                    </Typography>
-                  </Box>
-                </Grid>
-                {/* 行高微调 Slider */}
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ minWidth: 56, flexShrink: 0 }}
-                    >
-                      {i18n("line_height") || "行高"}
-                    </Typography>
-                    <Slider
-                      size="small"
-                      value={windowLineHeight}
-                      min={1}
-                      max={2.5}
-                      step={0.1}
-                      onChange={(e, val) =>
-                        updateWindowCss("line-height", String(val))
-                      }
-                      sx={{ flex: 1 }}
-                    />
-                    <Typography
-                      variant="body2"
-                      sx={{ minWidth: 28, textAlign: "right" }}
-                    >
-                      {windowLineHeight}
-                    </Typography>
-                  </Box>
-                </Grid>
-                {/* 上下与左右内边距微调 Slider */}
-                <Grid item xs={12} sm={6}>
-                  <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
-                    <Typography
-                      variant="body2"
-                      color="text.secondary"
-                      sx={{ minWidth: 56, flexShrink: 0 }}
-                    >
-                      {i18n("padding") || "内边距"}
-                    </Typography>
-                    <Typography variant="body2">
-                      {i18n("vertical") || "上下"}
-                    </Typography>
-                    <Slider
-                      size="small"
-                      value={windowPadding.vertical}
-                      min={0}
-                      max={2}
-                      step={0.1}
-                      onChange={(e, val) => {
-                        updateWindowCss(
-                          "padding",
-                          `${val}${windowPadding.unit} ${windowPadding.horizontal}${windowPadding.unit}`
-                        );
-                      }}
-                      sx={{ width: 80 }}
-                    />
-                    <Typography variant="body2">
-                      {i18n("horizontal") || "左右"}
-                    </Typography>
-                    <Slider
-                      size="small"
-                      value={windowPadding.horizontal}
-                      min={0}
-                      max={3}
-                      step={0.1}
-                      onChange={(e, val) => {
-                        updateWindowCss(
-                          "padding",
-                          `${windowPadding.vertical}${windowPadding.unit} ${val}${windowPadding.unit}`
-                        );
-                      }}
-                      sx={{ width: 80 }}
-                    />
-                  </Box>
-                </Grid>
-                {/* 字幕文字四周的阴影开关 */}
-                <Grid item xs={12} sm={6}>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        size="small"
-                        checked={windowHasTextShadow}
+              {/* 字幕窗格背景样式控制区域 */}
+              <Box>
+                <Typography variant="subtitle2" gutterBottom>
+                  {i18n("background_styles")}
+                </Typography>
+                <Grid container spacing={1.5} alignItems="center">
+                  {/* 窗格背景底色与透明度滑动条 */}
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ minWidth: 56, flexShrink: 0 }}
+                      >
+                        {i18n("background_color") || "背景颜色"}
+                      </Typography>
+                      <Box
+                        component="input"
+                        type="color"
+                        value={windowBgHex}
                         onChange={(e) => {
-                          if (e.target.checked) {
-                            updateWindowCss("text-shadow", "1px 1px 2px black");
-                          } else {
-                            const newObj = { ...windowCssRef.current };
-                            delete newObj["text-shadow"];
-                            updateWindowCssDirect(objectToCss(newObj));
-                          }
+                          const rgb = hexToRgb(e.target.value);
+                          updateWindowCss(
+                            "background-color",
+                            `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${windowBgRgba.a})`
+                          );
+                        }}
+                        sx={{
+                          width: 28,
+                          height: 28,
+                          border: "none",
+                          cursor: "pointer",
+                          p: 0,
+                          bgcolor: "transparent",
                         }}
                       />
-                    }
-                    label={
-                      <Typography variant="body2">
-                        {i18n("text_shadow") || "文字阴影"}
+                      <Typography variant="body2" sx={{ minWidth: 48 }}>
+                        {i18n("opacity") || "透明度"}
                       </Typography>
-                    }
-                  />
+                      <Slider
+                        size="small"
+                        value={windowBgRgba.a}
+                        min={0}
+                        max={1}
+                        step={0.05}
+                        onChange={(e, val) => {
+                          updateWindowCss(
+                            "background-color",
+                            `rgba(${windowBgRgba.r}, ${windowBgRgba.g}, ${windowBgRgba.b}, ${val})`
+                          );
+                        }}
+                        sx={{ flex: 1 }}
+                      />
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 36, textAlign: "right" }}
+                      >
+                        {Math.round(windowBgRgba.a * 100)}%
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  {/* 行高微调 Slider */}
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ minWidth: 56, flexShrink: 0 }}
+                      >
+                        {i18n("line_height") || "行高"}
+                      </Typography>
+                      <Slider
+                        size="small"
+                        value={windowLineHeight}
+                        min={1}
+                        max={2.5}
+                        step={0.1}
+                        onChange={(e, val) =>
+                          updateWindowCss("line-height", String(val))
+                        }
+                        sx={{ flex: 1 }}
+                      />
+                      <Typography
+                        variant="body2"
+                        sx={{ minWidth: 28, textAlign: "right" }}
+                      >
+                        {windowLineHeight}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  {/* 上下与左右内边距微调 Slider */}
+                  <Grid item xs={12} sm={6}>
+                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                      <Typography
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ minWidth: 56, flexShrink: 0 }}
+                      >
+                        {i18n("padding") || "内边距"}
+                      </Typography>
+                      <Typography variant="body2">
+                        {i18n("vertical") || "上下"}
+                      </Typography>
+                      <Slider
+                        size="small"
+                        value={windowPadding.vertical}
+                        min={0}
+                        max={2}
+                        step={0.1}
+                        onChange={(e, val) => {
+                          updateWindowCss(
+                            "padding",
+                            `${val}${windowPadding.unit} ${windowPadding.horizontal}${windowPadding.unit}`
+                          );
+                        }}
+                        sx={{ width: 80 }}
+                      />
+                      <Typography variant="body2">
+                        {i18n("horizontal") || "左右"}
+                      </Typography>
+                      <Slider
+                        size="small"
+                        value={windowPadding.horizontal}
+                        min={0}
+                        max={3}
+                        step={0.1}
+                        onChange={(e, val) => {
+                          updateWindowCss(
+                            "padding",
+                            `${windowPadding.vertical}${windowPadding.unit} ${val}${windowPadding.unit}`
+                          );
+                        }}
+                        sx={{ width: 80 }}
+                      />
+                    </Box>
+                  </Grid>
+                  {/* 字幕文字四周的阴影开关 */}
+                  <Grid item xs={12} sm={6}>
+                    <FormControlLabel
+                      control={
+                        <Switch
+                          size="small"
+                          checked={windowHasTextShadow}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              updateWindowCss(
+                                "text-shadow",
+                                "1px 1px 2px black"
+                              );
+                            } else {
+                              const newObj = { ...windowCssRef.current };
+                              delete newObj["text-shadow"];
+                              updateWindowCssDirect(objectToCss(newObj));
+                            }
+                          }}
+                        />
+                      }
+                      label={
+                        <Typography variant="body2">
+                          {i18n("text_shadow") || "文字阴影"}
+                        </Typography>
+                      }
+                    />
+                  </Grid>
                 </Grid>
-              </Grid>
-            </Box>
+              </Box>
 
-            {/* 折叠的高级 CSS 源码编辑器面板 (可自由手写额外的样式规则覆盖视频字幕的外观) */}
-            <Accordion
-              sx={{ boxShadow: "none", "&:before": { display: "none" } }}
-            >
-              <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="body2" color="text.secondary">
-                  {i18n("advanced_css") || "高级 CSS 编辑"}
-                </Typography>
-              </AccordionSummary>
-              <AccordionDetails>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={4}>
-                    <CodeField
-                      size="small"
-                      label={i18n("origin_styles")}
-                      name="originStyle"
-                      value={originStyle}
-                      onChange={handleChange}
-                      maxRows={10}
-                      fullWidth
-                    />
+              {/* 折叠的高级 CSS 源码编辑器面板 (可自由手写额外的样式规则覆盖视频字幕的外观) */}
+              <Accordion
+                sx={{ boxShadow: "none", "&:before": { display: "none" } }}
+              >
+                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                  <Typography variant="body2" color="text.secondary">
+                    {i18n("advanced_css") || "高级 CSS 编辑"}
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails>
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} sm={4}>
+                      <CodeField
+                        size="small"
+                        label={i18n("origin_styles")}
+                        name="originStyle"
+                        value={originStyle}
+                        onChange={handleChange}
+                        maxRows={10}
+                        fullWidth
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <CodeField
+                        size="small"
+                        label={i18n("translation_styles")}
+                        name="translationStyle"
+                        value={translationStyle}
+                        onChange={handleChange}
+                        maxRows={10}
+                        fullWidth
+                      />
+                    </Grid>
+                    <Grid item xs={12} sm={4}>
+                      <CodeField
+                        size="small"
+                        label={i18n("background_styles")}
+                        name="windowStyle"
+                        value={windowStyle}
+                        onChange={handleChange}
+                        maxRows={10}
+                        fullWidth
+                      />
+                    </Grid>
                   </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <CodeField
-                      size="small"
-                      label={i18n("translation_styles")}
-                      name="translationStyle"
-                      value={translationStyle}
-                      onChange={handleChange}
-                      maxRows={10}
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} sm={4}>
-                    <CodeField
-                      size="small"
-                      label={i18n("background_styles")}
-                      name="windowStyle"
-                      value={windowStyle}
-                      onChange={handleChange}
-                      maxRows={10}
-                      fullWidth
-                    />
-                  </Grid>
-                </Grid>
-              </AccordionDetails>
-            </Accordion>
-          </Stack>
-        </Box>
+                </AccordionDetails>
+              </Accordion>
+            </Stack>
+          </Box>
+        </SettingsSection>
       </Stack>
     </Box>
   );

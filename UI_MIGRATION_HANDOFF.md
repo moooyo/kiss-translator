@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `a12f05ab`
+**最后更新:** 2026-08-23 · `dev-newui` @ `957742b8`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -8,11 +8,14 @@
 
 ## 现在卡在哪
 
-**三项实机验证** —— 需要装未打包扩展 + 真实 YouTube 页面,仓库内无法证明。详细步骤见文末附录。
+**代码侧已经到头了。剩下的只有三项实机验证** —— 需要装未打包扩展 + 真实 YouTube 页面,
+仓库内无法证明。步骤、期望、以及「没过说明什么」都在文末附录,构建产物在 `build/chrome`。
 
-在它们完成前,**建议不要动字幕的两个运行时项**(`0d533e8` / `cadfde2`)—— 它们改的是同一批文件,叠上去之后万一验证出问题,分不清是哪一批引入的。
+全量 **1009 通过 / 0 失败**,CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
+lockfile 校验 + manifest 产物校验)。
 
-除此之外没有阻塞项。全量 **973 通过 / 0 失败**,CI 在每次 push 和 PR 上跑,`build:chrome` 和 `build:web` 均通过。
+唯一还开着的技术项是**跨 realm 设置写入竞态**(见「待办 4」),但那不是阻塞项 ——
+建议先跑一版看收窄后的窗口是否还会出问题,而不是现在就为它引入 MV3 依赖。
 
 ## 分支约定
 
@@ -83,11 +86,14 @@
 
 同 realm(内容脚本里三个 provider 同处一页,最常见)已由 `39bec28` 完全关闭;跨 realm 的窗口从「该上下文上次加载至今」缩到**一次存储往返**。要彻底关掉需要跨 realm 的单一序列化点 —— 那正是被否决的后台 worker 的作用。收窄后的窗口若被证明仍会出问题,再回头看。
 
-### 5. 零散(互不阻塞,随时可做)
+### ~~5. 零散~~ — 已做完(`957742b8`)
 
-- `release.yml` 仍把 pnpm 版本硬编码为 9.14.4,而 `test.yml` 已改为从 `packageManager` 读
-- `.pnpm-version` 记录了同一版本号,但**仓库里没有任何地方读取它**
-- 并发的 `trySyncSetting/Rules/Words` 仍可能在 `putSyncMeta` 的读-改-写之间交错(窗口已是微秒级)
+- 云同步已串行化。`Options/index.js:60` 就是 `Promise.all([trySyncSetting(), trySyncRules()])`,
+  交错会丢掉某个键的 `syncAt`,而 `syncAt === 0` 会让 `syncData` 强制 `updateAt = 0`,
+  此后远端无条件获胜。**队列里的任务不得再调用入队函数,否则死锁** ——
+  `changeSyncEncryptKey` / `syncSettingAndRules` 刻意留在队列外
+- pnpm 版本收敛到 `packageManager` 单一来源,两个 workflow 都不再写死
+- `.pnpm-version` 保留(可能有外部工具读),但加了测试与 `packageManager` 钉死,漂移会变红
 
 ## 已完成
 
@@ -110,6 +116,7 @@
 | 播放器内菜单加显示顺序 | `7355d2a1` | 从 `Menus.js` 提取的唯一一块;管路本来就通,只缺控件 |
 | CI 校验 manifest 产物 | `016971c5` | `manifest-artifacts.mjs` + `verify-manifest.mjs`,已在 CI 实跑 |
 | 字幕轨恢复 | `870b7d72` / `cca901af` / `a12f05ab` | 拦截器晚装时不再永远无字幕;按 YouTube 默认轨元数据选轨,拿不准就不猜 |
+| 云同步串行化 + pnpm 单一来源 | `957742b8` | 修掉「丢 syncAt → 远端永远获胜」;`.pnpm-version` 与 `packageManager` 用测试钉死 |
 
 > 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 

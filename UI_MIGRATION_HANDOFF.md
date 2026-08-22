@@ -25,6 +25,13 @@
 | `backup/dev-before-sync-*` | 同步前的安全快照,内容已含于 `newui`/`beta` |
 | `archive/atomic-setting-patch`(**标签**) | 已归档的三 commit 栈。本文档多处按 SHA 引用它,**不要删这个标签** |
 
+所有 `agent/*` 分支及其 worktree 已于 2026-08-23 清理(本地 + origin)。删除前逐个确认过可达性:
+三个 atomic-setting-patch 栈分支包含在归档标签里,`settings-new-ui` / `popup-m3-redesign` /
+`storage-subscriptions-v2` 的 tip 已是 `dev-newui` 的祖先 —— 没有 commit 被孤儿化。
+
+> Windows 路径长度限制导致两个 worktree 目录未能删净(`splits/editor-draft-protection`、
+> `kiss-translator-popup-m3-review`)。git 侧注册已移除,磁盘上是纯残留,可手工删。
+
 `dev-newui` 与 `upstream/dev` 齐平,无待同步的上游工作。
 
 `archive/atomic-setting-patch` 里三个 commit 的归宿:`cdf403a` **否决**、`b47873c` **已合入 `a6bf0b1`**、`94fcf96` **核心已重写为 `storage.patchObj`**。前两者与后者的详情见「已否决(备查)」。

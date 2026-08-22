@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `91039d0`
+**最后更新:** 2026-08-23 · `dev-newui` @ `4c28586`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -174,9 +174,13 @@ newui        : 578b2b76...
 
 **测试基线现在是全绿的**(2026-08-23 起,`91039d0`)。此前 `src/apis/trans.dict.test.js` 长期有 1 条失败,本文档一度把它当成「可接受的非全绿基线」——其实那是一条过期测试:上游 `2432ec1`(#1022)有意把词典提示词的标签从「所在段落:」改成英文,测试没跟着改。现在断言改为从 `defaultDictUserPrompt` 模板自身推导,文案再变也不会误报。
 
-**所以 push/PR CI 的拦路石已经清掉了。** 在此之前新加的 workflow 一上来就是红的,现在可以加了 —— 见下方。
+这条清掉后 push/PR CI 才得以加上 —— 见下方。
 
-**根本没有 push/PR 阶段的 CI。** `.github/workflows/` 里只有 `release.yml`,且触发条件是 `on: push: tags: v*`。也就是说 **jest 在打 tag 之前一次都不会跑** —— `a6bf0b1` 专门加的 `src/scripts/userscriptGrants.test.js`(守着那 4 行 `@grant` 不被误删)实际上只在本地有效。要补一个 push/PR workflow 的话,得先处理上面那条非全绿基线,否则新 workflow 一上来就是红的。
+**push/PR CI 已经有了**(`4c28586`,`.github/workflows/test.yml`)。`on: [push, pull_request]`,跑全量 jest + `build:chrome` + `build:web`,约 2 分钟。已在 fork 上实跑通过:109 套件 / 963 用例全绿。
+
+它和 `release.yml` 有一处**刻意的不同**:不写死 pnpm 版本。`pnpm/action-setup@v4` 会读 `package.json` 的 `packageManager` 字段,这样 pin 只有一处而不是三处(`release.yml` 目前仍硬编码 9.14.4,升级时两个文件都要动)。另外加了一步 `git diff --exit-code pnpm-lock.yaml` —— 一旦有人把 pnpm 提到 10+,overrides 块被删会当场变红,而不是等到发版才发现。
+
+**注意:`gh` 在这个仓库里默认指向上游 `fishjar/kiss-translator`,不是你的 fork。** 查自己的运行记录要显式带 `-R moooyo/kiss-translator`,否则看到的是上游的。按 AGENTS.md 上游是只读的。
 
 ## 待实机验证(三项,没有测试能覆盖)
 

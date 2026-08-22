@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `4f005e0`
+**最后更新:** 2026-08-23 · `dev-newui` @ `31dcaab`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -176,15 +176,77 @@ newui        : 578b2b76...
 
 **根本没有 push/PR 阶段的 CI。** `.github/workflows/` 里只有 `release.yml`,且触发条件是 `on: push: tags: v*`。也就是说 **jest 在打 tag 之前一次都不会跑** —— `a6bf0b1` 专门加的 `src/scripts/userscriptGrants.test.js`(守着那 4 行 `@grant` 不被误删)实际上只在本地有效。要补一个 push/PR workflow 的话,得先处理上面那条非全绿基线,否则新 workflow 一上来就是红的。
 
-## 待实机验证(没有测试能覆盖,按风险从高到低)
+## 待实机验证(三项,没有测试能覆盖)
 
-| 项 | 怎么验 | 来源 |
-|---|---|---|
-| 划词提示框的 × 能关掉 | 真实 YouTube 视频,悬停单词出提示框后点 × | `96d8c1d` |
-| 悬停暂停后能恢复播放 | 悬停某个字幕单词的同时,从播放器内菜单改分段或 AI 上下文设置,确认视频恢复播放 | `96d8c1d` |
-| SPA 反复导航下样式不再累积 | 装未打包扩展,在 YouTube 上反复导航,观察 shadow root 的 `adoptedStyleSheets` 是否仍在增长。`translator.js` 的 `#removeTextStyles` 只有一个调用点,单测只能验证过滤逻辑、验不了生命周期 | `ffcfbb1` |
+三项都需要**未打包扩展 + 真实 YouTube 页面**。dev server 里的浏览器加载不了扩展,
+`YouTubeCaptionProvider.test.js` 又把 XHR 拦截整个 mock 了,所以仓库内无法证明。
+建议一次做完 —— 前置条件相同。
 
-前两项无法在仓库内证明:`YouTubeCaptionProvider.test.js` 把 XHR 拦截整个 mock 掉了,也没有 headless YouTube。
+### 前置(做一次)
+
+```
+CI=true pnpm run build:chrome
+```
+
+Chrome → `chrome://extensions` → 打开「开发者模式」→「加载已解压的扩展程序」→ 选 `build/chrome`。
+然后打开一个**有英文字幕**的 YouTube 视频,在扩展设置里确认:
+
+- 字幕翻译已启用、`Start automatically` 已开(第 2 项依赖 `autoTranslate`,
+  `#reProcessEvents()` 开头就是 `if (!this.#setting.autoTranslate) return;`)
+- 悬停查词设为 `on`(设置项 `hoverLookupMode`,取值 `on` / `off` / `mobile_off`)
+
+### 1. 划词提示框的 × 能关掉 — `96d8c1d`
+
+**步骤:** 鼠标悬停在某个英文字幕单词上 → 出现查词提示框 → 点右上角 ×。
+
+**期望:** 提示框消失。
+
+**修复前长什么样:** 点 × 毫无反应。三处关闭按钮当时把逻辑写成内联 `onclick`,
+而所有 `innerHTML` 都要过 `trustedTypesHelper.createHTML` → 无配置的 `DOMPurify.sanitize`,
+`on*` 属性被一律剥掉。**四个发行渠道都是坏的**,不是 CSP 或 YouTube 特有。
+
+**顺带看:** 查一个 Bing 词典没有释义的生僻词,应当显示「No definition found」
+而不是一个空的释义框(空数组曾被当成查到了)。
+
+### 2. 悬停暂停后能恢复播放 — `96d8c1d`
+
+**步骤:** 悬停某个字幕单词(视频会自动暂停)→ **保持鼠标不动**,
+从播放器内的字幕菜单改 `segSlug`(AI 断句)或 `aiContextSlug`(智能上下文)。
+
+**期望:** 字幕窗口重建,视频**恢复播放**。
+
+**修复前长什么样:** 视频永远停在暂停,而字幕窗口已经消失、无从恢复。
+改这两个设置会走 `#reProcessEvents()` → `#destroyManager()`(`YouTubeCaptionProvider.js:798`)
+→ `BilingualSubtitleManager.destroy()`,后者移除的正是光标底下的容器,
+于是 `pointerleave` 永远不触发,`#wasPlayingBeforeHover` 永远不清。
+
+**另一条等效路径:** 悬停单词时直接 SPA 导航到另一个视频。
+
+### 3. SPA 反复导航下样式不再累积 — `ffcfbb1`
+
+**步骤:** 在 YouTube 内**点击链接**在视频之间反复跳转(不要刷新页面,刷新会重置一切),
+来回 10 次以上。每隔几次在 DevTools Console 跑:
+
+```js
+(() => {
+  let sheets = 0, roots = 0;
+  const walk = (node) => node.querySelectorAll("*").forEach((el) => {
+    if (el.shadowRoot) {
+      roots++;
+      sheets += (el.shadowRoot.adoptedStyleSheets || []).length;
+      walk(el.shadowRoot);
+    }
+  });
+  walk(document);
+  return { roots, sheets, doc: (document.adoptedStyleSheets || []).length };
+})()
+```
+
+**期望:** `sheets` 稳定在一个小数值,不随导航次数单调增长。
+
+**修复前长什么样:** 每次 SPA 重启都往 shadow root 里再叠一张样式表,数字一路涨。
+`translator.js` 的 `#removeTextStyles()` 只有一个调用点(`:4057`,在整体拆除流程里,
+紧挨着 `#removeInjector()`),单测只能验证过滤逻辑,验不了生命周期。
 
 **iOS 的 `@grant` 安装问题已排除,无需实机验证**(2026-08-22 查证)。理由不是「大概没事」,而是这个仓库自己就是现成的对照实验:
 
@@ -206,5 +268,3 @@ iOS 版是 Options 页的一级入口且一直装得上,所以不认识的 grant
 CI=true npx react-app-rewired test --watchAll=false
 pnpm run build:chrome
 ```
-
-**未被测试覆盖的验证项:** 已合入的样式回收(`translator.js` 的 `#removeTextStyles`)和 XHR 安装哨兵,其实际效果依赖 SPA 反复导航,单测只能验证逻辑。需装未打包扩展、在 YouTube 上反复导航,观察页面 shadow root 的 `adoptedStyleSheets` 是否仍在累积。

@@ -222,6 +222,31 @@ describe("Prompts", () => {
     unmount();
   });
 
+  test("keeps a dirty draft when only the prompt object identity changes", () => {
+    const prompt = createPrompt(PROMPT_CATEGORY_USER, {
+      slug: "first_prompt",
+      name: "First prompt",
+    });
+    const { container, rerender, unmount } = renderPrompts([prompt]);
+    const nameInput = container.querySelector('input[name="name"]');
+
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      ).set.call(nameInput, "Changed prompt");
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    // 提示词列表重建后是全新对象，内容完全一致 —— 不得冲掉未保存的草稿。
+    rerender([{ ...prompt }]);
+    expect(container.querySelector('input[name="name"]').value).toBe(
+      "Changed prompt"
+    );
+
+    unmount();
+  });
+
   test("confirms before creating a prompt from a template", async () => {
     const customPrompt = createPrompt(PROMPT_CATEGORY_USER, {
       slug: "custom_prompt",

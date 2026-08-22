@@ -186,6 +186,31 @@ describe("StylesSetting style previews", () => {
     view.cleanup();
   });
 
+  test("keeps a dirty draft when only the style object identity changes", () => {
+    const view = renderStyleAccordion(CUSTOM_STYLE);
+    act(() => {
+      view.container.querySelector(".MuiAccordionSummary-root").click();
+    });
+
+    const nameInput = view.container.querySelector('input[name="styleName"]');
+    act(() => {
+      Object.getOwnPropertyDescriptor(
+        HTMLInputElement.prototype,
+        "value"
+      ).set.call(nameInput, "Local style draft");
+      nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+    });
+
+    // useAllTextStyles 在 customStyles 每次写入时都会 .map() 出全新的样式对象：
+    // 引用是新的、内容一个字没变。这种身份抖动不得冲掉未保存的草稿。
+    view.rerender({ ...CUSTOM_STYLE });
+    expect(view.container.querySelector('input[name="styleName"]').value).toBe(
+      "Local style draft"
+    );
+
+    view.cleanup();
+  });
+
   test("keeps an expanded style draft mounted while the manager is hidden", () => {
     const view = renderStylesSetting();
 

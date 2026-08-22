@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-22 · `dev-newui` @ `ffcfbb1`
+**最后更新:** 2026-08-22 · `dev-newui` @ `ca24567`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -24,28 +24,62 @@
 | Popup Material 3 | `a96fdf8` | PR #1013,`agent/popup-m3-redesign` |
 | 固定 pnpm 9.14.4 | `2904560` | 见下方「已知坑」 |
 | 内容页运行时样式/注入器泄漏修复 | `ffcfbb1` | PR #5(仅评审用),`fix/runtime-style-leak-dev` |
+| 设置页草稿身份抖动守卫 | 本次 | `StylesSetting.js` / `Prompts.js`,各带一条回归测试;是下方 `b47873c` 的前置条件 |
 
 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
 
 ## 待办(按优先级)
 
-### 1. `agent/atomic-setting-patch` — 建议优先
+### 1. `agent/atomic-setting-patch` — 拆开逐个 cherry-pick,**不要整合**
 
-设置原子写入 / 跨上下文存储订阅 / 编辑草稿保护,三个 commit 的栈(合栈顶即含全部三个,不必单独处理 `agent/storage-subscriptions`、`agent/editor-draft-protection`)。
+2026-08-22 对三个 commit 逐个复审,推翻了此前「合栈顶即含全部三个」的建议 —— 那样做会踩下面的陷阱。三个 commit 应得三种不同结论。
 
-三个问题均已核实在 `dev-newui` 上存在:并发写入无串行化、storage 层无订阅、`usePersistedEntityDraft` 不存在。`src/hooks/Storage.js` 顶部的 `REVIEW:` 注释本身就建议加 `chrome.storage.onChanged` 监听。源码约 700 行,测试约 1320 行。
+#### `cdf403a` 编辑草稿保护 —— **丢弃**
 
-**合并冲突预估**(已试合验证):核心层 `storage.js` / `Storage.js` / `gm.js` / `settingPatch.js` 干净通过;冲突集中在 5 个 Options 文件:
+它的核心文件与 `a07d39f`(#1004 的 M3 基线)上曾存在过的版本**字节相同**,后被 `ed5e79b`「Narrow settings UI behavior changes」整个删除。这是对一次有意决策的 revert,不是新修复:
 
 ```
-Apis.js               4 处 /  83 行
-Apis.test.js          6 处 / 385 行
-Prompts.test.js       5 处 / 219 行
-StylesSetting.js      4 处 /  47 行
-StylesSetting.test.js 10 处 / 266 行
+git rev-parse cdf403a:src/views/Options/usePersistedEntityDraft.js  → 9559628c...
+git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c...
 ```
 
-冲突性质是同一问题的两种实现竞争:`dev-newui`(来自 #1004)用 `useEffect` 同步草稿,该分支用 `usePersistedEntityDraft` 取代。需逐处取舍并保留 M3 的 `SettingsCard` 结构。**拖得越久,这几个文件的冲突越难解。**
+它带的 `StylesSetting.test.js` 用例也是把 `ed5e79b` 删除并反转过的断言原样复活。
+
+另有一处 `ed5e79b` 时期没有的缺陷:`rebaseLocalChanges` 中 baseline 与 draft 一致的 key 走 early return、从不写入 `next`。当 persisted 侧为 `{}` 时(`Apis.js` 以 `usePersistedEntityDraft(api || {}, apiSlug)` 调用,`api` 来自可能瞬时落空的 `transApis.find(...)`),脏草稿会塌缩成只剩被编辑的那个字段。它替代的旧代码最多回退到已持久化的值,造不出残缺实体。
+
+**而它贡献了整个栈 100% 的冲突**(29 处 / 约 1000 行 / 5 文件)。`git merge-tree` 对三个 commit 分别测得的冲突数完全相同 —— 后两个 commit 自身零冲突。
+
+其中唯一值得留下的是 `StylesSetting` 的草稿丢失,已用 6 行内容比对守卫在 `dev-newui` 上单独修掉(见「已完成」),契约不变:持久化内容真的变化时草稿照样被覆盖,只是「对象换身份、内容未改」不再被误判。
+
+#### `b47873c` 跨上下文存储订阅 —— **合,但需带三个修复**
+
+缺口确认存在:`src/hooks/Storage.js:31` 的 `REVIEW:` 注释就是它的 spec,`storage.js` 导出的对象里没有任何 subscribe。**零冲突** —— `dev-newui` 从未改过 `src/hooks/Storage.js` 和 `src/libs/gm.js`。这两个 commit 合起来是全栈 78% 的新增代码量。
+
+注意:持有独立快照的 `SettingProvider` 是**五个**(popup / fab / contentPopup / options / `TranBox.js:451` 的 tranbox),不是四个。
+
+前两项是**前置条件而非后续优化**:
+
+1. `loadInitialData` 调 `setData(storedVal)` 时未设 `externalStorageValueRef`,挂载回写照发、且现在是广播。接收端会回退旧值、设上自己的 external 标记,其写 effect 随即提前 return —— 新编辑从 UI 和存储同时消失,没有东西能自愈。**比现状更差。**`Storage.js:8` 已有 `isSameStorageValue` 可用
+2. `StylesSetting` / `Prompts` 的草稿守卫必须先落地 —— **已完成**。订阅一上,每次外部写入都会重建实体身份,把今天很难触发的草稿丢失变成常态
+3. 删掉 `src/views/Popup/index.js:63-75` 那个失效的手写监听器及其测试(`setObj` 存的是 JSON 字符串,监听器却对它取 `.autoTranslateClipboard`)
+
+`config-overrides.js` / `package.json` 加的 4 行 `@grant` 是**必需的**,没有它整个 GM 分支在油猴下是永久静默 no-op。`userscript-metadata.mjs` 那 105 行工具可丢(CI 不跑测试)。待验证:iOS Safari 的 Userscripts app 是否会因不认识这些 grant 而拒装 —— 运行时降级是安全的(`getOptionalGmMethod` 会吞掉异常),但安装时行为需实机试一次。
+
+#### `94fcf96` 设置原子写入 —— **先改造再合**
+
+`settingPatch.js` 本身干净、纯函数、测试扎实(含一条移除队列就会失败的真实交错测试),零冲突,零夹带。但三处要先改:
+
+- 后台经 `getSettingWithDefault()` 读写回存,而 `storage.js:173` 上方注释明说那层归一化**只在内存中**做。持久化它会把 `config/api.js` 里 `thinkingEffort: "_default"`(「接口默认,不注入参数」)替换成具体值写死 —— 用户从未选择的推理强度参数从此被注入,且不可恢复。应改读原始 `getSetting()`
+- 「Serialize」名不副实:`sync.js:394` 和 `:519` 仍在做未入队的整对象 `setSetting`
+- SW 往返无失败兜底。不会丢(patch 是累积的、会向前 rebase),但反过来:一个未刷出的 delta 会变成不可见、无上限的 per-tab override,遮盖其他上下文的值。需要 sendBgMsg 失败时直接写存储的 plan B
+
+**无法单独 cherry-pick** —— 其 `Storage.js` hunk 是写在 `b47873c` 重写后的 hook 之上的(`subscribeObj` / `externalStorageValueRef` / `revisionAtStart`),且没有 `subscribeObj` 时约 40% 的新增行是没有东西驱动的 revision 机制。
+
+#### 合并机制与陷阱
+
+`cdf403a` 是**最老**的 commit,不能「合栈顶跳过它」——必须逐个 cherry-pick `b47873c`、`94fcf96`。两边文件集无交集(`comm -12` 为空),后两个从不引用该 hook 或任何 Options 文件,所以这样做是安全的。
+
+**陷阱:** 直接 `git merge` 整个分支时 `Prompts.js` 会**无冲突标记地自动合并**,悄悄把 `ed5e79b` 从该文件移除的机制装回去,而 `Apis.js` / `StylesSetting.js` 还挂在冲突里。谁按 `dev-newui` 解完那几处冲突,就会得到三个组件用两套草稿机制、且没有任何信号。cherry-pick 可完全避开。
 
 ### 2. 字幕 — 最大剩余块,需先拆分
 

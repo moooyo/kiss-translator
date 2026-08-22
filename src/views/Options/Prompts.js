@@ -187,6 +187,7 @@ function PromptFields({
   const i18n = useI18n();
   const confirm = useConfirm();
   const [formData, setFormData] = useState(() => normalizePrompt(prompt));
+  const lastSyncedPromptRef = useRef(JSON.stringify(normalizePrompt(prompt)));
   const promptDisplayName = getPromptDisplayName(prompt, i18n);
   const systemPromptRef = useRef(null);
   const userPromptRef = useRef(null);
@@ -195,7 +196,14 @@ function PromptFields({
     formData.category === PROMPT_CATEGORY_USER ||
     formData.category === PROMPT_CATEGORY_DICTIONARY;
 
+  // prompt 的对象身份会随所在列表的每次重建而变化，内容却未必变。
+  // 与 StyleFields 同理：只有持久化内容真的发生变化时才覆盖用户未保存的草稿。
   useLayoutEffect(() => {
+    const nextSnapshot = JSON.stringify(normalizePrompt(prompt));
+    if (lastSyncedPromptRef.current === nextSnapshot) {
+      return;
+    }
+    lastSyncedPromptRef.current = nextSnapshot;
     setFormData(normalizePrompt(prompt));
   }, [prompt]);
 

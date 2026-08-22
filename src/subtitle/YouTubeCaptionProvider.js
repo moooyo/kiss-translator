@@ -12,6 +12,7 @@ import { clearMsgHistory } from "../apis/history.js";
 import {
   buildTrackKey,
   findCaptionTrack,
+  findDefaultCaptionTrack,
   getCaptionTracks,
   getSubtitleEvents,
   isChatCaptionTrack,
@@ -253,11 +254,15 @@ export class YouTubeCaptionProvider {
     if (!videoId) return;
 
     try {
-      const { captionTracks } = await getCaptionTracks(videoId);
-      const track = (captionTracks || []).find(
-        (item) => !isChatCaptionTrack(item) && item?.baseUrl
-      );
-      if (!track) return;
+      const trackData = await getCaptionTracks(videoId);
+      // 用 YouTube 自己的默认轨元数据，而不是「取第一条非聊天轨」。
+      // 一个视频可能有多条语言的字幕，取第一条会加载并翻译用户没选的那条。
+      // 元数据不足以判断时它返回 null —— 那就不恢复，等真实拦截。
+      const track = findDefaultCaptionTrack(trackData);
+      if (!track?.baseUrl || isChatCaptionTrack(track)) {
+        logger.debug("Youtube Provider: no unambiguous default track");
+        return;
+      }
 
       const baseUrl = track.baseUrl.startsWith("https")
         ? track.baseUrl

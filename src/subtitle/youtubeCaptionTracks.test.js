@@ -1,6 +1,7 @@
 import {
   buildTrackKey,
   findCaptionTrack,
+  findDefaultCaptionTrack,
   getCaptionTracks,
   getSubtitleEvents,
   isChatCaptionTrack,
@@ -32,6 +33,96 @@ describe("youtubeCaptionTracks", () => {
   // getSubtitleEvents 此前完全没有测试。这三条钉的是「有没有响应体」这个分叉：
   // 拦截器装载晚于 timedtext 请求时就没有响应体，而解析快路径对 null 的处理
   // 是静默返回 undefined —— 调用方会把它当成「这条轨没有字幕」。
+  // 只在没拦截到 timedtext 请求时用得上。判错的代价是加载并翻译一条用户
+  // 没选的字幕轨，所以「拿不准就返回 null」和「能拿准就选对」同等重要。
+  describe("findDefaultCaptionTrack", () => {
+    const tracks = (...langs) => langs.map((lang) => ({ languageCode: lang }));
+
+    test("returns null without tracks", () => {
+      expect(findDefaultCaptionTrack()).toBeNull();
+      expect(findDefaultCaptionTrack({ captionTracks: [] })).toBeNull();
+    });
+
+    test("uses the only track when there is no ambiguity", () => {
+      const captionTracks = tracks("en");
+      expect(findDefaultCaptionTrack({ captionTracks })).toBe(captionTracks[0]);
+    });
+
+    test("refuses to guess between several tracks with no metadata", () => {
+      expect(
+        findDefaultCaptionTrack({ captionTracks: tracks("en", "ja") })
+      ).toBeNull();
+    });
+
+    test("prefers an explicit default caption index", () => {
+      const captionTracks = tracks("en", "ja");
+      expect(
+        findDefaultCaptionTrack({ captionTracks, defaultCaptionTrackIndex: 1 })
+      ).toBe(captionTracks[1]);
+    });
+
+    test("ignores an out-of-range default caption index", () => {
+      expect(
+        findDefaultCaptionTrack({
+          captionTracks: tracks("en", "ja"),
+          defaultCaptionTrackIndex: 7,
+        })
+      ).toBeNull();
+    });
+
+    test("resolves through the indexed default audio track", () => {
+      const captionTracks = tracks("en", "ja");
+      expect(
+        findDefaultCaptionTrack({
+          captionTracks,
+          audioTracks: [
+            { defaultCaptionTrackIndex: 0 },
+            { defaultCaptionTrackIndex: 1 },
+          ],
+          defaultAudioTrackIndex: 1,
+        })
+      ).toBe(captionTracks[1]);
+    });
+
+    test("resolves through the audio track flagged as default", () => {
+      const captionTracks = tracks("en", "ja");
+      expect(
+        findDefaultCaptionTrack({
+          captionTracks,
+          audioTracks: [
+            { defaultCaptionTrackIndex: 0 },
+            { defaultCaptionTrackIndex: 1, hasDefaultTrack: true },
+          ],
+        })
+      ).toBe(captionTracks[1]);
+    });
+
+    test("accepts a default all audio tracks agree on", () => {
+      const captionTracks = tracks("en", "ja");
+      expect(
+        findDefaultCaptionTrack({
+          captionTracks,
+          audioTracks: [
+            { defaultCaptionTrackIndex: 1 },
+            { defaultCaptionTrackIndex: 1 },
+          ],
+        })
+      ).toBe(captionTracks[1]);
+    });
+
+    test("refuses when audio tracks disagree about the default", () => {
+      expect(
+        findDefaultCaptionTrack({
+          captionTracks: tracks("en", "ja"),
+          audioTracks: [
+            { defaultCaptionTrackIndex: 0 },
+            { defaultCaptionTrackIndex: 1 },
+          ],
+        })
+      ).toBeNull();
+    });
+  });
+
   describe("getSubtitleEvents", () => {
     const capUrl = () =>
       new URL("https://www.youtube.com/api/timedtext?v=abc&lang=en&fmt=json3");

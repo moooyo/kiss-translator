@@ -48,6 +48,9 @@ jest.mock("./youtubeCaptionTracks.js", () => ({
   getCaptionTracks: jest.fn(),
   getSubtitleEvents: jest.fn(),
   isChatCaptionTrack: (track) => Boolean(track?.isChat),
+  // 用真实实现：默认轨的判定规则正是这里要测的行为，假的会让测试变成测 mock
+  findDefaultCaptionTrack: jest.requireActual("./youtubeCaptionTracks.js")
+    .findDefaultCaptionTrack,
   isSameLang: (...args) => mockIsSameLang(...args),
 }));
 
@@ -272,10 +275,11 @@ describe("YouTubeCaptionProvider track recovery", () => {
     expect(getSubtitleEvents).not.toHaveBeenCalled();
   });
 
-  test("skips live chat tracks when choosing what to recover", async () => {
+  // 猜错的代价是加载并翻译一条用户没选的字幕轨，所以宁可不恢复。
+  test("does not guess when several tracks are ambiguous", async () => {
     getCaptionTracks.mockResolvedValue({
       captionTracks: [
-        { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en", isChat: true },
+        { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en" },
         { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=ja" },
       ],
       fullDescription: "",
@@ -283,12 +287,68 @@ describe("YouTubeCaptionProvider track recovery", () => {
 
     const provider = makeProvider();
     provider.initialize();
+    await act(async () => settle());
 
+    expect(getSubtitleEvents).not.toHaveBeenCalled();
+  });
+
+  test("uses the track YouTube marks as default when there are several", async () => {
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en" },
+        { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=ja" },
+      ],
+      defaultCaptionTrackIndex: 1,
+      fullDescription: "",
+    });
+
+    const provider = makeProvider();
+    provider.initialize();
     await act(async () => settle());
 
     expect(getSubtitleEvents).toHaveBeenCalled();
     expect(getSubtitleEvents.mock.calls[0][1].searchParams.get("lang")).toBe(
       "ja"
     );
+  });
+
+  test("resolves the default through the default audio track", async () => {
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en" },
+        { baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=ja" },
+      ],
+      audioTracks: [
+        { defaultCaptionTrackIndex: 0 },
+        { defaultCaptionTrackIndex: 1, hasDefaultTrack: true },
+      ],
+      fullDescription: "",
+    });
+
+    const provider = makeProvider();
+    provider.initialize();
+    await act(async () => settle());
+
+    expect(getSubtitleEvents.mock.calls[0][1].searchParams.get("lang")).toBe(
+      "ja"
+    );
+  });
+
+  test("stays out of the way when the resolved default is a live chat track", async () => {
+    getCaptionTracks.mockResolvedValue({
+      captionTracks: [
+        {
+          baseUrl: "https://www.youtube.com/api/timedtext?v=video-1&lang=en",
+          isChat: true,
+        },
+      ],
+      fullDescription: "",
+    });
+
+    const provider = makeProvider();
+    provider.initialize();
+    await act(async () => settle());
+
+    expect(getSubtitleEvents).not.toHaveBeenCalled();
   });
 });

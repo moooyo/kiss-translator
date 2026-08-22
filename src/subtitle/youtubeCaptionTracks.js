@@ -69,6 +69,77 @@ export function buildTrackKey(potUrl) {
 }
 
 /**
+ * 依据 YouTube 播放器响应里的默认轨元数据，判断应当加载哪条字幕轨。
+ *
+ * 只在没有拦截到 timedtext 请求时用得上——那时无从得知用户选的是哪条。
+ * **无法确定时返回 null,而不是挑一条**：一个视频可能有多条语言的字幕，
+ * 猜错的代价是加载并翻译一条用户没选的轨。宁可等真实拦截。
+ *
+ * @param {Object} [trackData] 播放器响应中的字幕轨元数据
+ * @param {Array<object>} [trackData.captionTracks] 字幕轨列表
+ * @param {Array<object>} [trackData.audioTracks] 音轨列表
+ * @param {number} [trackData.defaultAudioTrackIndex] 默认音轨下标
+ * @param {number} [trackData.defaultCaptionTrackIndex] 直接给出的默认字幕轨下标
+ * @returns {object|null} 可确定的默认字幕轨；无法确定时为 null
+ */
+export function findDefaultCaptionTrack({
+  captionTracks,
+  audioTracks,
+  defaultAudioTrackIndex,
+  defaultCaptionTrackIndex,
+} = {}) {
+  if (!Array.isArray(captionTracks) || captionTracks.length === 0) {
+    return null;
+  }
+
+  const isValidCaptionIndex = (index) =>
+    Number.isInteger(index) && index >= 0 && index < captionTracks.length;
+
+  // 1. 播放器直接给出了默认字幕轨
+  if (isValidCaptionIndex(defaultCaptionTrackIndex)) {
+    return captionTracks[defaultCaptionTrackIndex];
+  }
+
+  // 2. 通过默认音轨间接确定
+  const availableAudioTracks = Array.isArray(audioTracks) ? audioTracks : [];
+  let selectedAudioTrack = null;
+  if (
+    Number.isInteger(defaultAudioTrackIndex) &&
+    defaultAudioTrackIndex >= 0 &&
+    defaultAudioTrackIndex < availableAudioTracks.length
+  ) {
+    selectedAudioTrack = availableAudioTracks[defaultAudioTrackIndex];
+  } else {
+    const defaultAudioTracks = availableAudioTracks.filter(
+      (audioTrack) => audioTrack?.hasDefaultTrack === true
+    );
+    if (defaultAudioTracks.length === 1) {
+      selectedAudioTrack = defaultAudioTracks[0];
+    } else if (availableAudioTracks.length === 1) {
+      selectedAudioTrack = availableAudioTracks[0];
+    }
+  }
+
+  if (isValidCaptionIndex(selectedAudioTrack?.defaultCaptionTrackIndex)) {
+    return captionTracks[selectedAudioTrack.defaultCaptionTrackIndex];
+  }
+
+  // 3. 所有音轨都指向同一条字幕轨
+  const audioDefaultIndices = new Set(
+    availableAudioTracks
+      .map((audioTrack) => audioTrack?.defaultCaptionTrackIndex)
+      .filter(isValidCaptionIndex)
+  );
+  if (audioDefaultIndices.size === 1) {
+    const [sharedDefaultIndex] = audioDefaultIndices;
+    return captionTracks[sharedDefaultIndex];
+  }
+
+  // 4. 只有一条轨时没有歧义；多条则不猜
+  return captionTracks.length === 1 ? captionTracks[0] : null;
+}
+
+/**
  * 寻找与当前拦截请求最匹配的 YouTube 字幕轨。
  *
  * @param {Array<object>} captionTracks YouTube 页面提供的字幕轨配置列表。
@@ -153,9 +224,13 @@ async function fetchCaptionTracks(videoId) {
     const match = html.match(/ytInitialPlayerResponse\s*=\s*(\{.*?\});/s);
     if (!match) return {};
     const data = JSON.parse(match[1]);
+    const tracklist = data.captions?.playerCaptionsTracklistRenderer;
     return {
-      captionTracks:
-        data.captions?.playerCaptionsTracklistRenderer?.captionTracks,
+      captionTracks: tracklist?.captionTracks,
+      // 恢复路径需要知道 YouTube 自己认为哪条是默认轨，否则只能靠猜
+      audioTracks: tracklist?.audioTracks,
+      defaultAudioTrackIndex: tracklist?.defaultAudioTrackIndex,
+      defaultCaptionTrackIndex: tracklist?.defaultCaptionTrackIndex,
       fullDescription: data.videoDetails?.shortDescription || "",
     };
   } catch (err) {

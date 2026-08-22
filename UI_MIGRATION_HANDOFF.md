@@ -184,6 +184,22 @@ newui        : 578b2b76...
 `YouTubeCaptionProvider.test.js` 又把 XHR 拦截整个 mock 了,所以仓库内无法证明。
 建议一次做完 —— 前置条件相同。
 
+### 如果哪一项没过,说明什么
+
+前两项的**机制**已经被测试钉死了(DOMPurify 剥 `on*`、`destroy()` 时 `pointerleave` 不触发),
+每条测试都验证过「破坏对应修复它就红、且只有它红」。所以实机不通过的话,
+问题几乎一定在**集成层**而不是修复本身:
+
+- **第 1 项点 × 仍无反应** —— 先在 Console 看 `document.querySelector(".kiss-word-tooltip-close").outerHTML`。
+  若元素上带着 `onclick`,说明加载的是旧构建;若不带 `onclick` 但点击无效,
+  说明委托监听没挂上,查 `showWordTooltip` 里那个 `addEventListener("click", ...)`
+- **第 2 项视频仍卡暂停** —— 说明触发路径和记录的不一致。在 Console 观察改设置时
+  `YouTubeCaptionProvider` 是否真的走到 `#destroyManager()`;若走的是别的路径,
+  那条路径上也要补 `#resumeVideoPausedForHover()`
+- **第 3 项 `sheets` 仍在涨** —— 那 `ffcfbb1` 的修复就是没生效。它从来没被实机验证过,
+  `#removeTextStyles()` 只有一个调用点(`translator.js:4057`,在整体拆除流程里),
+  要确认 SPA 导航是否真的走到那个拆除流程
+
 ### 前置(做一次)
 
 ```

@@ -96,6 +96,47 @@ describe("youtubeCaptionTracks", () => {
     expect(buildTrackKey(url)).toBe("video-1|en|asr|English|zh");
   });
 
+  // 恢复路径（拦截器装载晚于 timedtext 请求）会拿字幕轨的 baseUrl 合成一个 URL
+  // 走同一个入口，于是 trackKey 由 baseUrl 算出；而晚到的真实拦截由真实
+  // timedtext URL 算出。两者必须相等，否则 provider 的去重挡不住，同一条轨
+  // 会被处理两遍——翻译也就跑两遍。
+  describe("track key parity between baseUrl and a real timedtext request", () => {
+    // YouTube 的 baseUrl 带一堆签名参数，真实请求在此之上再加 fmt/pot/c 等。
+    // buildTrackKey 只取 v/lang/kind/name/tlang，所以这些噪声不该影响结果。
+    const SIGNED =
+      "ei=abc&caps=&opi=1&xoaf=5&hl=en&ip=0.0.0.0&ipbits=0&expire=99&signature=sig&key=yt8";
+    const REQUEST_EXTRAS = "fmt=json3&xorb=2&xobt=3&xovt=3&c=WEB&pot=tok";
+
+    test.each([
+      ["an ASR track", "kind=asr&lang=en"],
+      ["a manual track", "lang=en"],
+      ["a named track", "lang=en&name=English"],
+    ])("matches for %s", (_case, trackParams) => {
+      const baseUrl = new URL(
+        `https://www.youtube.com/api/timedtext?v=vid-1&${SIGNED}&${trackParams}`
+      );
+      const intercepted = new URL(
+        `https://www.youtube.com/api/timedtext?v=vid-1&${SIGNED}&${trackParams}&${REQUEST_EXTRAS}`
+      );
+
+      expect(buildTrackKey(baseUrl)).toBe(buildTrackKey(intercepted));
+    });
+
+    // 合理的不相等：YouTube 自己在翻译时，拦截到的请求带 tlang，内容是译文，
+    // 而 baseUrl 指向的是原文轨。两者本就是不同的东西，key 不同是对的。
+    // 记在这里是为了让这个差异是已知的，而不是日后被当成 bug 追查。
+    test("differs when YouTube is auto-translating the track", () => {
+      const baseUrl = new URL(
+        "https://www.youtube.com/api/timedtext?v=vid-1&lang=en"
+      );
+      const intercepted = new URL(
+        "https://www.youtube.com/api/timedtext?v=vid-1&lang=en&tlang=zh"
+      );
+
+      expect(buildTrackKey(baseUrl)).not.toBe(buildTrackKey(intercepted));
+    });
+  });
+
   test("detects live chat caption tracks", () => {
     expect(
       isChatCaptionTrack({ name: { simpleText: "Live Chat replay" } })

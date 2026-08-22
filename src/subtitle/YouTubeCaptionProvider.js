@@ -14,6 +14,7 @@ import {
   findCaptionTrack,
   getCaptionTracks,
   getSubtitleEvents,
+  isChatCaptionTrack,
   isSameLang,
 } from "./youtubeCaptionTracks.js";
 import { eventsToSubtitles } from "./youtubeAiSegmentation.js";
@@ -36,6 +37,10 @@ import {
  * YouTube 字幕翻译与双语渲染入口。
  * 负责页面生命周期、字幕轨处理调度、异步竞态保护，并把结果交给播放器渲染器。
  */
+// 字幕轨恢复的延迟。这是兜底路径：宁可让首条字幕稍晚，也不要和一个慢但真实的
+// 拦截请求撞车、把同一条轨翻译两遍。
+const TRACK_RECOVERY_DELAY = 1500;
+
 export class YouTubeCaptionProvider {
   // 扩展配置选项对象
   #setting = {};
@@ -77,6 +82,7 @@ export class YouTubeCaptionProvider {
   #playerUi = null;
   // YouTube 底部控制条原生字幕激活状态的 DOM 监听器
   #ytSubtitleStateObserver = null;
+  #trackRecoveryTimer = null;
 
   // 挂载在视频右侧/下方的双语字幕列表面板管理器实例
   #subtitleListManager = null;
@@ -177,6 +183,8 @@ export class YouTubeCaptionProvider {
       this.#subtitleAbortController = null;
       this.#setting.autoTranslate = this.#defaultAutoTranslate;
       this.#playerUi.updateMenuProps();
+      // 导航后同样可能错过 timedtext 请求
+      this.#scheduleTrackRecovery();
     });
 
     waitForElement(CONTROLS_SELECTOR, (ytControls) => {
@@ -185,6 +193,7 @@ export class YouTubeCaptionProvider {
       );
       if (ytSubtitleBtn) {
         this.#observeYtSubtitleState(ytSubtitleBtn);
+        this.#scheduleTrackRecovery();
       }
 
       this.#playerUi.injectToggleButton(ytControls);
@@ -202,6 +211,70 @@ export class YouTubeCaptionProvider {
    * @param {HTMLButtonElement} ytSubtitleBtn YouTube 原生控制栏中的字幕切换按钮 DOM。
    * @returns {void}
    */
+  /**
+   * 安排一次字幕轨恢复。
+   *
+   * XHR 拦截器是通过追加 <script src> 注入的，是异步的；而 content.js 没有声明
+   * run_at。所以「YouTube 已经发出 timedtext 请求，拦截器才装好」是结构上可能的，
+   * 此时 #handleInterceptedRequest 永远不会被调用，字幕也就永远不出现——
+   * 而且没有任何回退。
+   *
+   * @private
+   * @returns {void}
+   */
+  #scheduleTrackRecovery() {
+    clearTimeout(this.#trackRecoveryTimer);
+    this.#trackRecoveryTimer = setTimeout(() => {
+      this.#trackRecoveryTimer = null;
+      void this.#recoverCurrentTrack();
+    }, TRACK_RECOVERY_DELAY);
+  }
+
+  /**
+   * 在没有拦截到 timedtext 请求时，主动取当前视频的字幕轨。
+   *
+   * @private
+   * @returns {Promise<void>}
+   */
+  async #recoverCurrentTrack() {
+    // 已经有字幕或正在处理，说明拦截路径是通的，不要插一脚
+    if (this.#flatEvents.length || this.#processingId) return;
+
+    // 门控要同时满足两点，现成的两种写法各缺一点：
+    //   - 不能用 #isYtSubtitleEnabled()：它在按钮不存在时返回 true（失败开放），
+    //     而恢复链路后面是取轨 → AI 上下文增强 → 翻译，没有任何成本门槛
+    //   - 不能缓存按钮引用：导航后 YouTube 会重建控制栏，旧节点已经游离，
+    //     上面的 aria-pressed 还停在导航前的值
+    // 所以每次实时查询，且查不到就不恢复。
+    const ytSubtitleBtn = document.querySelector(YT_SUBTITLE_BUTTON_SELECTOR);
+    if (ytSubtitleBtn?.getAttribute("aria-pressed") !== "true") return;
+
+    const videoId = this.#videoId;
+    if (!videoId) return;
+
+    try {
+      const { captionTracks } = await getCaptionTracks(videoId);
+      const track = (captionTracks || []).find(
+        (item) => !isChatCaptionTrack(item) && item?.baseUrl
+      );
+      if (!track) return;
+
+      const baseUrl = track.baseUrl.startsWith("https")
+        ? track.baseUrl
+        : window.location.origin + track.baseUrl;
+
+      // 直接重入常规入口：它会自己从这个 URL 推导 lang/kind 并找回同一条轨，
+      // 不必在这里复制一份选取逻辑。响应体传 null，getSubtitleEvents 会因此
+      // 走 fetch 回退。baseUrl 与真实 timedtext URL 算出的 trackKey 相同
+      // （见 youtubeCaptionTracks.test.js 的 track key parity），所以晚到的
+      // 真实拦截会被既有去重挡掉，不会翻译两遍。
+      logger.debug("Youtube Provider: recovering track without intercept");
+      await this.#handleInterceptedRequest(baseUrl, null);
+    } catch (err) {
+      logger.info("Youtube Provider: track recovery failed", err);
+    }
+  }
+
   #observeYtSubtitleState(ytSubtitleBtn) {
     this.#ytSubtitleStateObserver?.disconnect();
     this.#ytSubtitleStateObserver = new MutationObserver(() => {

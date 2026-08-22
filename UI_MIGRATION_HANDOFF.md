@@ -74,24 +74,51 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 `settingPatch.js` 本身干净、纯函数、测试扎实(含一条移除队列就会失败的真实交错测试),零夹带。但:
 
-**更正(2026-08-23):此前本文档说它「现在会冲突」「两个 hunk 会把副作用装回 setData 更新函数」——**
-**两条都是错的,是我量错和转述未核实所致。** 实测:
+**测量方法警告 —— 这个 commit 上已经反转过两轮,别再用错的量法。**
+
+2026-08-23 我一度「更正」说它零冲突、且不碰 `save()`/`update()`。**那次更正本身是错的**,
+两个错误都出在测量:
 
 ```
-git merge-tree 94fcf96^ dev-newui 94fcf96   # 只 cherry-pick 它自己
-→ 零冲突标记
+# 错的：旧三参形式输出的是 diff，冲突标记带 "+" 前缀，
+#       锚定 ^ 的 grep 因此计到 0
+git merge-tree 94fcf96^ dev-newui 94fcf96 | grep -c '^<<<<<<<'   # → 0，假的
+
+# 对的：
+git merge-tree --write-tree --merge-base=94fcf96^ dev-newui 94fcf96
+# → EXIT=1, CONFLICT (content): Merge conflict in src/hooks/Storage.js
 ```
 
-之前那次量的是 `git merge-tree dev-newui 94fcf96`,合的是**整个栈**(连带已否决的 `cdf403a`),
-所以看到 10 个文件冲突;而且当时用 `head -20` 截断了输出,只看到前两个。
-它也**没有碰 `save()` / `update()`** —— `git show 94fcf96 -- src/hooks/Storage.js` 里
-涉及那两个 ref 的只有一行 `skipRemoteSyncValueRef`。
+第二个错误是 grep 模式没覆盖实际新增的行(`localChangeRevisionRef` / `dataRef`),
+于是漏判成「没碰 save/update」。实际 `@@ -162,6 +292,10 @@` 和 `@@ -182,6 +316,10 @@`
+两个 hunk **就落在 `save()` 和 `update()` 的 setData 更新函数里**。
 
-**但「合得干净」不等于「合了正确」,而且干净反而更危险 —— git 不会警告。**
-真正待评估的是语义:`94fcf96` 是写在 `b47873c` 那版 hook 之上的,而 `828b1bd` 之后
-改了同一个 hook 的不变量(自回声抑制 `selfWrittenPayloadsRef`、
-`loadInitialData`/`reload` 的 external 标记)。文本上不打架,不代表两套机制放在一起还成立。
-动它之前先回答这个,别拿冲突数当判断依据。
+**结论:单独 cherry-pick 它会在 `src/hooks/Storage.js` 冲突,而且那个冲突无论怎么解都是错的 ——**
+见下方「合并陷阱」。
+
+#### 共存性:两套机制不是打架,是一套静默取代另一套,而且更弱
+
+`isBackgroundManagedSetting = isExt && key === STOKEY_SETTING`(94fcf96 的 `Storage.js:66`)
+在订阅回调(`:108`)和写盘副作用(`:248`)里都**早退**,位置都在当前 `claimSelfWrite` /
+`rememberSelfWrite` 之前。也就是说:**扩展模式下的主设置键,`828b1bd` 的自回声抑制被整个绕过**,
+换成 `applyPersistedSetting` 的 rebase。
+
+但 `enqueueSettingWrite` 从不乐观推进 `persistedSettingRef`,也不记录自己发出去的 patch
+(`persistedSettingRef.current` 只在 `:83 :98 :143 :149 :159 :352` 赋值,没有一处在写入路径上)。
+所以它**分不清「用户在途中撤回了这次编辑」和「用户根本没做过这次编辑」** ——
+SW 往返期间的一次撤回会在 UI 和存储里同时被抹掉。
+那正是 `828b1bd` 要修的输入框回退 bug,在**流量最高的那个键上**复活。
+
+#### 合并陷阱:两种解法都是错的
+
+`localChangeRevisionRef.current += 1` 全文只有两处(`:296` `:320`),都在那两个冲突的更新函数里。
+而写盘副作用在 `:248` 就早退了,走不到 `:273` 的 `debouncedSync` —— 所以后台托管的设置,
+**唯一的同步触发点**是 `:224-228` 的 `localRevision > remoteSyncRevisionRef.current`,
+两个 ref 都在 `:101-102` 归零。
+
+- 解成 **OURS**(正确保留 `828b1bd`)→ 两处 `+= 1` 一起没了 → 判据永远是 `0 > 0` →
+  **会话内设置同步彻底失效,而且是静默的**(94fcf96 那四条后台路径测试没有一条断言 `syncData`)
+- 解成 **THEIRS** → 对所有键回退 `828b1bd`
 
 三处待改造:
 

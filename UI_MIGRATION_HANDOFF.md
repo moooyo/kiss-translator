@@ -8,14 +8,15 @@
 
 ## 现在卡在哪
 
-**剩下三项实机验证** —— 需要装未打包扩展 + 真实 YouTube 页面,仓库内无法证明。
+**剩下两项实机验证** —— 需要装未打包扩展 + 真实 YouTube 页面,仓库内无法证明。
 步骤、期望、以及「没过说明什么」都在文末附录,构建产物在 `build/chrome`。
+第 3 项(SPA 样式累积)已经不必手工做了,理由见附录。
 
-全量 **1031 通过 / 0 失败**(112 → 114 suite),CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
+全量 **1043 通过 / 0 失败**(114 → 115 suite),CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
 lockfile 校验 + manifest 产物校验)。
 
-还开着的技术项:**跨 realm 设置写入竞态**(「待办 4」)、**AI 词典的存量值校验**(「待办 6」)、
-**发布 target 清单双写**(「待办 7」)。三项都不阻塞发版。
+**唯一还开着的技术项是跨 realm 设置写入竞态**(「待办 4」)。它不阻塞发版,
+但也**不是一个小修**——原因见那一节,别再当成「顺手做掉」的条目。
 
 ## 分支约定
 
@@ -45,9 +46,18 @@ lockfile 校验 + manifest 产物校验)。
 
 ## 待办
 
-### 1. 三项实机验证 —— 暂缓
+### 1. 两项实机验证 —— 仍未做
 
-按 2026-08-23 的决定,推迟到**代码工作全部结束后统一做**。步骤见文末附录。
+需要装未打包扩展 + 真实 YouTube 页面。步骤见文末附录。
+
+原本的第 3 项(SPA 反复导航下样式累积)**已经不用手工做了**:那条链路
+`TranslatorManager.restart()` → `#destroyRuntimeModules()` → `translator.stop()`
+→ `#removeTextStyles()` 已经查证并用 `translator.test.js` 钉住 —— 连跑 4 轮
+「注入 → stop」,`document` 与 shadow root 的 `adoptedStyleSheets` 每轮都回到 0,
+把 `stop()` 里的 `#removeTextStyles()` 去掉这条测试就变红。
+
+剩下两项的**机制**同样早被测试钉死(DOMPurify 剥 `on*`、`destroy()` 时恢复播放),
+留着实机跑一遍是为了盖住集成层 —— 装错构建、监听没挂上这类仓库内证明不了的东西。
 
 ### ~~2. `0d533e8`~~ / ~~3. `cadfde2`~~ — 两个都处理完了,只取了值得取的部分
 
@@ -84,9 +94,29 @@ lockfile 校验 + manifest 产物校验)。
 `window` 监听器都留着,provider 在用例间累积。新加的 describe 因此放在文件末尾,
 且自身断言避免绝对调用次数。
 
-### 4. 已知开口:跨 realm 设置写入竞态
+### 4. 已知开口:跨 realm 设置写入竞态 —— 不是小修
 
-同 realm(内容脚本里三个 provider 同处一页,最常见)已由 `39bec28` 完全关闭;跨 realm 的窗口从「该上下文上次加载至今」缩到**一次存储往返**。要彻底关掉需要跨 realm 的单一序列化点 —— 那正是被否决的后台 worker 的作用。收窄后的窗口若被证明仍会出问题,再回头看。
+同 realm(内容脚本里三个 provider 同处一页,最常见)已由 `39bec28` 完全关闭;跨 realm 的窗口从「该上下文上次加载至今」缩到**一次存储往返**。
+
+**「写完再读回来校验、丢了就重放」这条路走不通,别再试。** 丢失的一方是**先写的那个**:
+A 读 → B 读 → B 写 → A 写,A 把 B 抹掉了。A 读回来看到的正是自己刚写的值,**它没有任何
+线索知道自己抹掉了谁**;而 B 读回来时 A 还没写,同样看不到问题。读回校验对双方都是盲的。
+
+事件驱动(靠 `a6bf0b1` 的存储订阅,收到别人的变更时检查自己的字段还在不在)能看见,
+但分不清「B 故意把 alpha 改回旧值」和「B 顺手抹掉了我的 alpha」—— 一律重放就会
+复活用户在另一个标签页里刚刚改掉的设置。这正是 `94fcf96` 那对 revision ref
+「怎么解都是错」的同一个陷阱。
+
+真正能关掉它的只有两条,都不小:
+
+1. **跨 realm 的单一序列化点** —— 即被否决的后台 worker。它被 `isExt` 挡住,对油猴和 iOS
+   完全无效,而那正是回声窗口最宽的地方。`navigator.locks` 同理:扩展页面之间能用,
+   内容脚本跑在页面 origin 下,盖不住「选项页 vs 内容脚本」这条最主要的路径
+2. **给存储对象加逐字段的 Lamport 版本戳** —— 这条对三个渠道都成立,是唯一真正通用的解法。
+   代价是改存储格式 + 迁移,而且动的是本仓库被测量推翻过两次的那段代码
+
+建议:**当成一个独立的、自带复现测试的改动来做**,不要和别的批次混在一起。
+在那之前先跑一版,看收窄后的窗口是否真的还会出问题。
 
 ### ~~5. 零散~~ — 已做完(`957742b8`)
 
@@ -97,7 +127,14 @@ lockfile 校验 + manifest 产物校验)。
 - pnpm 版本收敛到 `packageManager` 单一来源,两个 workflow 都不再写死
 - `.pnpm-version` 保留(可能有外部工具读),但加了测试与 `packageManager` 钉死,漂移会变红
 
-### 6. AI 词典的存量值校验 —— 值得做,不阻塞
+### ~~6. AI 词典的存量值校验~~ — 已做完
+
+那 4 道校验已经补进 `TranForm.js` 的 `aiDictApiSetting`,`TranForm.test.js` 里 5 条
+反例 + 1 条正例钉住(去掉任一道校验都会让对应那条变红)。**只取了这 4 道,没有引入
+`dictionaryCapabilities.js` 整个文件** —— 它的另一半 `normalizeDictionaryTab` 这边本来就有。
+
+下面是当初的判断依据,留档备查:
+
 
 `newui` 的 `Selection/dictionaryCapabilities.js` **不是纯重构**。`dev-newui` 在
 `TranForm.js:217-245` 有等价的内联逻辑,但少了 4 道校验:
@@ -119,7 +156,16 @@ lockfile 校验 + manifest 产物校验)。
 `TranForm.js:297` 有 `(defaultDictAvailable || aiDictAvailable)` 总闸,`AiDictCont`
 自己也挡了 null。**该取的是那 4 道校验,不是整个文件。**
 
-### 7. 发布 target 清单是双写的
+### ~~7. 发布 target 清单双写~~ — 已做完
+
+渠道清单收敛到 `src/scripts/releaseTargets.mjs`,`archive.mjs` 直接读它;
+YAML 写不了 import,所以 `releaseTargets.test.js` 把 `release.yml` 的 `matrix.client`
+钉在同一份清单上 —— 只往一边加渠道会当场变红。**比的是成员不是顺序**:matrix 里
+每个 client 是各自独立的 job,钉死顺序只会让一次可读性调整无端变红。
+
+`pnpm zip` 实跑过:5 个 zip 都在,firefox/thunderbird 仍是 manifest 在压缩包根部的
+扁平结构,chrome 仍是带目录的。下面是当初的判断依据,留档备查:
+
 
 `archive.mjs` 的 `tasks[]` 产出 5 个**不带版本号**的 zip(`chrome.zip`…),
 `release.yml` 的 `matrix.client` 又**另外列了一遍**同样 5 个,上传时才拼成
@@ -158,6 +204,9 @@ lockfile 校验 + manifest 产物校验)。
 | 划词翻译框 Material 3 + header 重建 | 本次 | `Selection/styles.js` 新增;header 换成 56px + 拖拽手柄 + 溢出菜单。**已在 dev server 浏览器验收(明暗两套)** |
 | 悬浮球 Material 3 + 动作菜单 | 本次 | `Action/styles.js` 新增;58px squircle,点击展开 5 项 Popper 菜单。**已在 dev server 浏览器验收(明暗两套)** |
 | 拖拽 cancel 兜底 + header 控件护栏 | 本次 | 两个 Draggable 都补了 `pointercancel`/`touchcancel`;详见「拖拽的两条护栏」 |
+| AI 词典存量值校验 | 本次 | `TranForm.js` 补 4 道校验,5 反例 + 1 正例钉住 |
+| 发布渠道单一来源 | 本次 | `releaseTargets.mjs`;`archive.mjs` 读它,`release.yml` 的 matrix 由测试钉住 |
+| SPA 样式累积测试 | 本次 | `translator.test.js`,把原第 3 项实机检查转成自动化 |
 
 > 上述两个 UI PR(#1004 / #1013)的 base 曾指向上游 `fishjar:dev`,**已于 2026-08-22 由作者本人关闭**,
 > 内容早已以 `5ffbe66` / `a96fdf8` 合入 `dev-newui`。当前没有任何在途的上游 PR。
@@ -217,6 +266,11 @@ lockfile 校验 + manifest 产物校验)。
 **耦合警告:** `TranForm.js` / `TranCont.js` 是划词面板与 Popup **共用**的,`dev-newui` 上刚被 #1013 改过并带有上游特性,不能直接取 `newui` 版本。悬浮球 `ContentFab.js` 已按 `newui` 的设计重写(M3 + 动作菜单),见「划词框 / 悬浮球 M3 的移植边界」。
 
 ## 已知坑
+
+**`pnpm format` 盖不到 `.mjs`。** 脚本里的 glob 是 `"**/*.{js,json,html}"`,所以
+`src/scripts/` 下的 `.mjs` 从来没被格式化过 —— 现在 `build-task.mjs` / `sync-version.mjs` /
+`update-version.mjs` 三个是漂的。不是本次改动引入的,也没有 CI 在管;要收拾就单独收拾,
+别夹在别的改动里(prettier 会一次性重排整个文件,把真正的改动淹掉)。
 
 **pnpm 版本必须是 9.14.4。** `package.json` 的 `packageManager` 字段已固定。用更高版本(如 `npx pnpm` 拉到的最新版)执行安装或构建时,pnpm 10+ 不再读取 `pnpm.overrides`,会把 `pnpm-lock.yaml` 的 `overrides` 块整个删掉 —— 那是 `0273e52` 针对 CVE-2026-54466 的三个 pin(`fast-xml-parser`、`shell-quote`、`websocket-driver`)。CI 里的 `git diff --exit-code pnpm-lock.yaml` 会当场抓到这种情况。
 
@@ -339,9 +393,11 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 ---
 
-# 附录:实机验证清单(三项)
+# 附录:实机验证清单(两项)
 
-三项都需要**未打包扩展 + 真实 YouTube 页面**。dev server 里的浏览器加载不了扩展,`YouTubeCaptionProvider.test.js` 又把 XHR 拦截整个 mock 了,所以仓库内无法证明。建议一次做完 —— 前置条件相同。
+两项都需要**未打包扩展 + 真实 YouTube 页面**。dev server 里的浏览器加载不了扩展,`YouTubeCaptionProvider.test.js` 又把 XHR 拦截整个 mock 了,所以仓库内无法证明。建议一次做完 —— 前置条件相同。
+
+原第 3 项已改由测试覆盖,不必手工做,步骤保留在下面仅供参考。
 
 ## 前置(做一次)
 
@@ -372,7 +428,13 @@ Chrome → `chrome://extensions` → 开发者模式 → 「加载已解压的�
 
 **等效路径:** 悬停单词时直接 SPA 导航到另一个视频
 
-## 3. SPA 反复导航下样式不再累积 — `ffcfbb1`
+## ~~3. SPA 反复导航下样式不再累积~~ — 已由测试覆盖
+
+> `translator.test.js` 的「repeated SPA restarts do not accumulate adopted stylesheets」
+> 连跑 4 轮「注入 → stop」,`document` 与 shadow root 的 `adoptedStyleSheets` 每轮都回到 0;
+> 把 `stop()` 里的 `#removeTextStyles()` 去掉,这条测试立刻变红、且只有它红。
+> 触发链也查证过:SPA 导航走 `TranslatorManager.restart()` → `#destroyRuntimeModules()`
+> → `translator.stop()` → `#removeTextStyles()`。下面的手工步骤留作参考。
 
 **步骤:** 在 YouTube 内**点击链接**在视频间反复跳转(别刷新,刷新会重置一切),10 次以上。每隔几次在 Console 跑:
 
@@ -400,7 +462,13 @@ Chrome → `chrome://extensions` → 开发者模式 → 「加载已解压的�
 
 - **第 1 项点 × 仍无反应** —— Console 看 `document.querySelector(".kiss-word-tooltip-close").outerHTML`。带 `onclick` 说明加载的是旧构建;不带但点击无效,说明委托监听没挂上,查 `showWordTooltip` 里那个 `addEventListener("click", ...)`
 - **第 2 项视频仍卡暂停** —— 触发路径和记录的不一致。观察改设置时是否真的走到 `#destroyManager()`;若走别的路径,那条路径也要补 `#resumeVideoPausedForHover()`
-- **第 3 项 `sheets` 仍在涨** —— `ffcfbb1` 的修复没生效。它从来没被实机验证过,`#removeTextStyles()` 只有一个调用点(`translator.js:4057`,在整体拆除流程里),要确认 SPA 导航是否真的走到那个流程
+
+> 曾经试过给这条触发路径补自动化测试(断言改 `segSlug` 会让 manager 被 destroy),
+> **没做成,已回退**:provider 的异步处理链本身就会反复销毁重建 manager,
+> 断言在「把 `segSlug` 的路由整个改掉」之后照样通过 —— 是条空跑的测试。
+> 要补的话得先给 provider 一个可控的静止点,别再照原样试一遍。
+
+(原第 3 项已由测试覆盖,不在此列。)
 
 ## iOS 的 `@grant` 已排除,无需验证
 

@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useSetting } from "./Setting";
 import { I18N, URL_RAW_PREFIX } from "../config";
 import { useGet } from "./Fetch";
@@ -13,9 +14,15 @@ export const getI18n = (uiLang, key, defaultText = "") => {
   return I18N?.[key]?.[uiLang] ?? defaultText;
 };
 
-// 预柯里化语言参数，返回一个只需传入 key 的获取翻译函数
+// 预柯里化语言参数，返回一个只需传入 key 的获取翻译函数。
+// 必须走 useCallback：i18n 出现在 Menus / Apis / Layout / Confirm / CustomStyles
+// 等十几处 useMemo、useCallback 的依赖数组里，每次渲染换一个函数身份会让那些
+// 缓存全部失效，等于没写。uiLang 不变时身份必须稳定。
 export const useLangMap = (uiLang) => {
-  return (key, defaultText = "") => getI18n(uiLang, key, defaultText);
+  return useCallback(
+    (key, defaultText = "") => getI18n(uiLang, key, defaultText),
+    [uiLang]
+  );
 };
 
 /**

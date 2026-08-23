@@ -242,9 +242,14 @@ export class WordTooltipController {
       this.tooltipEl.remove();
     }
 
-    this.tooltipEl = document.createElement("div");
-    this.tooltipEl.className = "kiss-word-tooltip";
-    this.tooltipEl.innerHTML = trustedTypesHelper.createHTML(
+    // 本次查词创建的气泡必须用局部变量持有。await 期间用户可能已经移到别的词上，
+    // 那时 this.tooltipEl 指向的是新词的气泡 —— 慢响应若直接写 this.tooltipEl，
+    // 会把上一个词的标题、释义和收藏按钮整个画进当前这个词的气泡里。
+    // 所以下面每一处 DOM 写入之前都要先比对身份。
+    const tooltipEl = document.createElement("div");
+    this.tooltipEl = tooltipEl;
+    tooltipEl.className = "kiss-word-tooltip";
+    tooltipEl.innerHTML = trustedTypesHelper.createHTML(
       '<div class="kiss-word-loading">Looking up...</div>'
     );
 
@@ -252,7 +257,7 @@ export class WordTooltipController {
     // trustedTypesHelper.createHTML，而它的两条分支都是无配置的
     // DOMPurify.sanitize，会把 on* 属性一律剥掉。监听器挂在 tooltip 元素
     // 自身，随元素一起销毁，无需手动解绑。
-    this.tooltipEl.addEventListener("click", (event) => {
+    tooltipEl.addEventListener("click", (event) => {
       if (event.target?.closest?.(".kiss-word-tooltip-close")) {
         this.hideWordTooltip();
       }
@@ -268,20 +273,22 @@ export class WordTooltipController {
       const top = containerRect.top + 20;
 
       const maxLeft = window.innerWidth - tooltipWidth - 10;
-      this.tooltipEl.style.left = Math.min(maxLeft, Math.max(10, left)) + "px";
-      this.tooltipEl.style.top = Math.max(10, top) + "px";
-      this.tooltipEl.style.maxWidth = tooltipWidth + "px";
-      this.tooltipEl.style.maxHeight = tooltipHeight + "px";
-      this.tooltipEl.style.overflow = "auto";
+      tooltipEl.style.left = Math.min(maxLeft, Math.max(10, left)) + "px";
+      tooltipEl.style.top = Math.max(10, top) + "px";
+      tooltipEl.style.maxWidth = tooltipWidth + "px";
+      tooltipEl.style.maxHeight = tooltipHeight + "px";
+      tooltipEl.style.overflow = "auto";
     }
 
-    document.body.appendChild(this.tooltipEl);
+    document.body.appendChild(tooltipEl);
 
     try {
       const dictResult = await apiMicrosoftDict(word);
       const { phonetic, definition, examples } =
         this.#extractDictionaryData(dictResult);
 
+      // 落生词表与气泡是否还在无关：用户确实查了这个词，晚到的结果也该收录。
+      // 因此身份守卫只挡 DOM 写入，不挡这里。
       this.#dispatchAddWord({
         word,
         phonetic,
@@ -292,8 +299,15 @@ export class WordTooltipController {
       const wordData = { timestamp, phonetic, definition, examples };
       const hasDictionaryResult = hasDictionaryPayload(dictResult);
       if (this.autoFavWord && hasDictionaryResult) {
-        await saveFavoriteWordIfMissing(word, wordData);
+        // 收藏写存储失败不该掉进外层 catch —— 那会把一次成功的查词
+        // 显示成 "Failed to load definition"。
+        try {
+          await saveFavoriteWordIfMissing(word, wordData);
+        } catch (error) {
+          logger.info("Failed to save favorite subtitle word:", word, error);
+        }
       }
+      if (this.tooltipEl !== tooltipEl) return;
       this.#renderDictionaryResult(word, dictResult, wordData);
     } catch (error) {
       logger.info("Dictionary lookup failed for word:", word, error);
@@ -305,15 +319,14 @@ export class WordTooltipController {
         timestamp,
       });
 
-      if (this.tooltipEl) {
-        this.tooltipEl.innerHTML =
-          trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
+      if (this.tooltipEl !== tooltipEl) return;
+      this.tooltipEl.innerHTML =
+        trustedTypesHelper.createHTML(`<div class="kiss-word-tooltip-header">
         <span>${word}</span>
         <button type="button" class="kiss-word-tooltip-close">×</button>
       </div>
       <div class="kiss-word-definition">Failed to load definition</div>`);
-        this.#addFavoriteButton(word, { timestamp });
-      }
+      this.#addFavoriteButton(word, { timestamp });
     }
   }
 

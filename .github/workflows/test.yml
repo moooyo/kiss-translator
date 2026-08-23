@@ -15,7 +15,7 @@ jobs:
       # 不再读 package.json 的 pnpm.overrides，会把 pnpm-lock.yaml 里的
       # overrides 块整个删掉，那是针对 CVE-2026-54466 的三个 pin
       # (fast-xml-parser / shell-quote / websocket-driver)。
-      # release.yml 目前把 9.14.4 硬编码在自己文件里，升级时两处都要动。
+      # release.yml 自 957742b8 起也走同一条路径，版本只有 packageManager 一处来源。
       - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v4

@@ -1,6 +1,6 @@
 # UI 迁移进度 Handoff
 
-**最后更新:** 2026-08-23 · `dev-newui` @ `957742b8`
+**最后更新:** 2026-08-24 · `dev-newui`
 
 把 `newui` 这个单体分支上的 UI 重构,切成可评审的小块逐步合进 `dev-newui` 的进度记录。
 
@@ -8,36 +8,38 @@
 
 ## 现在卡在哪
 
-**代码侧已经到头了。剩下的只有三项实机验证** —— 需要装未打包扩展 + 真实 YouTube 页面,
-仓库内无法证明。步骤、期望、以及「没过说明什么」都在文末附录,构建产物在 `build/chrome`。
+**剩下三项实机验证** —— 需要装未打包扩展 + 真实 YouTube 页面,仓库内无法证明。
+步骤、期望、以及「没过说明什么」都在文末附录,构建产物在 `build/chrome`。
 
-全量 **1009 通过 / 0 失败**,CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
+全量 **1031 通过 / 0 失败**(112 → 114 suite),CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
 lockfile 校验 + manifest 产物校验)。
 
-唯一还开着的技术项是**跨 realm 设置写入竞态**(见「待办 4」),但那不是阻塞项 ——
-建议先跑一版看收窄后的窗口是否还会出问题,而不是现在就为它引入 MV3 依赖。
+还开着的技术项:**跨 realm 设置写入竞态**(「待办 4」)、**AI 词典的存量值校验**(「待办 6」)、
+**发布 target 清单双写**(「待办 7」)。三项都不阻塞发版。
 
 ## 分支约定
 
 | 分支 | 用途 |
 |---|---|
 | `dev` | `fishjar/kiss-translator:dev` 的**纯镜像**,不要直接提交 |
-| `dev-newui` | 新 UI 主线。所有新 UI 工作从这里切、合回这里 |
-| `newui` | 原始单体分支,包含完整重构。停更于 2026-08-09,**落后大量上游特性** |
-| `beta` | `newui` 的祖先(7/20 旧快照),无独有内容,**可忽略** |
-| `backup/dev-before-sync-*` | 同步前的安全快照,内容已含于 `newui`/`beta` |
+| `dev-newui` | **我们自己的发布分支**。所有新 UI 工作从这里切、合回这里。**永远不要合进 `dev`** |
+| `newui` | 原始单体分支,包含完整重构。停更于 2026-08-09,**落后大量上游特性**。仍是 M3 移植的唯一参照物,**不要删** |
+| `gh-pages` | 网站产物 |
 | `archive/atomic-setting-patch`(**标签**) | 已归档的三 commit 栈。本文档多处按 SHA 引用它,**不要删这个标签** |
+| `archive/live-settings-combined`(**标签**) | 已归档的 `8414d5f5`(原 `backup/live-settings-combined-20260723`)。内容已全部有归宿,见「已否决」 |
 
-所有 `agent/*` 分支及其 worktree 已于 2026-08-23 清理(本地 + origin)。删除前逐个确认过可达性:
-三个 atomic-setting-patch 栈分支包含在归档标签里,`settings-new-ui` / `popup-m3-redesign` /
-`storage-subscriptions-v2` 的 tip 已是 `dev-newui` 的祖先 —— 没有 commit 被孤儿化。
-
-> Windows 路径长度限制导致两个 worktree 目录未能删净(`splits/editor-draft-protection`、
-> `kiss-translator-popup-m3-review`)。git 侧注册已移除,磁盘上是纯残留,可手工删。
-
-`dev-newui` 与 `upstream/dev` 齐平,无待同步的上游工作。
+**`dev-newui` 不走上游。** 它是这个 fork 自己的发布分支 —— `.github/workflows/release.yml` 由 `v*` 标签触发,
+产出 5 个渠道的 zip。上游 PR #1004 / #1013 已于 2026-08-22 由作者本人关闭,当前没有任何在途的上游 PR。
+`dev-newui` 与 `upstream/dev` 齐平(领先 61,落后 0),无待同步的上游工作。
 
 `archive/atomic-setting-patch` 里三个 commit 的归宿:`cdf403a` **否决**、`b47873c` **已合入 `a6bf0b1`**、`94fcf96` **核心已重写为 `storage.patchObj`**。前两者与后者的详情见「已否决(备查)」。
+
+2026-08-24 的清理:已删远程 `beta`、`backup/dev-before-sync-20260809-4fe89cf`、`fix/runtime-style-leak-dev`
+(三者均验证过「0 个独有 commit」;删第三个连带关闭了 fork PR #5,其内容早已以 `ffcfbb1` 合入)。
+本地 `backup/live-settings-combined-20260723` 归档成标签后删除。
+`kiss-translator-splits/` 与 `kiss-translator-popup-m3-review/` 6 个残留目录全部清空 ——
+删前逐文件比对过,660 个文件的内容**全部已存在于仓库对象库**,没有丢东西。fork 上仅剩
+`dev` / `dev-newui` / `gh-pages` / `newui` 四个分支。
 
 > **`gh` 默认指向上游。** 在这个 checkout 里 `gh` 解析到 `fishjar/kiss-translator` 而不是你的 fork。查自己的 CI 运行记录必须显式带 `-R moooyo/kiss-translator`,否则看到的是上游的历史,会误判成「Actions 没触发」。按 AGENTS.md 上游是只读的。
 
@@ -95,6 +97,42 @@ lockfile 校验 + manifest 产物校验)。
 - pnpm 版本收敛到 `packageManager` 单一来源,两个 workflow 都不再写死
 - `.pnpm-version` 保留(可能有外部工具读),但加了测试与 `packageManager` 钉死,漂移会变红
 
+### 6. AI 词典的存量值校验 —— 值得做,不阻塞
+
+`newui` 的 `Selection/dictionaryCapabilities.js` **不是纯重构**。`dev-newui` 在
+`TranForm.js:217-245` 有等价的内联逻辑,但少了 4 道校验:
+
+| 校验 | newui | dev-newui 内联 |
+|---|---|---|
+| API 必须启用 | `!api.isDisabled` | 只按 `apiSlug` 找 |
+| API 必须是 AI 类型 | `API_SPE_TYPES.ai.has(apiType)` | 不查 |
+| 提示词必须是词典分类 | `category === PROMPT_CATEGORY_DICTIONARY` | 只查 `!prompt` |
+| 提示词不能是空白串 | `trim()` 非空 | 纯 truthy,`"   "` 算有 |
+
+**可达性:存量值失效。** 设置页选择器(`Options/Tranbox.js` 的 `aiEnabledApis` /
+`dictionaryPromptOptions`)在**选的时候**已经过滤了,所以这 4 道只在用户先选好、
+之后再把那个接口停用 / 改成非 AI 类型 / 把提示词改分类时才生效。届时 `dev-newui`
+仍会拿它当 AI 词典用,把词典提示词发给一个非 AI 端点。
+
+**另一半 `normalizeDictionaryTab` 不是缺口** —— `TranForm.js:302` 的
+`value={defaultDictAvailable ? dictTab : "ai"}` 加 useEffect 已覆盖同样的降级,
+`TranForm.js:297` 有 `(defaultDictAvailable || aiDictAvailable)` 总闸,`AiDictCont`
+自己也挡了 null。**该取的是那 4 道校验,不是整个文件。**
+
+### 7. 发布 target 清单是双写的
+
+`archive.mjs` 的 `tasks[]` 产出 5 个**不带版本号**的 zip(`chrome.zip`…),
+`release.yml` 的 `matrix.client` 又**另外列了一遍**同样 5 个,上传时才拼成
+`kiss-translator_<tag>_<client>.zip`。两份清单必须一致,但没有任何东西保证:
+
+- 只加进 `archive.mjs` → zip 造出来了却不上传,**发布里静默少一个包**
+- 只加进 `release.yml` → `asset_path` 找不到,当场报错(这个反而安全)
+
+`newui` 的 `release-archives.mjs` 价值就在于把 target 收成一处 frozen 常量 ——
+和 `957742b8` 把 pnpm 版本收敛到 `packageManager` 是同一招。**但不能照搬**:
+它内部写死 `kiss-translator_v${version}_${target}.zip`,而 `dev-newui` 磁盘上根本
+不是这个名字(版本号是 release workflow 拼的)。该取的是「单一来源的 target 列表」。
+
 ## 已完成
 
 | 内容 | commit | 说明 |
@@ -117,8 +155,44 @@ lockfile 校验 + manifest 产物校验)。
 | CI 校验 manifest 产物 | `016971c5` | `manifest-artifacts.mjs` + `verify-manifest.mjs`,已在 CI 实跑 |
 | 字幕轨恢复 | `870b7d72` / `cca901af` / `a12f05ab` | 拦截器晚装时不再永远无字幕;按 YouTube 默认轨元数据选轨,拿不准就不猜 |
 | 云同步串行化 + pnpm 单一来源 | `957742b8` | 修掉「丢 syncAt → 远端永远获胜」;`.pnpm-version` 与 `packageManager` 用测试钉死 |
+| 划词翻译框 Material 3 + header 重建 | 本次 | `Selection/styles.js` 新增;header 换成 56px + 拖拽手柄 + 溢出菜单。**已在 dev server 浏览器验收(明暗两套)** |
+| 悬浮球 Material 3 + 动作菜单 | 本次 | `Action/styles.js` 新增;58px squircle,点击展开 5 项 Popper 菜单。**已在 dev server 浏览器验收(明暗两套)** |
+| 拖拽 cancel 兜底 + header 控件护栏 | 本次 | 两个 Draggable 都补了 `pointercancel`/`touchcancel`;详见「拖拽的两条护栏」 |
 
-> 上述两个 UI PR 的 base 仍指向上游 `fishjar:dev`,在 GitHub 上依旧 open 且显示冲突 —— 本地合并不会自动关闭它们。
+> 上述两个 UI PR(#1004 / #1013)的 base 曾指向上游 `fishjar:dev`,**已于 2026-08-22 由作者本人关闭**,
+> 内容早已以 `5ffbe66` / `a96fdf8` 合入 `dev-newui`。当前没有任何在途的上游 PR。
+
+### 划词框 / 悬浮球 M3 的移植边界
+
+参照物只有 `newui` 一个分支(已删的 `beta` 是它的祖先,`upstream/feat/tones-setting` 动 Selection
+是加「翻译风格」功能、与 M3 无关)。两个 `styles.js` 用到的 M3 变量和 `kt-m3-pop` / `kt-m3-rise`
+关键帧 `dev-newui` 本来就有,CSS 基本直接可用。
+
+**刻意没取的部分:**
+
+- **`newui` header 上的「翻译/词典」分栏 Tabs** —— 它依赖 `dictionaryCapabilities` 和 `activeView`,
+  要连带改 `TranForm`,而 `TranForm` / `TranCont` 是划词面板与 Popup **共用**的。原来 Logo + 版本号
+  占的位置保留下来了
+- **`newui` 把 `hideClickAway` 画成图钉** —— `dev-newui` 一直是「锁 = 点击外部不消失」「图钉 = 跟随选区」,
+  改图标会让老用户对不上。保留原语义
+- **`openSeparateWindow` 打开后顺手 `setShowBox(false)`** —— `newui` 这么做了,`dev-newui` 没有。
+  那是行为变更不是换皮,连同原 REVIEW 注释一起留着
+
+**6 个 header 控件一个没少**,只是重新分了层:常驻区放「锁定 / 更多 / 关闭」,
+其余四个(独立窗口 / 极简模式 / 跟随选区 / 深色模式)收进溢出菜单,`TranBox.test.js` 逐个钉住了。
+
+### 拖拽的两条护栏
+
+- **`pointercancel` / `touchcancel` 必须绑到 `handlePointerUp`**(两个 Draggable 都是)。
+  规范上 cancel 之后浏览器**不会再补发 `pointerup` / `touchend`**,而清空 `origin` 的唯一出口就在
+  `handlePointerUp` 里。少了它,一次被系统手势(触屏滚动、缩放)打断的拖拽会让 `origin` 永久残留,
+  之后指针只要掠过触发区就继续拖动 —— **没有按下任何键**
+- **`Selection/DraggableResizable` 的「按在 button 上不起拖」护栏不能照抄到 `Action/Draggable`。**
+  前者的触发区是 header 那个 div、按钮是它的子节点,加护栏正确;后者的触发区**本身就是那个
+  `<button>`(悬浮球)**,加了护栏整个球就拖不动了。动作菜单挂在 `children` 上,那一侧没绑指针监听
+- **`Draggable` 的 `fitContent` / `expanded` 两个新 prop 都是为悬浮球菜单加的**:
+  容器带 `willChange: transform`,是内部 fixed 子节点的包含块,58px 固定宽度会把菜单裁掉(`fitContent`);
+  贴边时容器只有 0.2 不透明度,菜单挂在同一个容器里会跟着变透明,而这时指针并不在球上(`expanded`)
 
 ## 改这些地方前必须知道的约束
 
@@ -140,7 +214,7 @@ lockfile 校验 + manifest 产物校验)。
 
 它停更于 2026-08-09,直接合会回退这些上游特性:QwenMT、Yandex、Google Cloud Translation、剪贴板自动翻译(#1024)、悬停气泡独立翻译服务(#1015)、生词本词典提示(#1014)、语言变体翻译(#1017)、英文词典提示词预设(#1022)、CVE-2026-54466 修复(#1001)。
 
-**耦合警告:** `TranForm.js` / `TranCont.js` 是划词面板与 Popup **共用**的,`dev-newui` 上刚被 #1013 改过并带有上游特性,不能直接取 `newui` 版本。悬浮球 `ContentFab.js` 耦合最小,自分叉后未被改动过。
+**耦合警告:** `TranForm.js` / `TranCont.js` 是划词面板与 Popup **共用**的,`dev-newui` 上刚被 #1013 改过并带有上游特性,不能直接取 `newui` 版本。悬浮球 `ContentFab.js` 已按 `newui` 的设计重写(M3 + 动作菜单),见「划词框 / 悬浮球 M3 的移植边界」。
 
 ## 已知坑
 
@@ -226,7 +300,12 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 脚本本身在 `dev-newui` 上跑不起来:引用 4 个 `pnpm build` 从不产出的 safari 路径,
 `--release` 那半边编码了 newui 自己的归档命名与目录约定,而 CI 只构建 7 个 target 中的 2 个。
-其中唯一有价值且无对应物的是 `manifest-artifacts.mjs`,已单独提取(`016971c5`)。
+其中 `manifest-artifacts.mjs` 已单独提取(`016971c5`)。
+
+> **本文档此前说「唯一有价值且无对应物的是 `manifest-artifacts.mjs`」,那句话不准。**
+> 同一批里的 `release-archives.mjs` 也无对应物 —— 但它的价值不在文件本身而在「单一来源的
+> target 列表」,直接照搬反而会错。详见「待办 7」。
+> (另一个 `userscript-metadata.mjs` 确实已有对应物:`src/scripts/userscriptGrants.test.js`。)
 
 ### `src/subtitle/Menus.js` 整体取
 
@@ -254,7 +333,7 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 - **`apis/index.js` 批量并发兜底值** `1` → `DEFAULT_BATCH_CONCURRENCY`:默认值本来就是 10,兜底只在值非法时触发,`1` 是更安全的落点
 - **`subtitleIndexAlign.js`** —— 纯提取变量,零行为变化
 - **`MSG_TRANS_TOGGLE` 支持 `args.enabled`** —— `dev-newui` 已从上游获得
-- **划词面板不是新功能** —— `src/views/Selection/` 最早的 commit 是 2023-10-26,上游 `TranBox.js` 501 行、`newui` 394 行,是**重写+精简**。真正的新增只有「翻译/词典」分栏、`dictionaryCapabilities.js`,以及两个修复
+- **划词面板不是新功能** —— `src/views/Selection/` 最早的 commit 是 2023-10-26,上游 `TranBox.js` 501 行、`newui` 394 行,是**重写+精简**。真正的新增只有「翻译/词典」分栏(**未取**,理由见「移植边界」)、`dictionaryCapabilities.js`(**部分取**,见「待办 6」),以及两个修复:`DraggableResizable` 的 cancel 兜底(**已取**)和 `Action/index.js` 的 `width={360}` 硬编码(**不需要** —— `dev-newui` 的那个 Box 已经不写死宽度,由 `popProps` 传)
 - **预览面板没有丢弃 kebab-case 属性** —— 本文档一度这么记载,是从 `Warning: Unsupported style property` 反推的,**方向反了**。浏览器实测这些属性全在且实际渲染。React 对连字符写法只是开发模式告警,照样应用
 - **iOS 的 `@grant` 安装问题** —— 已排除,理由见附录末尾
 

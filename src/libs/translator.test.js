@@ -1773,6 +1773,72 @@ describe("Translator rule styles", () => {
     expect(shadowRoot.querySelectorAll("style")).toHaveLength(1);
   });
 
+  // SPA 导航走的是 TranslatorManager.restart() -> #destroyRuntimeModules()
+  // -> translator.stop() -> #removeTextStyles()。这条链此前从未被验证过，
+  // 而它断掉的表现是：每次 SPA 重启往 shadow root 再叠一张样式表，
+  // 页面不报错、功能照常，只有 adoptedStyleSheets 一路涨到卡顿。
+  test("repeated SPA restarts do not accumulate adopted stylesheets", async () => {
+    // jsdom 的 document 上没有 adoptedStyleSheets，而 #injectSheet(document)
+    // 先于 shadow root 执行 —— 属性缺失会把整个实例翻到 <style> 回退路径上，
+    // 这条测试就测不到要测的东西了。所以两边都得补上。
+    const originalDocumentSheets = Object.getOwnPropertyDescriptor(
+      document,
+      "adoptedStyleSheets"
+    );
+    Object.defineProperty(document, "adoptedStyleSheets", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+
+    document.body.innerHTML =
+      '<main id="root"><section id="host">Content</section></main>';
+    const host = document.getElementById("host");
+    const shadowRoot = host.attachShadow({ mode: "open" });
+    Object.defineProperty(shadowRoot, "adoptedStyleSheets", {
+      configurable: true,
+      writable: true,
+      value: [],
+    });
+    shadowRoot.innerHTML = "<p>Shadow content</p>";
+
+    try {
+      const counts = [];
+      for (let i = 0; i < 4; i += 1) {
+        const translator = createTranslator({ scanAll: "true" });
+        await flushAsync();
+        counts.push({
+          doc: document.adoptedStyleSheets.length,
+          shadow: shadowRoot.adoptedStyleSheets.length,
+        });
+
+        // 等价于一次 SPA 导航：manager 快照状态后销毁运行期子模块，
+        // 其中就包含 translator.stop()。
+        translator.stop();
+        expect(document.adoptedStyleSheets).toHaveLength(0);
+        expect(shadowRoot.adoptedStyleSheets).toHaveLength(0);
+      }
+
+      // 每一轮都必须回到同一个数量，而不是 1、2、3、4 一路累加。
+      expect(counts).toEqual([
+        { doc: 1, shadow: 1 },
+        { doc: 1, shadow: 1 },
+        { doc: 1, shadow: 1 },
+        { doc: 1, shadow: 1 },
+      ]);
+    } finally {
+      if (originalDocumentSheets) {
+        Object.defineProperty(
+          document,
+          "adoptedStyleSheets",
+          originalDocumentSheets
+        );
+      } else {
+        delete document.adoptedStyleSheets;
+      }
+    }
+  });
+
   test("falls back to inline <style> when adoptedStyleSheets setter throws", async () => {
     document.body.innerHTML =
       '<main id="root"><section id="host">Content</section></main>';

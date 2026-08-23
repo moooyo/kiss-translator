@@ -29,6 +29,7 @@ import { kissLog } from "./log";
 import { debounce } from "./utils";
 import { getGmMethod } from "./gm";
 import { mergeSettingPatch } from "./settingPatch";
+import { bumpRevisions, collectPatchPaths } from "./fieldRevisions";
 
 const localStorageListeners = new Map();
 
@@ -285,9 +286,49 @@ async function putObj(key, obj) {
 // 按键串行化补丁写入。读-改-写本身不是原子的，两次并发的 patchObj
 // 会各自读到补丁应用前的值，后写的那次抹掉先写的那次 —— 正是它要修的问题。
 // 同一 realm 内（内容脚本里 fab / contentPopup / tranbox 三个 provider 同处一页）
-// 这条链把交错完全消除；跨 realm（选项页 vs 弹窗 vs 各标签页）仍有窗口，
-// 但从「该上下文上次加载至今」缩短为一次存储往返。
+// 这条链把交错完全消除；跨 realm（选项页 vs 弹窗 vs 各标签页）拦不住，
+// 那一半由逐字段版本戳事后识别并重放，见 fieldRevisions.js。
 const patchQueues = new Map();
+
+// 本 realm 的标识。只用来给版本戳做平手判定 —— 两个 realm 各自把 counter 从 3
+// 推到 4 时，光比 counter 谁也看不出对方覆盖了自己。
+const REALM_ID = `${Date.now().toString(36)}-${Math.random()
+  .toString(36)
+  .slice(2, 8)}`;
+
+/**
+ * 版本戳存放在**旁挂键**里，不进设置对象本身。
+ *
+ * 设置对象会被 getSettingWithDefault 到处读、还会整份上云同步，往里塞
+ * 内部字段要牵动迁移、同步和每一个消费方。旁挂的代价是值和戳不是一次写入，
+ * 顺序因此是有讲究的 —— 见 patchObj 里的说明。
+ *
+ * @param {string} key 数据键名
+ * @returns {string} 对应的版本戳键名
+ */
+function revisionsKey(key) {
+  return `${key}__kissFieldRevisions`;
+}
+
+/**
+ * 读取某个键当前的逐字段版本戳。
+ *
+ * @param {string} key 数据键名
+ * @returns {Promise<Object>} 戳表，没有时返回空对象
+ */
+async function getFieldRevisions(key) {
+  return (await getObj(revisionsKey(key))) ?? {};
+}
+
+/**
+ * 删除某个键的版本戳旁挂表。数据键被整体删除时一并清掉，
+ * 免得留下一份指向已不存在数据的孤儿戳表。
+ *
+ * @param {string} key 数据键名
+ */
+async function clearFieldRevisions(key) {
+  await del(revisionsKey(key));
+}
 
 /**
  * 把补丁合并进已存储的对象，而不是覆盖整份快照。
@@ -298,16 +339,31 @@ const patchQueues = new Map();
  * @param {string} key 键名
  * @param {Object} patch createSettingPatch 产出的补丁
  * @param {Object} [options]
- * @param {Function} [options.onWillWrite] 在实际落盘**之前**同步收到合并结果。
- *   订阅回声是在 setObj 内部发出的，等 patchObj 的 promise resolve 再登记自写载荷
- *   就可能已经晚了，所以留这个同步时机给调用方。
+ * @param {Function} [options.onWillWrite] 在实际落盘**之前**同步收到合并结果
+ *   与本次写入的版本戳表。订阅回声是在 setObj 内部发出的，等 patchObj 的 promise
+ *   resolve 再登记自写载荷就可能已经晚了，所以留这个同步时机给调用方。
  * @returns {Promise<Object>} 合并后实际落盘的值
  */
 async function patchObj(key, patch, { onWillWrite } = {}) {
   const run = async () => {
     const cur = (await getObj(key)) ?? {};
     const next = mergeSettingPatch(cur, patch);
-    onWillWrite?.(next);
+
+    const paths = collectPatchPaths(patch);
+    const revisions = bumpRevisions(
+      await getFieldRevisions(key),
+      paths,
+      REALM_ID
+    );
+
+    onWillWrite?.(next, revisions);
+    // 先戳后值。值的写入会触发订阅回声，别的 realm 收到回声时就会去读戳 ——
+    // 反过来写的话，那一刻戳还没落盘，对方读到的是旧戳、判定「我的写入还在」，
+    // 于是漏掉一次本该做的重放；而戳键本身没有订阅者，它不会再唤醒任何人。
+    //
+    // 中途失败(戳落了值没落)是良性的:对方看到自己的戳被推高，那不算回退，
+    // 不会重放 —— 退化成今天的行为，而不是错误地回滚别人的修改。
+    await setObj(revisionsKey(key), revisions);
     await setObj(key, next);
     return next;
   };
@@ -339,6 +395,8 @@ export const storage = {
   getObj,
   putObj,
   patchObj,
+  getFieldRevisions,
+  clearFieldRevisions,
   subscribe,
   subscribeObj,
 };

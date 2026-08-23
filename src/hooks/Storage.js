@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { storage } from "../libs/storage";
 import { createSettingPatch } from "../libs/settingPatch";
+import { buildReplayPatch, findRegressedPaths } from "../libs/fieldRevisions";
 import { kissLog } from "../libs/log";
 import { syncData } from "../libs/sync";
 import { useDebouncedCallback } from "./DebouncedCallback";
@@ -90,6 +91,11 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
   const selfWrittenPayloadsRef = useRef([]);
   // 本上下文已知的落盘值。写入时据它算出补丁，只写自己真正改过的字段。
   const persistedValueRef = useRef(undefined);
+  // 本上下文上次写入时的逐字段版本戳，以及那次写入的完整值。
+  // 跨 realm 的覆盖只能事后识别：别人拿过期快照写回来时，会把我推高过的戳
+  // 一起抹掉，于是「存储里的戳比我写进去的还旧」就成了可靠信号。
+  const writtenRevisionsRef = useRef({});
+  const writtenValueRef = useRef(undefined);
 
   // Subscribe before reading so a late initial read cannot overwrite a newer
   // value delivered by the storage change channel.
@@ -100,6 +106,38 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     skipRemoteSyncValueRef.current = undefined;
     selfWrittenPayloadsRef.current = [];
     persistedValueRef.current = undefined;
+    writtenRevisionsRef.current = {};
+    writtenValueRef.current = undefined;
+
+    // 跨 realm 覆盖的事后修复。别人用过期快照写回来时会连同我推高过的版本戳
+    // 一起抹掉，所以「存储里某个字段的戳比我写进去的还旧」只可能是被覆盖了 ——
+    // 真正的后续修改一定会把戳推得更高，那种情况不能回滚。
+    const repairClobberedFields = async () => {
+      const written = writtenRevisionsRef.current;
+      if (!written || Object.keys(written).length === 0) return;
+
+      try {
+        const stored = await storage.getFieldRevisions?.(key);
+        const regressed = findRegressedPaths(stored, written);
+        if (regressed.length === 0) return;
+
+        const replay = buildReplayPatch(writtenValueRef.current, regressed);
+        if (replay === undefined) return;
+
+        // 重放本身也是一次 patchObj，会把戳推到更高，对方看到的是「更新」
+        // 而不是「回退」，因此不会反过来再修一次 —— 一轮即收敛。
+        await storage.patchObj(key, replay, {
+          onWillWrite: (merged, revisions) => {
+            persistedValueRef.current = merged;
+            writtenValueRef.current = merged;
+            writtenRevisionsRef.current = revisions;
+            rememberSelfWrite(selfWrittenPayloadsRef.current, merged);
+          },
+        });
+      } catch (error) {
+        kissLog(`storage repair error for key: ${key}`, error);
+      }
+    };
 
     const unsubscribe = storage.subscribeObj?.(key, (storedValue) => {
       if (!isMounted) return;
@@ -115,6 +153,10 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
       if (claimSelfWrite(selfWrittenPayloadsRef.current, nextValue)) {
         return;
       }
+
+      // 到这里说明是别的 realm 写的。它有可能是拿过期快照写的，
+      // 顺手把我刚落盘的字段抹回了旧值 —— 查一下版本戳，是的话重放。
+      repairClobberedFields();
 
       persistedValueRef.current = nextValue;
       setData((currentValue) => {
@@ -204,10 +246,14 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     if (patch !== undefined) {
       storage
         .patchObj(key, patch, {
-          onWillWrite: (merged) => {
+          onWillWrite: (merged, revisions) => {
             // 登记的是**合并结果**而不是 data：别人的字段可能一并落了进来，
             // 回声携带的是合并结果，用 data 去比对会认领不上。
             persistedValueRef.current = merged;
+            // 重放要用「我写进去的那份完整值」取字段，不能用 data ——
+            // 合并可能把别人的字段也带了进来，那些不该由我来重放。
+            writtenValueRef.current = merged;
+            writtenRevisionsRef.current = revisions;
             rememberSelfWrite(selfWrittenPayloadsRef.current, merged);
           },
         })
@@ -272,6 +318,13 @@ export function useStorage(key, defaultVal = null, syncKey = "") {
     skipRemoteSyncValueRef.current = undefined;
     try {
       await storage.del(key);
+      // 整个键都删掉了，就没有「我的字段被谁覆盖了」这回事。
+      // 不清掉这两个 ref，随后任何一次外部写入都会触发一次重放，
+      // 把刚被删除的数据又写回去。
+      writtenRevisionsRef.current = {};
+      writtenValueRef.current = undefined;
+      persistedValueRef.current = undefined;
+      await storage.clearFieldRevisions?.(key);
       externalStorageValueRef.current = undefined;
       skipRemoteSyncValueRef.current = undefined;
       setData(null);

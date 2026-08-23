@@ -14,6 +14,8 @@ jest.mock("../libs/storage", () => ({
     del: jest.fn(() => Promise.resolve()),
     subscribeObj: jest.fn(),
     patchObj: jest.fn(),
+    getFieldRevisions: jest.fn(() => Promise.resolve({})),
+    clearFieldRevisions: jest.fn(() => Promise.resolve()),
   },
 }));
 
@@ -71,8 +73,14 @@ function createHookHost({
 // CRA 的 jest 配置默认 resetMocks: true，会连 jest.fn() 的默认实现一起清掉，
 // 所以实现必须在每个用例里重设 —— 现有的 getObj/setObj 也是这么做的。
 // 这里刻意用真实的 mergeSettingPatch：合并语义本身就是被测行为的一部分。
-function wirePatchObj() {
+let revisionStore = {};
+
+function wirePatchObj(realmId = "realm-local") {
   const { mergeSettingPatch } = jest.requireActual("../libs/settingPatch");
+  const { bumpRevisions, collectPatchPaths } = jest.requireActual(
+    "../libs/fieldRevisions"
+  );
+  storage.getFieldRevisions.mockImplementation(async () => revisionStore);
   // 真实实现按键串行（见 libs/storage.js 与 storage.test.js 的
   // "patchObj serialization"）。mock 必须忠实于同一契约，否则两次并发补丁
   // 会读到同一个初值，测出来的就不是 hook 的行为而是 mock 的缺陷。
@@ -81,7 +89,13 @@ function wirePatchObj() {
     const run = async () => {
       const cur = (await storage.getObj(key)) ?? {};
       const next = mergeSettingPatch(cur, patch);
-      onWillWrite?.(next);
+      const revisions = bumpRevisions(
+        revisionStore,
+        collectPatchPaths(patch),
+        realmId
+      );
+      onWillWrite?.(next, revisions);
+      revisionStore = revisions;
       await storage.setObj(key, next);
       return next;
     };
@@ -173,6 +187,137 @@ describe("useStorage concurrent whole-object writes", () => {
 
     a.unmount();
     b.unmount();
+  });
+});
+
+// 跨 realm 的覆盖:另一个上下文(别的标签页 / 选项页)拿着过期快照写回来,
+// 顺手把我刚落盘的字段抹成了旧值。同 realm 的队列拦不住这一种 —— 只能事后
+// 靠逐字段版本戳识别:别人用旧快照写入时会把我推高过的戳一起抹掉。
+describe("useStorage repairs fields another realm clobbered", () => {
+  let listeners;
+  let store;
+
+  const wireLiveStorage = (initial) => {
+    store = initial;
+    listeners = new Set();
+    revisionStore = {};
+
+    storage.getObj.mockImplementation(async () => store);
+    storage.subscribeObj.mockImplementation((_key, listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    });
+    storage.setObj.mockImplementation(async (_key, value) => {
+      store = value;
+      listeners.forEach((listener) => listener(value));
+    });
+    wirePatchObj("realm-mine");
+  };
+
+  // 另一个 realm 用过期快照写入:它的戳表里没有我刚推高的那一条,
+  // 写回去就把它抹掉了 —— 这正是可靠的判据。
+  const foreignStaleWrite = (value, revisions = {}) => {
+    store = value;
+    revisionStore = revisions;
+    listeners.forEach((listener) => listener(value));
+  };
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.clearAllMocks();
+    globalThis.__KISS_CONTEXT__ = "options";
+    storage.del.mockResolvedValue(undefined);
+    syncData.mockResolvedValue(undefined);
+    isOptions.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    delete globalThis.__KISS_CONTEXT__;
+    jest.useRealTimers();
+  });
+
+  test("replays a field a stale foreign snapshot wrote over", async () => {
+    wireLiveStorage({ alpha: 1, beta: 1 });
+    const host = createHookHost({ key: "shared", syncKey: "" });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    await act(async () => host.hookResult.update({ alpha: 2 }));
+    await flushEffects();
+    expect(store).toEqual({ alpha: 2, beta: 1 });
+
+    // 另一个 realm 拿改 beta 前的快照写回来,alpha 被抹回 1
+    foreignStaleWrite({ alpha: 1, beta: 99 });
+    await flushEffects();
+    await flushEffects();
+
+    expect(store).toEqual({ alpha: 2, beta: 99 });
+
+    host.unmount();
+  });
+
+  // 别人在我之后做了真正的修改,戳会更高。那是正常的后来者获胜,
+  // 回滚它就等于复活用户刚在另一个标签页改掉的设置。
+  test("leaves a genuinely newer foreign write alone", async () => {
+    wireLiveStorage({ alpha: 1 });
+    const host = createHookHost({ key: "shared", syncKey: "" });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    await act(async () => host.hookResult.update({ alpha: 2 }));
+    await flushEffects();
+
+    // 戳比我的更高 = 对方是在看到我的写入之后才改的
+    const alphaPath = JSON.stringify(["alpha"]);
+    foreignStaleWrite({ alpha: 3 }, { [alphaPath]: [99, "realm-other"] });
+    await flushEffects();
+    await flushEffects();
+
+    expect(store).toEqual({ alpha: 3 });
+
+    host.unmount();
+  });
+
+  test("does nothing when this context has never written", async () => {
+    wireLiveStorage({ alpha: 1 });
+    const host = createHookHost({ key: "shared", syncKey: "" });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    foreignStaleWrite({ alpha: 7 });
+    await flushEffects();
+    await flushEffects();
+
+    expect(store).toEqual({ alpha: 7 });
+
+    host.unmount();
+  });
+
+  // 删掉整个键之后就没有「我的字段被谁覆盖了」这回事。不清掉记录的话，
+  // 随后任何一次外部写入都会触发重放，把刚删掉的数据又写回去。
+  test("stops repairing after the key is removed", async () => {
+    wireLiveStorage({ alpha: 1 });
+    const host = createHookHost({ key: "shared", syncKey: "" });
+    host.render();
+    await waitForLoaded(host.hookResult);
+    await flushEffects();
+
+    await act(async () => host.hookResult.update({ alpha: 2 }));
+    await flushEffects();
+
+    await act(async () => host.hookResult.remove());
+    await flushEffects();
+
+    foreignStaleWrite({ beta: 1 });
+    await flushEffects();
+    await flushEffects();
+
+    expect(store).toEqual({ beta: 1 });
+
+    host.unmount();
   });
 });
 

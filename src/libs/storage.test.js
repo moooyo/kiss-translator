@@ -9,6 +9,7 @@ import {
   OPT_TRANS_TENCENT,
 } from "../config";
 import { getSettingWithDefault, runDataMigration, storage } from "./storage";
+import { encodePath, findRegressedPaths } from "./fieldRevisions";
 
 // 存储测试不涉及流式解析，隔离 ESM-only 依赖以免 Jest 27 在加载阶段失败。
 jest.mock("@streamparser/json", () => ({ JSONParser: jest.fn() }));
@@ -46,6 +47,54 @@ describe("patchObj serialization", () => {
     ]);
 
     expect(readStoredJson("race-key")).toEqual({ alpha: 2, beta: 2 });
+  });
+
+  // 跨 realm：另一个上下文的写入落在我们的读和写之间。patchQueues 是模块级的，
+  // 只能串行化本 realm 内的调用，拦不住这一种 —— 存储层没法阻止覆盖发生，
+  // 它只负责留下可靠的痕迹：覆盖方拿的是过期的戳表，写回去会把被覆盖字段的戳
+  // 一起抹掉。真正的重放在 hooks/Storage.js，见那边的
+  // "repairs fields another realm clobbered"。
+  test("a stale foreign write leaves the clobbered field's revision behind", async () => {
+    const beta = encodePath(["beta"]);
+    await storage.setObj("race-key", { alpha: 1, beta: 1 });
+
+    const proto = Object.getPrototypeOf(window.localStorage);
+    const realGetItem = proto.getItem;
+    const realSetItem = proto.setItem;
+    const foreignRevisions = { [beta]: [1, "realm-other"] };
+    let injected = false;
+
+    const spy = jest.spyOn(proto, "getItem").mockImplementation(function (k) {
+      const value = realGetItem.call(this, k);
+      // patchObj 先读值、再读戳。在读戳这一刻注入，模拟「我们两样都读完了，
+      // 对方才落盘」—— 我们手上的戳表因此不含对方刚推高的那一条。
+      if (k === "race-key__kissFieldRevisions" && !injected) {
+        injected = true;
+        realSetItem.call(
+          this,
+          "race-key",
+          JSON.stringify({ alpha: 1, beta: 99 })
+        );
+        realSetItem.call(
+          this,
+          "race-key__kissFieldRevisions",
+          JSON.stringify(foreignRevisions)
+        );
+      }
+      return value;
+    });
+
+    await storage.patchObj("race-key", { alpha: 2 });
+    spy.mockRestore();
+
+    // 覆盖确实发生了：beta 被写回了旧值
+    expect(readStoredJson("race-key")).toEqual({ alpha: 2, beta: 1 });
+
+    // 而痕迹留下了：我们手上的戳表不含 beta，写回去就把对方的戳抹掉了。
+    // 对方比对「存储里的戳 vs 我写进去的戳」就能发现自己被覆盖。
+    const after = await storage.getFieldRevisions("race-key");
+    expect(after[beta]).toBeUndefined();
+    expect(findRegressedPaths(after, foreignRevisions)).toEqual([beta]);
   });
 
   test("a failed patch does not wedge later patches on the same key", async () => {

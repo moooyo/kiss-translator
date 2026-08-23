@@ -1,15 +1,26 @@
-import { browser } from "./browser";
+import { browser, isExtensionContextInvalidatedError } from "./browser";
+
+// 扩展被重载 / 更新 / 卸载后，仍留在页面里的旧上下文调用任何 extension API 都会抛
+// "Extension context invalidated"。这是必然会走到的正常终态，不是异常：
+// 下面几个入口大量以 `isExt && sendBgMsg(...)` 这种即发即忘的形式被调用
+// (translator.js 的 MSG_UPDATE_ICON 就是)，不吞掉的话每次扩展重载都会在
+// 用户页面的控制台里刷一串 unhandled rejection。
 
 /**
  * 获取当前用户正在浏览且聚焦的活跃标签页 (Tab) 信息。
  * @returns {Promise<Object|undefined>} 活跃的标签页对象
  */
 export const getCurTab = async () => {
-  const [tab] = await browser.tabs.query({
-    active: true,
-    lastFocusedWindow: true,
-  });
-  return tab;
+  try {
+    const [tab] = await browser.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    return tab;
+  } catch (err) {
+    if (isExtensionContextInvalidatedError(err)) return undefined;
+    throw err;
+  }
 };
 
 /**
@@ -29,8 +40,15 @@ export const getCurTabId = async () => {
  * @param {Object} args 指令参数数据
  * @returns {Promise<*>} 后台响应的数据
  */
-export const sendBgMsg = (action, args) =>
-  browser?.runtime.sendMessage({ action, args });
+export const sendBgMsg = async (action, args) => {
+  if (!browser?.runtime?.sendMessage) return undefined;
+  try {
+    return await browser.runtime.sendMessage({ action, args });
+  } catch (err) {
+    if (isExtensionContextInvalidatedError(err)) return undefined;
+    throw err;
+  }
+};
 
 /**
  * 向当前活跃页面标签发送通信消息。
@@ -53,6 +71,7 @@ export const sendTabMsg = async (action, args, options) => {
     // 2. "Receiving end does not exist" (常见于用户在不支持注入扩展的浏览器内置特权页面如 chrome:// 上触发了消息)
     // 此处静默返回，避免未就绪的通信异常打断业务逻辑调用链或污染扩展错误页。
     if (
+      isExtensionContextInvalidatedError(err) ||
       err?.message?.includes("Could not establish connection") ||
       err?.message?.includes("Receiving end does not exist")
     ) {

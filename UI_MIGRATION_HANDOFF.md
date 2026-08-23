@@ -410,6 +410,10 @@ git rev-parse a07d39f:src/views/Options/usePersistedEntityDraft.js  → 9559628c
 
 两项都需要**未打包扩展 + 真实 YouTube 页面**。dev server 里的浏览器加载不了扩展,`YouTubeCaptionProvider.test.js` 又把 XHR 拦截整个 mock 了,所以仓库内无法证明。建议一次做完 —— 前置条件相同。
 
+> **为什么不能让 agent 代跑(2026-08-24 实测)**:预览浏览器被限制在 localhost,
+> 导航到 `https://www.youtube.com/` 会直接弹回 `localhost:3000`;页面里也没有
+> `chrome.runtime`,不是扩展上下文,装不了未打包扩展。所以这两项只能人工做。
+
 原第 3 项已改由测试覆盖,不必手工做,步骤保留在下面仅供参考。
 
 ## 前置(做一次)
@@ -432,6 +436,20 @@ Chrome → `chrome://extensions` → 开发者模式 → 「加载已解压的�
 **修复前:** 点 × 毫无反应。三处关闭按钮当时写成内联 `onclick`,而所有 `innerHTML` 都要过 `trustedTypesHelper.createHTML` → 无配置的 `DOMPurify.sanitize`,`on*` 属性被一律剥掉。**四个发行渠道都是坏的**,不是 CSP 或 YouTube 特有
 
 **顺带看:** 查一个 Bing 词典没有释义的生僻词,应显示「No definition found」而不是空的释义框
+
+> **这一项已经被查到只剩「点击真的会触发」一件事。** 2026-08-24 逐条排掉的:
+>
+> - `wordHover.test.js` **没有 mock DOMPurify**,跑的是真库
+> - `trustedTypesHelper.createHTML` 的**两条分支都调同一个 `DOMPurify.sanitize`** ——
+>   有 Trusted Types 时走策略,策略体本身就是那句 sanitize;没有时直接调。
+>   jsdom 走后者、真实浏览器走前者,**行为无差**(浏览器里实测 `window.trustedTypes`
+>   存在,且一个原样返回的策略确实会保留 `onclick` —— 剥离来自 DOMPurify 而不是 TT)
+> - **发布产物已核对**:`build/chrome/content.js` 里关闭按钮是
+>   `<button type="button" class="kiss-word-tooltip-close">`,**没有内联 onclick**;
+>   委托监听 `...kiss-word-tooltip-close")&&this.hideWordTooltip()})` 也在
+>
+> 也就是说下面「没过说明什么」里的第一种可能(加载了旧构建)已经排除。
+> 真要跑的话只剩验证「委托监听在真实页面上确实被触发」。
 
 ## 2. 悬停暂停后能恢复播放 — `96d8c1d`
 

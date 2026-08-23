@@ -1,5 +1,7 @@
 #!/usr/bin/env zx
 
+import { getArchiveTasks } from "./releaseTargets.mjs";
+
 console.log(chalk.cyan("\nStarting compression tasks...\n"));
 
 // 1. 进入 build 目录
@@ -9,26 +11,15 @@ cd("build");
 await $`npx shx rm -f *.zip`;
 
 /**
- * 定义打包任务配置
- * * @property {string} output - 输出文件名
+ * 打包任务配置来自 releaseTargets.mjs —— 那里是发布渠道的唯一来源，
+ * release.yml 的 matrix.client 也被测试钉在同一份清单上。
+ * 不要在这里就地加渠道，否则打出来的 zip 不会被上传。
+ *
+ * @property {string} output - 输出文件名
  * @property {string} source - 要打包的源（文件或目录名）
  * @property {string} [cwd]  - (可选) 执行打包命令时所在的目录。
  */
-const tasks = [
-  { output: "chrome.zip", source: "chrome" },
-  { output: "edge.zip", source: "edge" },
-  { output: "userscript.zip", source: "userscript" },
-  {
-    output: "../firefox.zip",
-    source: "*",
-    cwd: "firefox",
-  },
-  {
-    output: "../thunderbird.zip",
-    source: "*",
-    cwd: "thunderbird",
-  },
-];
+const tasks = getArchiveTasks();
 
 try {
   for (const task of tasks) {

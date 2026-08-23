@@ -58,7 +58,10 @@ describe("manifest artifact references", () => {
       web_accessible_resources: [{ resources: ["api/*"] }],
     };
     expect(
-      findMissingManifestArtifacts(manifest, ["manifest.json", "api/rules.json"])
+      findMissingManifestArtifacts(manifest, [
+        "manifest.json",
+        "api/rules.json",
+      ])
     ).toEqual([]);
     expect(findMissingManifestArtifacts(manifest, ["manifest.json"])).toEqual([
       "api/*",

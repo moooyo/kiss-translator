@@ -152,9 +152,22 @@ describe("Subtitle segmentation warning", () => {
   });
 
   test.each([
-    ["retranslation is off", { forceSubtitleRetranslate: false, segSlug: "openai", apiSlug: "microsoft" }],
-    ["AI segmentation is disabled", { forceSubtitleRetranslate: true, segSlug: "-", apiSlug: "microsoft" }],
-    ["both services match", { forceSubtitleRetranslate: true, segSlug: "openai", apiSlug: "openai" }],
+    [
+      "retranslation is off",
+      {
+        forceSubtitleRetranslate: false,
+        segSlug: "openai",
+        apiSlug: "microsoft",
+      },
+    ],
+    [
+      "AI segmentation is disabled",
+      { forceSubtitleRetranslate: true, segSlug: "-", apiSlug: "microsoft" },
+    ],
+    [
+      "both services match",
+      { forceSubtitleRetranslate: true, segSlug: "openai", apiSlug: "openai" },
+    ],
   ])("stays silent when %s", (_case, overrides) => {
     expect(warned(overrides)).toBe(false);
   });
@@ -183,15 +196,21 @@ display: inline-block`,
       `background-image: url("data:image/svg+xml;utf8,<svg/>");
 color: white;`,
     ],
-    ["a comment containing a semicolon", `/* a;b */
-color: red;`],
+    [
+      "a comment containing a semicolon",
+      `/* a;b */
+color: red;`,
+    ],
     [
       "nested parentheses and quotes",
       `background: linear-gradient(90deg, rgba(0,0,0,.5), url("a;b"));
 color: red;`,
     ],
-    ["a single-quoted value", `content: 'a;b';
-color: red;`],
+    [
+      "a single-quoted value",
+      `content: 'a;b';
+color: red;`,
+    ],
   ])("survives %s", (_case, css) => {
     expect(normalize(roundTrip(css))).toBe(normalize(css));
   });
@@ -221,12 +240,12 @@ describe("Subtitle advanced controls", () => {
       ".kt-settings-advanced__content"
     );
 
-    expect(content.firstElementChild.classList.contains("MuiGrid-container")).toBe(
-      true
-    );
-    expect(content.querySelectorAll(".MuiGrid-grid-lg-6").length).toBeGreaterThan(
-      0
-    );
+    expect(
+      content.firstElementChild.classList.contains("MuiGrid-container")
+    ).toBe(true);
+    expect(
+      content.querySelectorAll(".MuiGrid-grid-lg-6").length
+    ).toBeGreaterThan(0);
     expect(content.querySelector(".MuiGrid-grid-lg-3")).toBeNull();
 
     view.unmount();

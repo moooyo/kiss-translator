@@ -137,7 +137,9 @@ try {
 
     const { version } = await fs.readJson("package.json");
     await fs.writeFile(inDest("version.txt"), version);
-    console.log(chalk.green(`Version file generated: ${inDest("version.txt")}`));
+    console.log(
+      chalk.green(`Version file generated: ${inDest("version.txt")}`)
+    );
   }
 
   console.log(

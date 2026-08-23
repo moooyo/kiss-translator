@@ -41,6 +41,14 @@ function Pointer({
 
   // 指针/触控按下事件
   function handlePointerDown(e) {
+    // header 同时是拖拽触发区，里面还坐着一排图标按钮和溢出菜单。按在它们身上
+    // 不能算起拖，否则点开菜单的同时整个框会跟着指针跑。这里必须顺手清掉
+    // origin：残留的旧起点会让下一次 move 直接从它开始算位移。
+    if (e.target.closest?.("button, input, select, textarea, a")) {
+      setOrigin(null);
+      return;
+    }
+
     // 非移动端环境，对指针捕获进行锁定，防止拖出元素边界时事件丢失
     !isMobile && e.target.setPointerCapture(e.pointerId);
 
@@ -151,16 +159,22 @@ function Pointer({
   }
 
   // REVIEW: handlePointerDown 中针对 isMobile 使用 TouchEvent 的 targetTouches[0] 获取坐标，非 isMobile 使用 PointerEvent。但在一些混合模式设备上（同时支持触屏和鼠标），使用 PointerEvent 代替 TouchEvent 可以获得更好的跨设备体验，同时能避免因 TouchEvent 与 PointerEvent 双重监听导致的事件冲突。
+  // cancel 分支不是可选的：pointercancel / touchcancel 之后浏览器不会再补发
+  // pointerup / touchend，而清空 origin 的唯一出口就在 handlePointerUp 里。
+  // 少了它，一次被系统手势（触屏滚动、缩放）打断的拖拽会让 origin 永久残留，
+  // 之后指针只要掠过 header 就会继续拖动——没有按下任何键。
   const touchProps = isMobile
     ? {
         onTouchStart: handlePointerDown,
         onTouchMove: handlePointerMove,
         onTouchEnd: handlePointerUp,
+        onTouchCancel: handlePointerUp,
       }
     : {
         onPointerDown: handlePointerDown,
         onPointerMove: handlePointerMove,
         onPointerUp: handlePointerUp,
+        onPointerCancel: handlePointerUp,
       };
 
   return (

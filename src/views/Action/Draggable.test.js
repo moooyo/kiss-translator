@@ -213,4 +213,62 @@ describe("Draggable FAB edge locking", () => {
     expect(draggable.style.transform).toBe("translate(580px, 200px)");
     expect(putFab).toHaveBeenLastCalledWith({ x: 580, y: 200, edge: "right" });
   });
+
+  // pointercancel 之后浏览器不会再补发 pointerup，而清空 origin 的唯一出口
+  // 就在 pointerup 里。少了 cancel 分支，被系统手势打断的一次拖拽会让 origin
+  // 永久残留，之后指针只要掠过悬浮球就继续拖动——没有按下任何键。
+  test("a cancelled pointer ends the drag instead of leaving it stuck", () => {
+    renderFab();
+    const handler = draggable.firstElementChild.firstElementChild;
+
+    act(() => {
+      handler.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 590,
+          clientY: 210,
+        })
+      );
+    });
+    act(() => {
+      handler.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 300,
+          clientY: 0,
+        })
+      );
+    });
+    act(() => {
+      handler.dispatchEvent(new MouseEvent("pointercancel", { bubbles: true }));
+    });
+    const afterCancel = draggable.style.transform;
+
+    act(() => {
+      handler.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 100,
+          clientY: 300,
+        })
+      );
+    });
+
+    expect(draggable.style.transform).toBe(afterCancel);
+  });
+
+  test("keeps the container unconstrained when fitContent is set", () => {
+    renderFab({ fitContent: true });
+    expect(draggable.style.width).toBe("");
+  });
+
+  // 贴边时容器只有 0.2 不透明度。菜单挂在同一个容器里，不把 expanded 算进来
+  // 的话，展开的菜单会跟着一起变透明——而这时指针并不在悬浮球上。
+  test("an expanded overlay keeps the snapped container fully opaque", () => {
+    const fab = renderFab();
+    expect(draggable.style.opacity).toBe("0.2");
+
+    rerenderFab(fab, { expanded: true });
+    expect(draggable.style.opacity).toBe("1");
+  });
 });

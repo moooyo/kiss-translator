@@ -88,6 +88,11 @@ export default function Draggable({
   handler, // 点击并开始拖拽的触发区域
   children, // 容器内部的主体渲染元素
   usePaper,
+  // 容器带 willChange: transform，因此它是内部 fixed 定位子节点的包含块。
+  // 悬浮球的动作菜单正是这样一个子节点，被 58px 的固定宽度圈住就会被裁掉。
+  // 置 true 让容器按内容收缩；贴边吸附的计算仍然走上面的 width 参数，不受影响。
+  fitContent,
+  expanded, // children 里有展开中的浮层时置 true，避免贴边透明度把它一起吞掉
 }) {
   const [hover, setHover] = useState(false);
   const [origin, setOrigin] = useState(null); // 拖动起始的参考原点坐标和 client 坐标
@@ -221,6 +226,9 @@ export default function Draggable({
 
   // 鼠标/手指按下，标记拖拽开始并记录起始坐标
   const handlePointerDown = (e) => {
+    // 注意：这里不能像 Selection/DraggableResizable 那样加「按在 button 上就不起拖」
+    // 的护栏——悬浮球的拖拽触发区本身就是一个 <button>，加了它整个球就拖不动了。
+    // 动作菜单挂在 children 上，那一侧没有绑指针监听，本来就不会误触发拖拽。
     !isMobile && e.target.setPointerCapture(e.pointerId); // 捕获指针事件，使得移出当前元素时仍能响应 move
     onStart && onStart();
     draggedRef.current = false;
@@ -291,31 +299,39 @@ export default function Draggable({
   };
 
   // 根据拖拽状态及贴边设定，动态计算当前的半透明度 (非 hover 或没被拖拽时呈透明隐藏状态)
+  // expanded 也要算作「露出」：菜单展开时容器若停在 0.2，整个菜单会跟着一起变透明，
+  // 几乎看不清——而这时指针并不在悬浮球上，hover 是 false。
   const opacity = useMemo(() => {
     if (snapEdge) {
-      return hover || origin ? 1 : 0.2;
+      return hover || origin || expanded ? 1 : 0.2;
     }
     return origin ? 0.8 : 1;
-  }, [origin, snapEdge, hover]);
+  }, [origin, snapEdge, hover, expanded]);
 
   // 根据移动端/PC端不同绑定不同的触摸/指针监听属性
+  // cancel 分支不是可选的：pointercancel / touchcancel 之后浏览器不会再补发
+  // pointerup / touchend，而清空 origin 的唯一出口就在 handlePointerUp 里。
+  // 少了它，一次被系统手势打断的拖拽会让 origin 永久残留，之后指针只要掠过
+  // 触发区就会继续拖动——没有按下任何键。
   const touchProps = isMobile
     ? {
         onTouchStart: handlePointerDown,
         onTouchMove: handlePointerMove,
         onTouchEnd: handlePointerUp,
+        onTouchCancel: handlePointerUp,
       }
     : {
         onPointerDown: handlePointerDown,
         onPointerMove: handlePointerMove,
         onPointerUp: handlePointerUp,
+        onPointerCancel: handlePointerUp,
       };
 
   return (
     <div
       ref={containerRef}
       style={{
-        width,
+        width: fitContent ? undefined : width,
         opacity,
         position: "fixed",
         top: 0,

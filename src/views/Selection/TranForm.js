@@ -22,6 +22,8 @@ import {
   OPT_LANGS_MAP,
   OPT_DICT_MAP,
   OPT_SUG_MAP,
+  API_SPE_TYPES,
+  PROMPT_CATEGORY_DICTIONARY,
   PROMPT_MODE_FOLLOW_API,
   findPromptBySlug,
 } from "../../config";
@@ -49,6 +51,9 @@ export const formatLanguageOptionName = (name) => {
 
   return parts.join(" - ");
 };
+
+// 全空白的提示词等同于没有配置：非空字符串才算数。
+const hasPrompt = (value) => typeof value === "string" && Boolean(value.trim());
 
 /**
  * 翻译交互核心表单组件 (集成源/目标语言选择、多引擎翻译、词典展示、汉典展示、语言检测与文本输入)
@@ -219,19 +224,32 @@ export default function TranForm({
       return null;
     }
 
-    const apiSetting = transApis.find((api) => api.apiSlug === aiDictApiSlug);
+    // 设置页的选择器只列出「已启用的 AI 接口」和「词典分类的提示词」，但存下来的是
+    // slug，之后接口被停用、改成非 AI 类型、或提示词被改分类，这里都不会收到通知。
+    // 不重新校验的话，词典请求会带着词典提示词发到一个非 AI 端点上去。
+    const apiSetting = transApis.find(
+      (api) =>
+        api.apiSlug === aiDictApiSlug &&
+        !api.isDisabled &&
+        API_SPE_TYPES.ai.has(api.apiType)
+    );
     if (!apiSetting) {
       return null;
     }
 
     // 跟随接口时必须确保 API 配置已经解析出了 dictPrompt，否则 AI 词典不可用。
+    // 全空白的提示词等同于没有：送出去只会得到一次无意义的计费请求。
     if (aiDictPromptSlug === PROMPT_MODE_FOLLOW_API) {
-      return apiSetting.dictPrompt ? apiSetting : null;
+      return hasPrompt(apiSetting.dictPrompt) ? apiSetting : null;
     }
 
     // 指定全局词典提示词时，用该提示词覆盖接口内置词典提示词。
     const prompt = findPromptBySlug(prompts, aiDictPromptSlug);
-    if (!prompt) {
+    if (
+      !prompt ||
+      prompt.category !== PROMPT_CATEGORY_DICTIONARY ||
+      !hasPrompt(prompt.systemPrompt)
+    ) {
       return null;
     }
 

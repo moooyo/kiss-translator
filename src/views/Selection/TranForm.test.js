@@ -342,6 +342,122 @@ describe("TranForm AI dictionary tab", () => {
   });
 });
 
+// 设置页的选择器只列出「已启用的 AI 接口」和「词典分类的提示词」，但存下来的只是
+// slug。用户之后停用那个接口、把它改成非 AI 类型、或改掉提示词分类，这里都收不到
+// 通知——不重新校验的话，词典请求会带着词典提示词发到一个非 AI 端点上去。
+describe("TranForm AI dictionary revalidates stale settings", () => {
+  beforeEach(() => {
+    apiDict.mockReset();
+    apiDict.mockResolvedValue("## library");
+    document.body.innerHTML = "";
+  });
+
+  // AI 词典不可用时 TranForm 根本不渲染 Tabs（只剩默认词典那一段），可用时是
+  // 「默认词典 + AI 词典」两个。按数量判断比按文案判断稳 —— 文案跟着 uiLang 走，
+  // 一旦对不上，"找不到那个 tab" 的断言就会永远为真，测试变成空跑。
+  const tabCount = (container) =>
+    container.querySelectorAll('[role="tab"]').length;
+
+  test.each([
+    [
+      "the API was disabled after being chosen",
+      {
+        transApis: [
+          {
+            apiSlug: "openai",
+            apiName: "OpenAI",
+            apiType: "OpenAI",
+            dictPrompt: "Dictionary prompt",
+            isDisabled: true,
+          },
+        ],
+      },
+    ],
+    [
+      "the API was switched to a non-AI type",
+      {
+        transApis: [
+          {
+            apiSlug: "openai",
+            apiName: "OpenAI",
+            apiType: "Microsoft",
+            dictPrompt: "Dictionary prompt",
+          },
+        ],
+      },
+    ],
+    [
+      "the API's own dictionary prompt is blank",
+      {
+        transApis: [
+          {
+            apiSlug: "openai",
+            apiName: "OpenAI",
+            apiType: "OpenAI",
+            dictPrompt: "   ",
+          },
+        ],
+      },
+    ],
+    [
+      "the chosen prompt is not a dictionary prompt",
+      {
+        aiDictPromptSlug: "translate-en",
+        prompts: [
+          {
+            slug: "translate-en",
+            category: "translate prompt",
+            systemPrompt: "Translate this",
+          },
+        ],
+      },
+    ],
+    [
+      "the chosen dictionary prompt is blank",
+      {
+        aiDictPromptSlug: "dict-en",
+        prompts: [
+          {
+            slug: "dict-en",
+            category: "dictionary prompt",
+            systemPrompt: "  ",
+          },
+        ],
+      },
+    ],
+  ])("hides the AI dictionary when %s", async (_case, props) => {
+    const { container, root } = renderTranForm(props);
+    await flushEffects();
+
+    expect(tabCount(container)).toBe(0);
+    expect(apiDict).not.toHaveBeenCalled();
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  test("still offers the AI dictionary when the stored settings are valid", async () => {
+    const { container, root } = renderTranForm({
+      aiDictPromptSlug: "dict-en",
+      prompts: [
+        {
+          slug: "dict-en",
+          category: "dictionary prompt",
+          systemPrompt: "Define this word",
+        },
+      ],
+    });
+    await flushEffects();
+
+    expect(tabCount(container)).toBe(2);
+
+    act(() => {
+      root.unmount();
+    });
+  });
+});
+
 describe("TranForm popup input", () => {
   beforeEach(() => {
     apiDict.mockReset();

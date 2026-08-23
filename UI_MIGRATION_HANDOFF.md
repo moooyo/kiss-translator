@@ -12,11 +12,15 @@
 步骤、期望、以及「没过说明什么」都在文末附录,构建产物在 `build/chrome`。
 第 3 项(SPA 样式累积)已经不必手工做了,理由见附录。
 
-全量 **1068 通过 / 0 失败**(115 → 116 suite),CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
+全量 **1083 通过 / 0 失败**(119 suite),CI 在每次 push 和 PR 上跑(jest + 两个 target 构建 +
 lockfile 校验 + manifest 产物校验)。
 
 跨 realm 设置写入竞态(「待办 4」)已经用逐字段版本戳收窄并做了事后重放。
 **它没有被彻底关掉** —— 剩下的窄缝、以及 iOS 收不到回声这两件事写在那一节里。
+
+2026-08-24 对 `newui` 做过一次完整的三方复核(merge-base `8c99a340`),结论见
+「`newui` 复核(2026-08-24)」一节:捞出 5 个此前没记录的真实缺口,**已全部修完**;
+另有 3 条曾被怀疑、查证后不成立,写在那一节里以免重复评估。
 除此之外没有已知的开放技术项。
 
 ## 分支约定
@@ -218,6 +222,12 @@ YAML 写不了 import,所以 `releaseTargets.test.js` 把 `release.yml` 的 `mat
 | 发布渠道单一来源 | 本次 | `releaseTargets.mjs`;`archive.mjs` 读它,`release.yml` 的 matrix 由测试钉住 |
 | SPA 样式累积测试 | 本次 | `translator.test.js`,把原第 3 项实机检查转成自动化 |
 | 跨 realm 写入竞态收窄 | 本次 | `fieldRevisions.js` + `patchObj` 旁挂戳 + hook 事后重放;见「待办 4」的记账 |
+| 划词框高度常量修正 | 本次 | `TRANBOX_CHROME_HEIGHT` 52 → 74;见「划词框的垂直几何」 |
+| 查词气泡陈旧响应守卫 | 本次 | `wordHover.js` 身份守卫 + 收藏失败单独兜底,3 条测试钉住 |
+| `useLangMap` 加 `useCallback` | 本次 | 十几处 `useMemo` 的依赖里有 `i18n`,身份每帧变等于缓存没写 |
+| 扩展上下文失效不再冒泡 | 本次 | `msg.js` 的 `getCurTab` / `sendBgMsg` / `sendTabMsg` 三个入口 |
+| `build:rules` 自建输出目录 | 本次 | 单独跑时 `build/web` 不存在会 ENOENT 被吞掉、退出码仍是 0 |
+| `vtt.test.js` | 本次 | 从 `newui` 原样取,`buildTranslationOnlyVtt` 此前零覆盖 |
 
 > 上述两个 UI PR(#1004 / #1013)的 base 曾指向上游 `fishjar:dev`,**已于 2026-08-22 由作者本人关闭**,
 > 内容早已以 `5ffbe66` / `a96fdf8` 合入 `dev-newui`。当前没有任何在途的上游 PR。
@@ -270,9 +280,31 @@ YAML 写不了 import,所以 `releaseTargets.test.js` 把 `release.yml` 的 `mat
 
 `base == ours` 意味着三方合并会**无冲突标记地静默采用 `newui` 那版**,顺手丢掉上游 `ab93d1f`(wordBreak/maxWidth)、把 `autoHideDuration` 从 5000 退回 2600(反 `0fe680b`)、去掉退出动画和 `elevation={6}`。文件里 `setTimeout(..., 0)` 那条 REVIEW 注释是真的,但代价是把一个和上游同步的文件变成永久冲突点。要修就在 `dev-newui` 上单独小改。
 
+### 划词框的垂直几何
+
+`libs/tranboxPosition.js` 的 `TRANBOX_CHROME_HEIGHT` **是三处 CSS 的手工汇总,没有任何东西自动同步**:
+
+```
+56px   Selection/styles.js 的 .kt-tranbox-header { min-height }
+8 + 8  DraggableResizable 的 lineWidth = 4 → gridTemplateRows 上下两行
+2px    Selection/styles.js 的 .KT-draggable-body { border: 1px } 上下各一
+```
+
+M3 改版把 header 从 36px 提到 56px、又加了卡片边框,这个常量当时留在 52 没动,
+`getMaxTranBoxContentHeight` / `getMaxTranBoxY` 因此整整放宽了 22px —— 小视口下框体探出屏幕底部。
+现已改为 74。
+
+**改这三处 CSS 中的任何一处,都要回来改这个常量**,并同步下面三个测试里写死的数字:
+`tranboxPosition.test.js`、`useTranBoxState.test.js`(3 处)、`useSelectionController.test.js`(1 处)。
+后两者的断言里都写了推导算式,照着改即可。
+
 ### 别直接 merge `newui`
 
 它停更于 2026-08-09,直接合会回退这些上游特性:QwenMT、Yandex、Google Cloud Translation、剪贴板自动翻译(#1024)、悬停气泡独立翻译服务(#1015)、生词本词典提示(#1014)、语言变体翻译(#1017)、英文词典提示词预设(#1022)、CVE-2026-54466 修复(#1001)。
+
+**`newui` 自己也落后:** 它的 `pnpm.overrides` 只有 2 个 CVE pin(缺 `websocket-driver`),
+`config/msg.js` 里删掉了 `EVENT_FAVORITE_WORD_CHANGE`(上游 #1014),
+也没有 `sendTopFrameMsg` / `shadowHost.js` / `useRules` 的 `isLoading` / `translateVariants` / `packageManager` 钉版 / `test.yml`。
 
 **耦合警告:** `TranForm.js` / `TranCont.js` 是划词面板与 Popup **共用**的,`dev-newui` 上刚被 #1013 改过并带有上游特性,不能直接取 `newui` 版本。悬浮球 `ContentFab.js` 已按 `newui` 的设计重写(M3 + 动作菜单),见「划词框 / 悬浮球 M3 的移植边界」。
 
@@ -299,6 +331,45 @@ CI=true pnpm run build:chrome
 CI(`test.yml`)跑的是同样的内容加 `build:web`,约 2 分钟。它和 `release.yml` 有一处刻意的不同:不写死 pnpm 版本,由 `pnpm/action-setup@v4` 读 `packageManager`。
 
 ## 已否决(备查,避免重复评估)
+
+### `newui` 复核(2026-08-24)
+
+**方法。** 以 merge-base `8c99a340` 做三方比对,而不是直接 diff 两个 tip ——
+两边都动过的文件里,「谁改了 base」才分得出是「没搬」还是「重做过」。
+结果:236 个文件有差异,其中 146 个两边都改过(**26 个已字节收敛**),38 个只有 `newui` 改过。
+另外把 `newui` 独有的 6 个测试文件真拷进仓库跑了一遍 jest —— 光读代码判断不了它们能不能过。
+
+**捞出 5 个此前没记录的真实缺口,已全部修完**,见「已完成」表末尾五行。
+
+**下面 3 条曾被怀疑、查证后不成立,不要再评估:**
+
+- **`youtubePlayerUi.js` 的 `waitForElement` 无清理句柄 / 没有 `destroyNotification()`** ——
+  **不可达**。`waitForElement` 命中即 `obs.disconnect()`;`YouTubeInitializer` 是一次性单例
+  (`initialized` 标志,永不重跑),provider 也没有销毁入口。那两个清理是给 `newui` 自己的
+  `suspend()` / `destroy()` 用的,而那套机制属于已否决的后台通道
+- **`config/setting.js` 的 `logLevel: LogLevel?.INFO?.value ?? 1`** —— 看着像循环引用防御,
+  实际是 `newui` 自己 `subtitle.test.js` 里 `jest.mock("../libs/log.js")` 没提供 `LogLevel`
+  造成的。**是测试 mock 的缺陷,不是源码问题,别改源码**
+- **`newui` 独有的另外 4 个测试文件** —— `subtitle.test.js` 测的全是
+  `setSubtitleInterceptorEnabled` / `stopSubtitle` / `suspend`,即已否决的机制;
+  `Alert.test.js` 测 `newui` 的 Alert 重写(见「`hooks/Alert.js` —— 不要动」);
+  `Rules.test.js` 要求先把 `patchRuleList` 从 `useRules` 里提出来,是纯重构;
+  `I18n.test.js` 有 2 条断言已否决的 `settings_brand_color` key。四个都不取
+
+**下面几项是有意不做的产品/工程决定:**
+
+- **ESLint 独立闸(`newui` 的 `check:lint`)** —— 实测 `npx eslint src --ext .js` 共 311 个问题,
+  **全部在测试文件里**,非测试源码 0 问题。搬 `newui` 的 `eslintConfig.overrides` 能消掉 304 个,
+  剩 7 个中 5 个是真的(3 × `no-unused-vars` + 2 × `no-useless-escape`)、2 个是误报
+  (`await-async-utils` 撞了项目自己的同名 `waitForElement`;`jest/valid-expect` 在
+  `batchQueue.test.js:99` 是「先存变量再 await」的刻意写法)。**这道闸目前抓不到任何真 bug**,
+  价值只有防回归,不做
+- **`sync-version --check`** —— `newui` 有只校验不写的模式,`dev-newui` 没有。不做
+- **字幕默认渲染样式** —— `newui` 把 `originStyle` / `translationStyle` / `windowStyle` 换成了
+  M3 排版(px clamp + 字重 + 译文 `#C6DAFF` + 圆角背景)。**保持上游默认**(2026-08-24 决定)
+- **播放器内菜单的「全部字幕设置 →」入口(`all_subtitle_settings`)** —— 不做
+- **`release.yml` 的硬化项**(action SHA 钉版 / `concurrency` group / `timeout-minutes` /
+  `workflow_dispatch` 重发已有 tag)—— 整套竞争实现已否决,这 4 项可单独摘但当前不做
 
 ### `cdf403a` 编辑草稿保护
 

@@ -278,10 +278,12 @@ YAML 写不了 import,所以 `releaseTargets.test.js` 把 `release.yml` 的 `mat
 
 ## 已知坑
 
-**`pnpm format` 盖不到 `.mjs`。** 脚本里的 glob 是 `"**/*.{js,json,html}"`,所以
-`src/scripts/` 下的 `.mjs` 从来没被格式化过 —— 现在 `build-task.mjs` / `sync-version.mjs` /
-`update-version.mjs` 三个是漂的。不是本次改动引入的,也没有 CI 在管;要收拾就单独收拾,
-别夹在别的改动里(prettier 会一次性重排整个文件,把真正的改动淹掉)。
+**`pnpm format` 的 glob 现在含 `.mjs`,并且有 CI 闸。** 曾经是
+`"**/*.{js,json,html}"`,`.mjs` 不在里面 —— `build-task.mjs` / `sync-version.mjs` /
+`update-version.mjs` 三个发布脚本因此从未被格式化过,谁跑一次 `pnpm format` 都会
+冒出一堆无关 diff。现在 glob 加宽了、三个文件也格式化了,CI 走 `pnpm run format:check`,
+`formatGlob.test.js` 把 `format` 和 `format:check` 两条脚本的 glob 钉在一起。
+**加新文件类型时两条都要改**,只改一条会当场变红。
 
 **pnpm 版本必须是 9.14.4。** `package.json` 的 `packageManager` 字段已固定。用更高版本(如 `npx pnpm` 拉到的最新版)执行安装或构建时,pnpm 10+ 不再读取 `pnpm.overrides`,会把 `pnpm-lock.yaml` 的 `overrides` 块整个删掉 —— 那是 `0273e52` 针对 CVE-2026-54466 的三个 pin(`fast-xml-parser`、`shell-quote`、`websocket-driver`)。CI 里的 `git diff --exit-code pnpm-lock.yaml` 会当场抓到这种情况。
 

@@ -30,6 +30,13 @@ jobs:
       - name: Lockfile must be untouched by install
         run: git diff --exit-code pnpm-lock.yaml
 
+      # 没有这道闸，格式漂移会一直攒着，然后在某次不相关的改动里作为几百行
+      # 无关 diff 冒出来，把真正的改动淹掉。走 package.json 的 format:check，
+      # 它和 format 用同一份 glob（有测试钉着）—— .mjs 曾经不在里面，
+      # 三个发布脚本因此从未被格式化过。
+      - name: Formatting
+        run: pnpm run format:check
+
       - name: Test
         run: pnpm exec react-app-rewired test --watchAll=false
         env:

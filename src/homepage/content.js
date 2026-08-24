@@ -14,42 +14,31 @@ export const languageOptions = [
   { value: "ru", label: "Русский" },
 ];
 
-const storeLocales = {
-  en: { chromium: "en", firefox: "en-US" },
-  zh_CN: { chromium: "zh-CN", firefox: "zh-CN" },
-  zh_TW: { chromium: "zh-TW", firefox: "zh-TW" },
-  ja: { chromium: "ja", firefox: "ja" },
-  ko: { chromium: "ko", firefox: "ko" },
-  fr: { chromium: "fr", firefox: "fr" },
-  de: { chromium: "de", firefox: "de" },
-  es: { chromium: "es", firefox: "es" },
-  vi: { chromium: "vi", firefox: "vi" },
-  ru: { chromium: "ru", firefox: "ru" },
-};
-
-const createInstalls = (language, meta = {}) => {
-  const locales = storeLocales[language] || storeLocales.en;
+// 这个 fork 不在任何应用商店上架，四个扩展渠道统一指向自己的 releases 页。
+// 上游的 Chrome / Edge / Firefox 商店链接**不能**留 —— 那会把访客送去装原版。
+const createInstalls = (meta = {}) => {
+  const releasesUrl = process.env.REACT_APP_RELEASES_URL;
 
   return [
     {
       name: "Chrome",
       meta: meta.extension || "Browser extension",
-      href: `https://chrome.google.com/webstore/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof?hl=${locales.chromium}`,
+      href: releasesUrl,
     },
     {
       name: "Edge",
       meta: meta.extension || "Browser extension",
-      href: `https://microsoftedge.microsoft.com/addons/detail/%E7%AE%80%E7%BA%A6%E7%BF%BB%E8%AF%91/jemckldkclkinpjighnoilpbldbdmmlh?hl=${locales.chromium}`,
+      href: releasesUrl,
     },
     {
       name: "Firefox",
       meta: meta.extension || "Browser extension",
-      href: `https://addons.mozilla.org/${locales.firefox}/firefox/addon/kiss-translator/`,
+      href: releasesUrl,
     },
     {
       name: "Thunderbird",
       meta: meta.release || "Release package",
-      href: "https://github.com/fishjar/kiss-translator/releases",
+      href: releasesUrl,
     },
     {
       name: "Userscript",
@@ -918,7 +907,7 @@ export const homepageContent = Object.fromEntries(
     {
       ...baseContent.en,
       ...translations[value],
-      installs: createInstalls(value, translations[value]?.installMeta),
+      installs: createInstalls(translations[value]?.installMeta),
       ecosystemProjects: ecosystemProjects[value] ?? ecosystemProjects.en,
       providers: translations[value]?.providers ?? baseContent.en.providers,
     },

@@ -1,17 +1,17 @@
 import { homepageContent, languageOptions } from "./content";
 
-const expectedStoreLocales = {
-  en: { chromium: "en", firefox: "en-US" },
-  zh_CN: { chromium: "zh-CN", firefox: "zh-CN" },
-  zh_TW: { chromium: "zh-TW", firefox: "zh-TW" },
-  ja: { chromium: "ja", firefox: "ja" },
-  ko: { chromium: "ko", firefox: "ko" },
-  fr: { chromium: "fr", firefox: "fr" },
-  de: { chromium: "de", firefox: "de" },
-  es: { chromium: "es", firefox: "es" },
-  vi: { chromium: "vi", firefox: "vi" },
-  ru: { chromium: "ru", firefox: "ru" },
-};
+const expectedLanguages = [
+  "en",
+  "zh_CN",
+  "zh_TW",
+  "ja",
+  "ko",
+  "fr",
+  "de",
+  "es",
+  "vi",
+  "ru",
+];
 
 const expectedOpenOptions = {
   en: "Open Script Settings",
@@ -29,7 +29,7 @@ const expectedOpenOptions = {
 describe("homepage content", () => {
   test("provides complete content for every homepage language", () => {
     expect(languageOptions.map(({ value }) => value)).toEqual(
-      Object.keys(expectedStoreLocales)
+      expectedLanguages
     );
 
     languageOptions.forEach(({ value }) => {
@@ -51,19 +51,20 @@ describe("homepage content", () => {
     });
   });
 
-  test("uses localized browser store links", () => {
-    Object.entries(expectedStoreLocales).forEach(
-      ([language, { chromium, firefox }]) => {
-        const [chrome, edge, firefoxInstall] =
-          homepageContent[language].installs;
-
-        expect(chrome.href).toContain(`?hl=${chromium}`);
-        expect(edge.href).toContain(`?hl=${chromium}`);
-        expect(firefoxInstall.href).toContain(
-          `addons.mozilla.org/${firefox}/firefox/`
+  // 这个 fork 不在任何商店上架。以前这里断言的是上游商店链接的语言参数；
+  // 现在要钉住的是相反的事：没有任何一个安装入口会把访客送去装原版。
+  test("never points an install target at an upstream listing", () => {
+    expectedLanguages.forEach((language) => {
+      homepageContent[language].installs.forEach(({ name, href }) => {
+        expect(typeof href).toBe("string");
+        expect(href).not.toMatch(/fishjar|rayjar/i);
+        expect(href).not.toMatch(
+          /chrome\.google\.com|microsoftedge\.microsoft\.com|addons\.mozilla\.org/i
         );
-      }
-    );
+        expect(href).toMatch(/moooyo/i);
+        expect(name).toBeTruthy();
+      });
+    });
   });
 
   test("keeps non-store download targets unchanged", () => {

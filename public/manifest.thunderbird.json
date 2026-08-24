@@ -4,11 +4,11 @@
   "description": "__MSG_app_description__",
   "version": "2.0.32",
   "default_locale": "en",
-  "author": "Gabe<yugang2002@gmail.com>",
-  "homepage_url": "https://github.com/fishjar/kiss-translator",
+  "author": "moooyo",
+  "homepage_url": "https://github.com/moooyo/kiss-translator-m3",
   "browser_specific_settings": {
     "gecko": {
-      "id": "yugang2002@gmail.com",
+      "id": "kiss-translator-m3@moooyo.github.io",
       "strict_min_version": "78.0"
     }
   },

@@ -365,30 +365,6 @@ export default function Popup() {
           <div className="kt-popup-empty">
             <span>{i18n("load_setting_err")}</span>
             <div className="kt-popup-empty__actions">
-              <Button
-                variant="text"
-                onClick={() =>
-                  window.open(
-                    process.env.REACT_APP_REVIEW_URL,
-                    "_blank",
-                    "noopener,noreferrer"
-                  )
-                }
-              >
-                {i18n("comment_support")}
-              </Button>
-              <Button
-                variant="text"
-                onClick={() =>
-                  window.open(
-                    process.env.REACT_APP_SUPPORT_URL,
-                    "_blank",
-                    "noopener,noreferrer"
-                  )
-                }
-              >
-                {i18n("appreciate_support")}
-              </Button>
               <Button variant="text" onClick={handleOpenSetting}>
                 {i18n("setting")}
               </Button>

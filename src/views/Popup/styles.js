@@ -43,8 +43,6 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-header__drag { display: flex; color: var(--kt-onv); cursor: move; }
 .kt-popup-header__actions { display: flex; flex: none; align-items: center; gap: 2px; }
 .kt-popup-header__actions .MuiIconButton-root { width: 38px; height: 38px; padding: 7px; }
-.kt-popup-header__sponsor.MuiIconButton-root { background: var(--kt-secc); color: var(--kt-onsecc); }
-.kt-popup-header__sponsor.MuiIconButton-root:hover { background: color-mix(in srgb, var(--kt-secc) 82%, var(--kt-onsecc)); }
 
 .kt-popup-tabs { min-height: 44px; margin: 0 14px; }
 .kt-popup-tabs .MuiTab-root { min-height: 44px; padding-block: 7px; }
@@ -225,9 +223,6 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-advanced-row { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 9px 10px 9px 12px; border-radius: 15px; background: var(--kt-sf2); font-size: 11.5px; font-weight: 550; }
 .kt-popup-advanced-row .MuiSwitch-root { margin: -4px -6px; transform: scale(.76); transform-origin: right center; }
 
-.kt-popup-support { display: flex; justify-content: flex-end; gap: 6px; margin-top: -4px; padding: 8px; border-radius: 16px; background: var(--kt-sf1); animation: kt-m3-rise .3s var(--kt-spring); }
-.kt-popup-support a { min-height: 34px; display: inline-flex; align-items: center; padding: 0 12px; border-radius: 999px; color: var(--kt-pri); font-size: 11px; font-weight: 700; text-decoration: none; }
-.kt-popup-support a:hover { background: var(--kt-sf2); }
 
 .kt-popup-footer { display: flex; align-items: center; gap: 8px; padding-top: 2px; color: var(--kt-onv); font-size: 10.5px; }
 .kt-popup-footer__keys { display: flex; align-items: center; gap: 4px; }

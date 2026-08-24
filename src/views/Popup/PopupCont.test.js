@@ -213,45 +213,21 @@ describe("PopupCont capability parity", () => {
     view.cleanup();
   });
 
-  test("leaves browser popup support actions to the header menu", async () => {
-    const view = renderPopupCont();
+  // 赞赏 / 评价入口已整体删除:它们指向我们没有的商店页和捐赠页。
+  // 浏览器弹窗和页内弹窗两种形态都要确认删干净了。
+  test.each([
+    ["browser popup", {}],
+    ["content popup", { isContent: true, processActions: jest.fn() }],
+  ])("carries no support entry point in the %s", async (_case, props) => {
+    const view = renderPopupCont(props);
     await flushEffects();
 
     const supportButton = Array.from(
       view.container.querySelectorAll("button")
     ).find((button) => button.textContent.includes("popup_support"));
+
     expect(supportButton).toBeUndefined();
     expect(view.container.querySelector(".kt-popup-support")).toBeNull();
-    view.cleanup();
-  });
-
-  test("places the content popup support disclosure after its trigger", async () => {
-    const view = renderPopupCont({
-      isContent: true,
-      processActions: jest.fn(),
-    });
-    await flushEffects();
-
-    const footerButtons = view.container.querySelectorAll(
-      ".kt-popup-footer button"
-    );
-    const supportButton = footerButtons[footerButtons.length - 1];
-    expect(supportButton.textContent).toContain("popup_support");
-
-    act(() => supportButton.click());
-
-    const supportDisclosure = view.container.querySelector(".kt-popup-support");
-    const firstSupportLink = supportDisclosure.querySelector("a");
-    expect(supportButton.compareDocumentPosition(supportDisclosure)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
-    expect(supportButton.closest("footer").nextElementSibling).toBe(
-      supportDisclosure
-    );
-    expect(supportButton.getAttribute("aria-controls")).toBe(
-      supportDisclosure.id
-    );
-    expect(document.activeElement).toBe(firstSupportLink);
     view.cleanup();
   });
 

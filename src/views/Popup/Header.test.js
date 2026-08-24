@@ -11,66 +11,67 @@ jest.mock("../../hooks/I18n", () => ({
 
 jest.mock("../../components/Logo", () => () => null);
 
-describe("Popup Header support menu", () => {
+// 这个文件原本测的是赞赏菜单。那个功能已经删掉:它指向的「评价」是我们没有的
+// 商店页、「赞赏」是我们没有的捐赠页,对这个 fork 是两个死链接。
+// 现在钉住的是删干净这件事本身 —— header 只剩独立窗口和设置两个动作。
+describe("Popup Header actions", () => {
   let container;
   let root;
-  let originalWindowOpen;
 
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    originalWindowOpen = window.open;
-    window.open = jest.fn();
   });
 
   afterEach(() => {
     act(() => root.unmount());
     document.body.innerHTML = "";
-    window.open = originalWindowOpen;
   });
 
-  test("places Sponsor before the window and settings actions", () => {
+  const renderHeader = (props = {}) => {
     act(() => {
       root.render(
-        <Header openSeparateWindow={jest.fn()} openSettings={jest.fn()} />
+        <Header
+          openSeparateWindow={jest.fn()}
+          openSettings={jest.fn()}
+          {...props}
+        />
       );
     });
+  };
 
-    const sponsor = container.querySelector('[aria-label="popup_support"]');
-    const separate = container.querySelector(
-      '[aria-label="open_separate_window"]'
-    );
-    const settings = container.querySelector('[aria-label="setting"]');
+  test("offers exactly the separate window and settings actions", () => {
+    renderHeader();
 
-    expect(sponsor.compareDocumentPosition(separate)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
+    const buttons = container.querySelectorAll(
+      ".kt-popup-header__actions button"
     );
-    expect(separate.compareDocumentPosition(settings)).toBe(
-      Node.DOCUMENT_POSITION_FOLLOWING
-    );
+
+    expect(
+      [...buttons].map((button) => button.getAttribute("aria-label"))
+    ).toEqual(["open_separate_window", "setting"]);
   });
 
-  test("keeps review and sponsorship actions in an anchored menu", () => {
-    act(() => {
-      root.render(
-        <Header openSeparateWindow={jest.fn()} openSettings={jest.fn()} />
-      );
-    });
+  test("carries no donation or review entry point", () => {
+    renderHeader();
 
-    const sponsor = container.querySelector('[aria-label="popup_support"]');
-    act(() => sponsor.click());
+    expect(container.querySelector('[aria-label="popup_support"]')).toBeNull();
+    expect(container.textContent).not.toContain("appreciate_support");
+    expect(container.textContent).not.toContain("comment_support");
+  });
 
-    const menuItems = document.body.querySelectorAll('[role="menuitem"]');
-    expect(menuItems).toHaveLength(2);
-    expect(menuItems[0].textContent).toContain("comment_support");
-    expect(menuItems[1].textContent).toContain("appreciate_support");
+  test("collapses to a close button when hosted in the page", () => {
+    const onClose = jest.fn();
+    renderHeader({ onClose });
 
-    act(() => menuItems[1].click());
-    expect(window.open).toHaveBeenCalledWith(
-      process.env.REACT_APP_SUPPORT_URL,
-      "_blank",
-      "noopener,noreferrer"
-    );
+    const close = container.querySelector('[aria-label="close"]');
+    expect(close).not.toBeNull();
+    expect(
+      container.querySelector('[aria-label="open_separate_window"]')
+    ).toBeNull();
+
+    act(() => close.click());
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

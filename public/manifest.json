@@ -6,6 +6,7 @@
   "default_locale": "en",
   "author": "moooyo",
   "homepage_url": "https://github.com/moooyo/kiss-translator-m3",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArDTLxfCJm6VFT4J9YKcOhGDkzlPGJh9/Lnon9xU3Ko1N1WYsskKiDD7mpUBLu1cnioKFgOLimziNNpTqRaLBoT9t6yvZdWcK4rRr6xFRSHEh4CNMI0tpEfkxkuXC77c/Bs/T4W2AREuZg0ntylvvU4CCs4JvrP4UR+BFws5mOQgO6KiURvdqHeiEGKpQSvADMK2ptG8xXaDcwruLmhDU60BlYTvcfgRKQEJPHSZ6ozTpFKleRbO6Tlaxpqjl5oC3BrfgpiutSsvqU4jtA6TkjT1K1iqBgif2h96bSAQckryUOnPWk/vwO5LH8GZjyiB2FIvdFnxiHyfakPUYE5SIqwIDAQAB",
   "background": {
     "service_worker": "background.js",
     "type": "module"

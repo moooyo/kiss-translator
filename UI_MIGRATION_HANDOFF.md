@@ -16,7 +16,7 @@
 | | |
 |---|---|
 | 代码 | 无已知开放技术项 |
-| 测试 | **1087 通过 / 0 失败**(120 suite) |
+| 测试 | **1092 通过 / 0 失败**(121 suite) |
 | CI | 每次 push 和 PR 都跑:jest + chrome/web 两个 target 构建 + lockfile 校验 + manifest 产物校验,约 2 分钟 |
 | 上游 | `dev-newui` 与 `upstream/dev` 齐平(领先 61,落后 0),无待同步工作,无在途 PR |
 | 身份 | 已与上游分家(存储 / DOM / 油猴 / 扩展 id / 更新 URL),见「产品身份」 |
@@ -121,7 +121,8 @@ fork 上仅剩 `dev` / `dev-newui` / `gh-pages` / `newui` 四个分支。2026-08
 (`.trim().split(/\s+/).join("-")`)和 `APP_LCNAME`,再连锁决定:
 
 ```
-存储键前缀   KISS-Translator-M3_setting_v2 等全部 STOKEY_*
+存储键前缀   KISS-Translator-M3_setting_v0 等全部 STOKEY_*
+             (尾部的 v0 来自 APP_VERSION[0],版本回到 0.0.1 后就是 0)
 CacheStorage KISS-Translator-M3_cache
 DOM ID       #kiss-translator-m3-fab / -box / -popup
 译文 CSS 类  .kiss-translator-m3-wrapper / -inner / -term ... 共 10 个
@@ -140,7 +141,30 @@ WebDAV 目录  /kiss-translator-m3/
 | `config-overrides.js` 的 entry key | `kiss-translator-m3.user` | 决定产物文件名,`build-ios.mjs` 里也硬编码了两处 |
 | `src/config/storage.js` 的 `KV_*_KEY` / `KV_SALT_*` | `kiss-m3-*` / `KISS-Translator-M3-*` | WebDAV 靠目录分家,但 Gist / KISS-Worker 是扁平的,只有文件名能分 |
 
-Chrome MV3 没有 `id` 字段,也**没有加 `key`** —— 那需要自管密钥对,而未打包安装本来就是各自不同的 ID。
+### Chrome 的 `key` 字段:换掉它等于清空所有用户数据
+
+`public/manifest.json` 里的 `key` 是 DER 公钥的 base64,决定扩展 ID
+**`enhckapfllnpbdljjmkdkihlcjjikpob`**。
+
+Chrome 的 ID 是公钥 SHA-256 前 128 位、十六进制每个 nibble 按 `0-f → a-p` 映射。
+**没有 `key` 时,「加载已解压的扩展程序」按目录的绝对路径推导 ID** ——
+而 `chrome.storage` 是按扩展 ID 分区的。我们按 zip 发版、解压出来是一个 `chrome/` 目录,
+用户把新版本解到另一个位置,设置、规则、生词本就全部读不到。`key` 就是为这个加的。
+
+反过来:**换掉这个 key,所有现有用户的 ID 随之改变,等同于清空他们的数据。**
+`src/scripts/extensionId.test.js` 把公钥和推导出的 ID 一起钉死,改 key 会当场变红 ——
+那条红必须是一次有意识的决定,不是顺手接受。
+
+- **私钥不在仓库里,也不需要它。** 只有公钥进 manifest(公钥本来就是公开的)。
+  私钥仅在签 `.crx` 时才用得上,而我们发的是 zip 让用户 Load unpacked。
+  生成时那份 `.pem` 落在 gitignore 掉的 `tmp/` 下,**要留就自己挪进密码管理器,别提交**。
+- **`key` 是 Chromium 专有的。** Edge 复用 chrome 产物,所以一并生效;
+  Gecko 两个 manifest 走 `browser_specific_settings.gecko.id`,**不要**给它们加 `key`,
+  测试里也钉了这一条。
+- **以后真要上 Chrome 应用商店时需要单独查一次**:商店用它自己的密钥,
+  manifest 里带着自选的 `key` 可能要先删掉。这条没有查证过,不要当结论用。
+
+Chrome MV3 本身没有 `id` 字段,`key` 是唯一能固定 ID 的途径。
 
 ### 三个「会互相破坏」的碰撞面(改名时最容易漏)
 
@@ -604,6 +628,18 @@ CI=true pnpm run build:chrome
 ```
 
 Chrome → `chrome://extensions` → 开发者模式 → 「加载已解压的扩展程序」→ 选 `build/chrome`。
+
+**装上之后先顺手确认三件改名相关的事**(都在扩展页和任意网页上,不需要 YouTube):
+
+1. 扩展列表里显示的是 **KISS Translator M3**,ID 是
+   `enhckapfllnpbdljjmkdkihlcjjikpob`
+2. **把同一份 `build/chrome` 复制到另一个目录再 Load unpacked 一次,两个 ID 应该相同** ——
+   这是 `key` 字段唯一能实机验的地方(没有它时 ID 跟着目录路径走,用户换个目录就丢数据)。
+   验完记得把多装的那份删掉
+3. 随便打开一个网页,Console 跑
+   `document.querySelector('[id^="kiss-translator-m3"]')` 应该有东西;
+   点开 Popup 应该正常弹出 —— Popup 能弹说明 Emotion cache key 那个坑真的躲过了
+   (应用名带数字时它会**静默挂不上**,不报错)
 
 打开一个**有英文字幕**的 YouTube 视频,确认:
 

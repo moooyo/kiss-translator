@@ -1,3 +1,8 @@
+## v0.0.2
+
+- 固定 Chrome 扩展 ID 为 `enhckapfllnpbdljjmkdkihlcjjikpob`：此前未打包安装的 ID 跟随扩展目录的绝对路径，而 `chrome.storage` 按扩展 ID 分区 —— 把新版本解压到别的目录会读不到原有的设置、规则与生词本。
+- 测试同时钉住公钥与其推导出的 ID：更换 key 会改变所有现有用户的 ID，等同于清空数据，必须是一次有意识的决定。
+
 ## v0.0.1
 
 - 从 fishjar/kiss-translator 分家为独立产品 **KISS Translator M3**，版本号自 0.0.1 重新起算。

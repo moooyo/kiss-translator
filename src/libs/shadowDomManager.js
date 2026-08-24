@@ -5,6 +5,28 @@ import createCache from "@emotion/cache";
 import { logger } from "./log";
 import { isolateShadowHost, setShadowHostVisible } from "./shadowHost";
 
+/**
+ * 把任意 id 规整成 Emotion 能接受的 cache key。
+ *
+ * Emotion 只允许小写字母和连字符 —— 传进数字会直接抛
+ * "Emotion key must only contain lower case alphabetical characters and -"，
+ * 而 ShadowDomManager 捕获后只记一条 warn，表现是整个组件**静默挂不上**。
+ * 应用名里带数字（KISS-Translator-M3）就会踩到，所以在这里统一兜住，
+ * 而不是让每个调用方各自记得。
+ *
+ * @param {string} key 原始 key（默认是宿主元素 id）
+ * @returns {string} 只含 [a-z-] 的 key
+ */
+export function toEmotionCacheKey(key) {
+  const sanitized = String(key || "")
+    .toLowerCase()
+    .replace(/[^a-z-]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+  return sanitized || "kiss";
+}
+
 export default class ShadowDomManager {
   #hostElement = null;
   #reactRoot = null;
@@ -30,7 +52,7 @@ export default class ShadowDomManager {
     }
     this._id = id;
     this._className = className;
-    this._cacheKey = cacheKey;
+    this._cacheKey = toEmotionCacheKey(cacheKey);
     this._ReactComponent = reactComponent;
     this._props = props;
     this._rootElement = rootElement;

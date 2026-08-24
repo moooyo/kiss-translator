@@ -146,12 +146,49 @@ const CSP_REMOVE_HEADERS = [
 let separateWindowId = null; // 当前已打开窗口的 ID
 let lastKnownBounds = null; // 缓存窗口最后一次有效的屏幕位置坐标与大小
 
+// 独立翻译窗口的出厂尺寸。曾经是 400x400 —— 那个高度连「原文输入框 + 语言行 +
+// 译文卡片」都放不下,一打开就得手动拉大。下面这组按内容实际所需推出来:
+// 面板本身宽 min(720px, 100vw)(见 Popup/styles.js 的 .kt-popup-shell--window),
+// 加窗口边框约 20px;高度是 输入框 112 + 页脚 52 + 语言行 60 + 译文卡片 180
+// + 对比更多服务 70 + 内外边距,再留一点余量。
 const DEFAULT_SEPARATE_WINDOW_BOUNDS = {
   left: 100,
   top: 100,
-  width: 400,
-  height: 400,
+  width: 740,
+  height: 720,
 };
+
+/**
+ * 把新窗口摆在当前聚焦窗口的中央。
+ *
+ * 固定的 left/top 会让窗口永远出现在主屏左上角 —— 多显示器时可能直接飞到
+ * 另一块屏上。后台 service worker 没有 `screen`,只能借聚焦窗口的位置定位。
+ *
+ * @param {{width: number, height: number}} bounds 期望的窗口宽高
+ * @returns {Promise<{left: number, top: number}|null>} 居中坐标,拿不到时返回 null
+ */
+async function centerOnFocusedWindow({ width, height }) {
+  try {
+    const focused = await browser.windows.getLastFocused();
+    if (
+      !focused ||
+      typeof focused.left !== "number" ||
+      typeof focused.top !== "number" ||
+      typeof focused.width !== "number" ||
+      typeof focused.height !== "number"
+    ) {
+      return null;
+    }
+
+    return {
+      left: Math.round(focused.left + (focused.width - width) / 2),
+      top: Math.round(focused.top + (focused.height - height) / 2),
+    };
+  } catch (err) {
+    kissLog("center separate window", err);
+    return null;
+  }
+}
 
 /**
  * 将独立窗口的位置及宽高数据持久化保存到 storage.local 中。
@@ -190,6 +227,12 @@ async function openSeparateWindowWithSavedBounds() {
       DEFAULT_SEPARATE_WINDOW_BOUNDS,
       saved || {}
     );
+
+    // 只有第一次打开(没有存过位置)才居中。之后要尊重用户自己摆的位置。
+    if (!saved) {
+      const centered = await centerOnFocusedWindow(bounds);
+      if (centered) Object.assign(bounds, centered);
+    }
 
     const win = await browser.windows.create({
       url: "popup.html#tranbox",

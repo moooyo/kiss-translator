@@ -143,3 +143,39 @@ describe("popup translation controls", () => {
     expect(moreStyleRule).not.toContain("margin:");
   });
 });
+
+// 独立翻译窗口曾经是一根固定 560px、贴在左边的列 —— 窗口一放大,右侧就是
+// 一大片死空白。修法是外壳铺满(背景不断成色带)、内容居中限宽。
+describe("separate translation window layout", () => {
+  const windowShellRule = POPUP_STYLES.match(
+    /\.kt-popup-shell--window\s*\{([^}]*)\}/
+  )?.[1];
+  const centeredRule = POPUP_STYLES.match(
+    /\.kt-popup-shell--window \.kt-popup-text-panel,[^{]*\{([^}]*)\}/
+  )?.[1];
+
+  test("lets the shell span the whole window", () => {
+    expect(windowShellRule).toContain("width: 100%");
+    // 固定宽度会让背景在两侧断开,露出底色
+    expect(windowShellRule).not.toMatch(/width:\s*min\(/);
+  });
+
+  test("centers the content and caps how wide a line gets", () => {
+    expect(centeredRule).toContain("width: min(720px, 100%)");
+    expect(centeredRule).toContain("margin-inline: auto");
+  });
+
+  test("measures full height against the dynamic viewport", () => {
+    // 100vh 在移动端浏览器里会被地址栏顶掉底部
+    expect(windowShellRule).toContain("min-height: 100dvh");
+    expect(windowShellRule).not.toContain("min-height: 100vh");
+  });
+});
+
+// 赞赏入口删掉后,它的样式也不该留着 —— 留着下次会有人以为控件还在。
+describe("removed support affordances", () => {
+  test("keeps no styles for the sponsor button or support disclosure", () => {
+    expect(POPUP_STYLES).not.toContain("kt-popup-header__sponsor");
+    expect(POPUP_STYLES).not.toContain("kt-popup-support");
+  });
+});

@@ -7,10 +7,21 @@ export const POPUP_STYLES = String.raw`
   color: var(--kt-on);
 }
 
+/* 独立翻译窗口。曾经是 width: min(560px, 100vw) 且不居中 —— 窗口一放大,
+   面板就死贴在左边,右侧留一大片空白。
+   这里让外壳铺满整个窗口(背景才不会在两侧断成色带),再把内容本身居中并限宽:
+   窗口拉宽时留白对称,而一行文字不会宽到扫不过来。
+   min-height 用 100dvh 而不是 100vh,免得移动端浏览器地址栏把底部顶掉。 */
 .kt-popup-shell--window {
-  width: min(560px, 100vw);
+  width: 100%;
   min-width: 0;
-  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.kt-popup-shell--window .kt-popup-text-panel,
+.kt-popup-shell--window .kt-popup-loading {
+  width: min(720px, 100%);
+  margin-inline: auto;
 }
 
 .kt-popup-shell.kt-popup-shell--content {

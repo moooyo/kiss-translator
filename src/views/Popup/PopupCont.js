@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import AutorenewRoundedIcon from "@mui/icons-material/AutorenewRounded";
 import DeleteSweepRoundedIcon from "@mui/icons-material/DeleteSweepRounded";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
@@ -96,14 +89,9 @@ export default function PopupCont({
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
-  const [showSupport, setShowSupport] = useState(false);
   const [translationBusy, setTranslationBusy] = useState(false);
   const busyTimerRef = useRef(null);
   const translationTogglePendingRef = useRef(false);
-  const supportTriggerRef = useRef(null);
-  const supportFirstLinkRef = useRef(null);
-  const supportDisclosureId = useId();
-  const supportTriggerId = `${supportDisclosureId}-trigger`;
   const { allTextStyles } = useAllTextStyles();
   const primaryPopupTextStyles = useMemo(
     () => resolvePopupTextStyles(allTextStyles, rule?.textStyle, false),
@@ -130,10 +118,6 @@ export default function PopupCont({
     },
     []
   );
-
-  useEffect(() => {
-    if (showSupport) supportFirstLinkRef.current?.focus();
-  }, [showSupport]);
 
   const blacklistValue = contextSetting?.blacklist || "";
   const isInCurrentBlacklist = useMemo(() => {
@@ -246,12 +230,13 @@ export default function PopupCont({
           }));
         }
 
+        // 开关成功不弹提示：结果就在上面那张卡片里 ——「翻译此页」下方的
+        // 已开启/已关闭 文案和开关位置都会同步变。再弹一个写着同样两个字的
+        // toast 只是重复，而且它锚在底部居中，正好盖住划词翻译/暂停翻译两个按钮。
+        // 失败仍然要弹，那种情况界面上没有任何别的迹象。
         busyTimerRef.current = window.setTimeout(
           () => {
             setTranslationBusy(false);
-            showMessage(
-              resolvedEnabled ? i18n("popup_enabled") : i18n("popup_disabled")
-            );
           },
           resolvedEnabled ? 900 : 0
         );
@@ -277,14 +262,6 @@ export default function PopupCont({
     tryClearCaches();
     showMessage(i18n("clear_success"));
   }, [i18n, showMessage]);
-
-  const handleSupportKeyDown = useCallback((event) => {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    setShowSupport(false);
-    supportTriggerRef.current?.focus();
-  }, []);
 
   const handleSaveRule = useCallback(async () => {
     if (!selectedDomain) return;
@@ -403,32 +380,6 @@ export default function PopupCont({
     ["scanAll", i18n("scan_all_nodes"), scanAll === "true"],
     ["isPlainText", i18n("plain_text_translate"), isPlainText],
   ];
-
-  const supportDisclosure = showSupport && (
-    <div
-      className="kt-popup-support"
-      id={supportDisclosureId}
-      role="region"
-      aria-labelledby={supportTriggerId}
-      onKeyDown={handleSupportKeyDown}
-    >
-      <a
-        ref={supportFirstLinkRef}
-        href={process.env.REACT_APP_REVIEW_URL}
-        target="_blank"
-        rel="noreferrer"
-      >
-        {i18n("comment_support")}
-      </a>
-      <a
-        href={process.env.REACT_APP_SUPPORT_URL}
-        target="_blank"
-        rel="noreferrer"
-      >
-        {i18n("appreciate_support")}
-      </a>
-    </div>
-  );
 
   const renderPopupStyleChip = (style) => (
     <button
@@ -742,18 +693,7 @@ export default function PopupCont({
             <Button variant="text" onClick={handleOpenSetting}>
               {i18n("popup_all_settings")}
             </Button>
-            <Button
-              ref={supportTriggerRef}
-              id={supportTriggerId}
-              variant="text"
-              aria-controls={supportDisclosureId}
-              aria-expanded={showSupport}
-              onClick={() => setShowSupport((current) => !current)}
-            >
-              {i18n("popup_support")}
-            </Button>
           </footer>
-          {supportDisclosure}
         </>
       )}
 

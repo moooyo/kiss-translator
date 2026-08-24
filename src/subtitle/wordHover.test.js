@@ -189,3 +189,136 @@ describe("WordTooltipController", () => {
     controller.destroy();
   });
 });
+
+// 实机测出来的:提示框固定显示在播放器右上角,而字幕在底部中间。离开单词后
+// 只留 100ms 就收起,鼠标根本走不到 —— 收藏和关闭两个按钮**从来就点不到**。
+// 所以这里钉的是「够得着」,不是「点了有反应」。
+//
+// 这些用例必须走真实路径:通过 attachSpanListeners 挂上监听,再在单词 span 上
+// 派发 pointerenter/pointerleave。直接在提示框上派发事件是测不出东西的 ——
+// 撤掉修复后根本没有计时器被安排,断言会照样通过。
+describe("WordTooltipController reachability", () => {
+  const OPEN_DELAY = 300;
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    document.body.innerHTML = "";
+    apiMicrosoftDict.mockReset();
+    apiMicrosoftDict.mockResolvedValue({
+      trs: [{ pos: "n.", def: "a definition" }],
+    });
+  });
+
+  afterEach(() => {
+    jest.runOnlyPendingTimers();
+    jest.useRealTimers();
+  });
+
+  /** 挂上监听、悬停单词、等提示框真正弹出来。 */
+  const hoverWordUntilTooltip = async (controller) => {
+    document.body.innerHTML =
+      '<div id="root"><span class="kiss-subtitle-word" data-word="behind">behind</span></div>';
+    const root = document.getElementById("root");
+    controller.attachSpanListeners(root);
+    const span = root.querySelector(".kiss-subtitle-word");
+
+    span.dispatchEvent(new Event("pointerenter"));
+    jest.advanceTimersByTime(OPEN_DELAY);
+    // showWordTooltip 是异步的,放行词典请求那几个微任务
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    return { span, tooltip: controller.tooltipEl };
+  };
+
+  test("opens a tooltip after hovering a word", async () => {
+    const controller = new WordTooltipController({});
+    const { tooltip } = await hoverWordUntilTooltip(controller);
+
+    expect(tooltip).not.toBeNull();
+    expect(tooltip.isConnected).toBe(true);
+    controller.destroy();
+  });
+
+  // 核心:离开单词已经安排了收起,指针走到提示框上必须把它取消掉。
+  test("keeps the tooltip alive once the pointer reaches it", async () => {
+    const controller = new WordTooltipController({});
+    const { span, tooltip } = await hoverWordUntilTooltip(controller);
+
+    span.dispatchEvent(new Event("pointerleave"));
+    tooltip.dispatchEvent(new Event("pointerenter"));
+    jest.advanceTimersByTime(10000);
+
+    expect(controller.tooltipEl).toBe(tooltip);
+    expect(tooltip.isConnected).toBe(true);
+    controller.destroy();
+  });
+
+  // 修复前离开单词只留 100ms,而提示框在播放器另一头,鼠标那时还在半路上。
+  test("still shows the tooltip 100ms after leaving the word", async () => {
+    const controller = new WordTooltipController({});
+    const { span, tooltip } = await hoverWordUntilTooltip(controller);
+
+    span.dispatchEvent(new Event("pointerleave"));
+    jest.advanceTimersByTime(100);
+
+    expect(controller.tooltipEl).toBe(tooltip);
+    controller.destroy();
+  });
+
+  test("hides when the pointer never arrives", async () => {
+    const controller = new WordTooltipController({});
+    const { span } = await hoverWordUntilTooltip(controller);
+
+    span.dispatchEvent(new Event("pointerleave"));
+    jest.advanceTimersByTime(10000);
+
+    expect(controller.tooltipEl).toBeNull();
+    controller.destroy();
+  });
+
+  test("hides again after the pointer leaves the tooltip", async () => {
+    const controller = new WordTooltipController({});
+    const { span, tooltip } = await hoverWordUntilTooltip(controller);
+
+    span.dispatchEvent(new Event("pointerleave"));
+    tooltip.dispatchEvent(new Event("pointerenter"));
+    jest.advanceTimersByTime(10000);
+    expect(controller.tooltipEl).toBe(tooltip);
+
+    tooltip.dispatchEvent(new Event("pointerleave"));
+    jest.advanceTimersByTime(10000);
+
+    expect(controller.tooltipEl).toBeNull();
+    controller.destroy();
+  });
+
+  test("reports pointer presence so the caller can hold playback", async () => {
+    const onTooltipHoverChange = jest.fn();
+    const controller = new WordTooltipController({ onTooltipHoverChange });
+    const { tooltip } = await hoverWordUntilTooltip(controller);
+
+    tooltip.dispatchEvent(new Event("pointerenter"));
+    expect(onTooltipHoverChange).toHaveBeenLastCalledWith(true);
+
+    tooltip.dispatchEvent(new Event("pointerleave"));
+    expect(onTooltipHoverChange).toHaveBeenLastCalledWith(false);
+    controller.destroy();
+  });
+
+  // 提示框消失了指针当然也不在它上面。漏掉这条通知,「按住不放」会一直挂着,
+  // 视频再也不会自己恢复播放。
+  test("clears pointer presence when the tooltip goes away", async () => {
+    const onTooltipHoverChange = jest.fn();
+    const controller = new WordTooltipController({ onTooltipHoverChange });
+    const { tooltip } = await hoverWordUntilTooltip(controller);
+    tooltip.dispatchEvent(new Event("pointerenter"));
+    onTooltipHoverChange.mockClear();
+
+    controller.hideWordTooltip();
+
+    expect(onTooltipHoverChange).toHaveBeenCalledWith(false);
+    controller.destroy();
+  });
+});

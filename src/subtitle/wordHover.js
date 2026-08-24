@@ -154,20 +154,48 @@ function hasDictionaryPayload(dictResult) {
   );
 }
 
+// 悬停多久才弹提示框。短了会在扫读时乱弹。
+const TOOLTIP_OPEN_DELAY = 300;
+
+// 离开单词后多久收起提示框。
+//
+// 这里必须给足鼠标**走过去**的时间:提示框固定显示在播放器右上角,而字幕在
+// 底部中间,一次移动要跨半个播放器。原来是 100ms —— 走不到,所以提示框里的
+// 收藏和关闭两个按钮**从来就点不到**,不是「× 坏了」而是根本够不着。
+// 指针一旦进入提示框,这个计时器就会被取消(见 showWordTooltip)。
+const TOOLTIP_HIDE_DELAY = 500;
+
 export class WordTooltipController {
   constructor({
     getVideoContainer,
     getTimestamp,
     autoFavWord = false,
     i18n = () => "",
-  }) {
+    onTooltipHoverChange,
+  } = {}) {
     this.getVideoContainer = getVideoContainer;
     this.getTimestamp = getTimestamp;
     this.autoFavWord = autoFavWord;
     this.i18n = i18n;
+    // 指针是否停在提示框上。字幕管理器用它决定要不要恢复播放 ——
+    // 用户正在读释义时把视频放走,等于让字幕从他眼皮底下跑掉。
+    this.onTooltipHoverChange = onTooltipHoverChange;
     this.tooltipEl = null;
     this.hoverTimeout = null;
     this.activeWordEl = null;
+  }
+
+  /**
+   * 安排收起提示框,可被指针重新进入取消。
+   * @returns {void}
+   */
+  #scheduleHideTooltip() {
+    if (this.hoverTimeout) {
+      clearTimeout(this.hoverTimeout);
+    }
+    this.hoverTimeout = setTimeout(() => {
+      this.hideWordTooltip();
+    }, TOOLTIP_HIDE_DELAY);
   }
 
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
@@ -215,7 +243,7 @@ export class WordTooltipController {
       this.showWordTooltip(target.dataset.word, {
         timestamp: getTimestamp?.() ?? 0,
       });
-    }, 300);
+    }, TOOLTIP_OPEN_DELAY);
   }
 
   #handleWordHoverOut(event) {
@@ -227,14 +255,7 @@ export class WordTooltipController {
       this.activeWordEl = null;
     }
 
-    if (this.hoverTimeout) {
-      clearTimeout(this.hoverTimeout);
-      this.hoverTimeout = null;
-    }
-
-    this.hoverTimeout = setTimeout(() => {
-      this.hideWordTooltip();
-    }, 100);
+    this.#scheduleHideTooltip();
   }
 
   async showWordTooltip(word, { timestamp = 0 } = {}) {
@@ -261,6 +282,22 @@ export class WordTooltipController {
       if (event.target?.closest?.(".kiss-word-tooltip-close")) {
         this.hideWordTooltip();
       }
+    });
+
+    // 指针停在提示框上时不能收起它 —— 否则收藏和关闭两个按钮永远够不着:
+    // 离开单词就启动了收起计时器,而提示框在播放器另一头。
+    // 同时通知外面别恢复播放,不然用户刚要点,字幕就从眼皮底下跑掉了。
+    tooltipEl.addEventListener("pointerenter", () => {
+      if (this.hoverTimeout) {
+        clearTimeout(this.hoverTimeout);
+        this.hoverTimeout = null;
+      }
+      this.onTooltipHoverChange?.(true);
+    });
+
+    tooltipEl.addEventListener("pointerleave", () => {
+      this.#scheduleHideTooltip();
+      this.onTooltipHoverChange?.(false);
     });
 
     const videoContainer = this.getVideoContainer?.();
@@ -334,6 +371,9 @@ export class WordTooltipController {
     if (this.tooltipEl) {
       this.tooltipEl.remove();
       this.tooltipEl = null;
+      // 提示框没了,指针当然也就不在它上面 —— 不通知的话,
+      // 「按住不放」的状态会一直挂着,视频再也不会自己恢复。
+      this.onTooltipHoverChange?.(false);
     }
   }
 

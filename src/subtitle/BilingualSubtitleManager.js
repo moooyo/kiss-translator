@@ -11,6 +11,10 @@ import {
   wrapWordsWithSpans,
 } from "./wordHover.js";
 
+// 离开字幕窗口后隔多久恢复播放。要覆盖住鼠标走到查词提示框所需的时间,
+// 并且必须 >= wordHover.js 里 TOOLTIP_HIDE_DELAY 之前指针能到达提示框的时间。
+const RESUME_AFTER_HOVER_DELAY = 500;
+
 /**
  * @class BilingualSubtitleManager
  * @description 负责控制在 YouTube 原生视频播放器上悬浮渲染双语字幕，以及对字幕进行预翻译缓存管理的核心逻辑类
@@ -30,6 +34,8 @@ export class BilingualSubtitleManager {
   #translationSessionId = 0; // 当前翻译会话版本 ID，用于防竞态过滤过期异步请求
   #abortController = null; // 用于在实例销毁时中止所有尚未返回的网络请求
   #wasPlayingBeforeHover = false; // 记录鼠标 hover 单词前视频是否原本处于播放状态，用于离开时恢复播放
+  #pointerOverTooltip = false; // 指针是否停在查词提示框上，停着就先别恢复播放
+  #resumeAfterHoverTimer = null; // 离开字幕窗口后的延迟恢复计时器
   #hoverTarget = null;
   #playerControlBarObserver = null; // 监听播放器底部控制条显隐突变的 MutationObserver
   #syncPaperBottomAfterDrag = null; // 拖拽结束后按当前控制条状态修正字幕位置
@@ -63,6 +69,14 @@ export class BilingualSubtitleManager {
       this.#wordTooltipController = new WordTooltipController({
         getVideoContainer: () => this.#videoEl.parentElement?.parentElement,
         getTimestamp: () => this.#getCurrentSubtitleStartTime(),
+        onTooltipHoverChange: (isOver) => {
+          this.#pointerOverTooltip = isOver;
+          if (isOver) {
+            this.#cancelPendingResume();
+          } else {
+            this.#scheduleResumeAfterHover();
+          }
+        },
       });
     }
   }
@@ -108,6 +122,8 @@ export class BilingualSubtitleManager {
     // 移除字幕渲染容器
     // 先恢复播放：容器就在光标底下，一旦移除 pointerleave 永远不会触发，
     // 悬浮查词暂停的视频会一直停着，而字幕窗口已经消失、用户无从恢复。
+    this.#cancelPendingResume();
+    this.#pointerOverTooltip = false;
     this.#resumeVideoPausedForHover();
     this.#captionWindowEl?.parentElement?.parentElement?.remove();
     // 释放 MutationObserver 监听器
@@ -126,6 +142,37 @@ export class BilingualSubtitleManager {
    * 还是字幕窗口在光标底下被整个拆掉（此时 pointerleave 不会触发），
    * 都能保证视频不会被留在暂停状态。
    */
+  /**
+   * 取消挂起的恢复播放。
+   * @returns {void}
+   */
+  #cancelPendingResume() {
+    if (this.#resumeAfterHoverTimer !== null) {
+      clearTimeout(this.#resumeAfterHoverTimer);
+      this.#resumeAfterHoverTimer = null;
+    }
+  }
+
+  /**
+   * 延迟恢复播放,给鼠标留出走到查词提示框的时间。
+   *
+   * 立刻恢复的话,用户从字幕移向提示框的**路上**视频就跑起来了 —— 而那正是
+   * 他要去点收藏/关闭的时候。指针落到提示框上会取消这次恢复,
+   * 离开提示框再重新安排。
+   *
+   * @returns {void}
+   */
+  #scheduleResumeAfterHover() {
+    this.#cancelPendingResume();
+    if (!this.#wasPlayingBeforeHover) return;
+
+    this.#resumeAfterHoverTimer = setTimeout(() => {
+      this.#resumeAfterHoverTimer = null;
+      if (this.#pointerOverTooltip) return;
+      this.#resumeVideoPausedForHover();
+    }, RESUME_AFTER_HOVER_DELAY);
+  }
+
   #resumeVideoPausedForHover() {
     const shouldResume = this.#wasPlayingBeforeHover;
     this.#wasPlayingBeforeHover = false;
@@ -255,7 +302,11 @@ export class BilingualSubtitleManager {
     if (isHoverLookupEnabled) {
       this.#captionWindowEl.addEventListener("pointerenter", (e) => {
         if (e.target === this.#captionWindowEl) {
-          this.#wasPlayingBeforeHover = this.#videoEl && !this.#videoEl.paused;
+          // 从提示框走回字幕上,挂起的恢复要取消,否则视频会在半路跑起来
+          this.#cancelPendingResume();
+          this.#wasPlayingBeforeHover =
+            this.#wasPlayingBeforeHover ||
+            (this.#videoEl && !this.#videoEl.paused);
           if (this.#videoEl && !this.#videoEl.paused) {
             this.#videoEl.pause();
           }
@@ -264,7 +315,7 @@ export class BilingualSubtitleManager {
 
       this.#captionWindowEl.addEventListener("pointerleave", (e) => {
         if (e.target === this.#captionWindowEl) {
-          this.#resumeVideoPausedForHover();
+          this.#scheduleResumeAfterHover();
           this.#hoverTarget = null;
         }
       });

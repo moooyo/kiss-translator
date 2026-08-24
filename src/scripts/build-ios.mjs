@@ -2,8 +2,8 @@
 
 console.log(chalk.cyan("\nBuilding iOS Userscript...\n"));
 
-const srcFile = "build/web/kiss-translator.user.js";
-const destFile = "build/web/kiss-translator-ios-safari.user.js";
+const srcFile = "build/web/kiss-translator-m3.user.js";
+const destFile = "build/web/kiss-translator-m3-ios-safari.user.js";
 const userscriptDir = "build/userscript"; // 目标汇总目录
 
 try {

@@ -28,6 +28,8 @@ import {
   MSG_SET_LOGLEVEL,
   MSG_CLEAR_CACHES,
   MSG_OPEN_SEPARATE_WINDOW,
+  MSG_FIT_SEPARATE_WINDOW,
+  SEPARATE_WINDOW_CONTENT_WIDTH,
   STOKEY_SEPARATE_WINDOW,
   PORT_STREAM_FETCH,
   MSG_UPDATE_ICON,
@@ -145,16 +147,17 @@ const CSP_REMOVE_HEADERS = [
 // 独立窗口 (TranBox 独立窗口模式) 的全局状态变量
 let separateWindowId = null; // 当前已打开窗口的 ID
 let lastKnownBounds = null; // 缓存窗口最后一次有效的屏幕位置坐标与大小
+let separateWindowFitPending = false; // 本次是否按出厂值打开、还等着按内容收一次
 
-// 独立翻译窗口的出厂尺寸。曾经是 400x400 —— 那个高度连「原文输入框 + 语言行 +
-// 译文卡片」都放不下,一打开就得手动拉大。下面这组按内容实际所需推出来:
-// 面板本身宽 min(720px, 100vw)(见 Popup/styles.js 的 .kt-popup-shell--window),
-// 加窗口边框约 20px;高度是 输入框 112 + 页脚 52 + 语言行 60 + 译文卡片 180
-// + 对比更多服务 70 + 内外边距,再留一点余量。
+// 独立翻译窗口的出厂尺寸,只是「测出真实高度之前」的一个起手值 ——
+// 窗口内容一渲染完就会由 MSG_FIT_SEPARATE_WINDOW 收到刚好合适的高度。
+// 宽度不参与自适应:内容有设计上限,再宽只是两侧留白(见 Popup/styles.js)。
+// 之所以还要个像样的起手值,是为了少一次肉眼可见的窗口跳动。
+const SEPARATE_WINDOW_CHROME_ALLOWANCE = 24;
 const DEFAULT_SEPARATE_WINDOW_BOUNDS = {
   left: 100,
   top: 100,
-  width: 740,
+  width: SEPARATE_WINDOW_CONTENT_WIDTH + SEPARATE_WINDOW_CHROME_ALLOWANCE,
   height: 720,
 };
 
@@ -187,6 +190,46 @@ async function centerOnFocusedWindow({ width, height }) {
   } catch (err) {
     kissLog("center separate window", err);
     return null;
+  }
+}
+
+/**
+ * 把独立窗口收到内容刚好需要的大小。
+ *
+ * 高度没法在编译期算准 —— 它随界面语言(标签换不换行)、浏览器缩放、系统字号
+ * 变化。所以窗口先按起手值打开,页面渲染完自己量一遍再回来告诉后台。
+ *
+ * 只在「这次是按出厂值打开的」时候生效:用户存过尺寸就说明他自己调过,
+ * 再去收窄等于把他的选择推翻。
+ *
+ * @param {Object} args 页面量出来的期望尺寸(已含窗口边框)与屏幕可用区域
+ * @returns {Promise<void>}
+ */
+async function fitSeparateWindow(args) {
+  if (!separateWindowFitPending || separateWindowId === null) return;
+  separateWindowFitPending = false;
+
+  const { width, height, availWidth, availHeight } = args || {};
+  if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+
+  // 留一点余量,免得贴着屏幕边或被任务栏压住
+  const maxWidth = Number.isFinite(availWidth) ? availWidth - 40 : Infinity;
+  const maxHeight = Number.isFinite(availHeight) ? availHeight - 80 : Infinity;
+  const nextWidth = Math.round(Math.max(360, Math.min(width, maxWidth)));
+  const nextHeight = Math.round(Math.max(320, Math.min(height, maxHeight)));
+
+  try {
+    const win = await browser.windows.get(separateWindowId);
+    // 用户在我们量完之前就自己拖过了,那就别动
+    if (!win || win.state !== "normal") return;
+
+    await browser.windows.update(separateWindowId, {
+      width: nextWidth,
+      height: nextHeight,
+    });
+    kissLog("Separate window fitted to content", { nextWidth, nextHeight });
+  } catch (err) {
+    kissLog("fit separate window", err);
   }
 }
 
@@ -228,7 +271,9 @@ async function openSeparateWindowWithSavedBounds() {
       saved || {}
     );
 
-    // 只有第一次打开(没有存过位置)才居中。之后要尊重用户自己摆的位置。
+    // 只有第一次打开(没有存过位置)才居中、才按内容收窄。
+    // 存过就说明用户自己调过,两样都不该再动。
+    separateWindowFitPending = !saved;
     if (!saved) {
       const centered = await centerOnFocusedWindow(bounds);
       if (centered) Object.assign(bounds, centered);
@@ -321,6 +366,7 @@ browser.windows?.onRemoved?.addListener?.(async (windowId) => {
 
     separateWindowId = null;
     lastKnownBounds = null;
+    separateWindowFitPending = false;
   }
 });
 
@@ -618,6 +664,7 @@ const messageHandlers = {
   [MSG_SET_LOGLEVEL]: (args) => logger.setLevel(args), // 修改运行时的日志记录等级
   [MSG_CLEAR_CACHES]: () => tryClearCaches(), // 清空翻译缓存
   [MSG_OPEN_SEPARATE_WINDOW]: () => openSeparateWindowWithSavedBounds(), // 打开独立翻译小窗口
+  [MSG_FIT_SEPARATE_WINDOW]: (args) => fitSeparateWindow(args), // 独立窗口按内容收到合适大小
   [MSG_UPDATE_ICON]: (args, sender) => updateIcon(args, sender?.tab?.id), // 变更页面的插件高亮图标
 };
 

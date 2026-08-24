@@ -2,6 +2,9 @@ import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { useSetting } from "../../hooks/Setting";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
+import { sendBgMsg } from "../../libs/msg";
+import { MSG_FIT_SEPARATE_WINDOW } from "../../config";
+import { SEPARATE_WINDOW_CONTENT_WIDTH } from "../../config/app";
 import { Trantab } from ".";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,6 +29,7 @@ jest.mock("../../libs/browser", () => ({
     },
   },
 }));
+jest.mock("../../libs/msg", () => ({ sendBgMsg: jest.fn() }));
 jest.mock("./PopupCont", () => () => null);
 jest.mock("./Header", () => () => null);
 jest.mock("../Selection/TranForm", () => {
@@ -184,5 +188,105 @@ describe("Trantab clipboard translation", () => {
       container.querySelector('[data-testid="tran-form"]').textContent
     ).toBe("new clipboard text");
     act(() => root.unmount());
+  });
+});
+
+// 独立窗口的高度编译期算不准 —— 界面语言、浏览器缩放、系统字号都会改变它。
+// 所以窗口先按起手值打开,内容渲染完页面量一遍再让后台收到刚好。
+describe("separate window auto-fit", () => {
+  let container;
+  let root;
+  let rafCallbacks;
+  let originalRaf;
+
+  const setWindowMetric = (name, value) =>
+    Object.defineProperty(window, name, {
+      configurable: true,
+      writable: true,
+      value,
+    });
+
+  beforeEach(() => {
+    sendBgMsg.mockClear();
+    useSetting.mockReturnValue({ setting });
+    readClipboardTextIfAllowed.mockResolvedValue(null);
+    container = document.createElement("div");
+    document.body.appendChild(container);
+    root = createRoot(container);
+
+    // 先把 rAF 的回调攒起来:面板要先渲染出来,才能给它设 scrollHeight
+    rafCallbacks = [];
+    originalRaf = window.requestAnimationFrame;
+    window.requestAnimationFrame = (callback) => {
+      rafCallbacks.push(callback);
+      return rafCallbacks.length;
+    };
+
+    setWindowMetric("outerHeight", 800);
+    setWindowMetric("innerHeight", 760); // 标题栏 + 边框 = 40
+    setWindowMetric("outerWidth", 760);
+    setWindowMetric("innerWidth", 744); // 左右边框 = 16
+  });
+
+  afterEach(() => {
+    window.requestAnimationFrame = originalRaf;
+    act(() => root.unmount());
+    document.body.innerHTML = "";
+  });
+
+  const renderAndMeasure = async (panelHeight) => {
+    await act(async () => {
+      root.render(<Trantab isSeparate />);
+      await Promise.resolve();
+    });
+    const panel = container.querySelector(".kt-popup-text-panel");
+    if (panel && panelHeight !== undefined) {
+      Object.defineProperty(panel, "scrollHeight", {
+        configurable: true,
+        value: panelHeight,
+      });
+    }
+    act(() => rafCallbacks.forEach((callback) => callback()));
+  };
+
+  test("asks the background to fit the measured content height", async () => {
+    await renderAndMeasure(612);
+
+    expect(sendBgMsg).toHaveBeenCalledTimes(1);
+    const [action, args] = sendBgMsg.mock.calls[0];
+    expect(action).toBe(MSG_FIT_SEPARATE_WINDOW);
+    // 内容 612 + 窗口边框 40
+    expect(args.height).toBe(652);
+  });
+
+  test("keeps width at the design cap rather than measuring it", async () => {
+    await renderAndMeasure(612);
+
+    // 宽度不测:超过上限只会让一行文字长到扫不过来。加的是左右边框。
+    expect(sendBgMsg.mock.calls[0][1].width).toBe(
+      SEPARATE_WINDOW_CONTENT_WIDTH + 16
+    );
+  });
+
+  test("does not measure the ordinary popup", async () => {
+    await act(async () => {
+      root.render(<Trantab />);
+      await Promise.resolve();
+    });
+    act(() => rafCallbacks.forEach((callback) => callback()));
+
+    expect(sendBgMsg).not.toHaveBeenCalled();
+  });
+
+  test("waits for the settings before measuring", async () => {
+    // 设置没加载完时渲染的是固定高的加载态,这时候量会把窗口收成一条缝
+    useSetting.mockReturnValue({ setting: null });
+    await act(async () => {
+      root.render(<Trantab isSeparate />);
+      await Promise.resolve();
+    });
+    act(() => rafCallbacks.forEach((callback) => callback()));
+
+    expect(sendBgMsg).not.toHaveBeenCalled();
   });
 });

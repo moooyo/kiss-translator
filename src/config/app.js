@@ -20,6 +20,13 @@ export const APP_CONSTS = {
 // 当前应用的版本，按点号拆分成数组 (例如: "1.0.2" -> ["1", "0", "2"])
 export const APP_VERSION = process.env.REACT_APP_VERSION.split(".");
 
+// 独立翻译窗口里内容的宽度上限。这是个**设计决定**,不是可测量的量 ——
+// 再宽一行文字就长到扫不过来,所以窗口拉宽只该是两侧留白变多。
+// Popup/styles.js 用它限住面板,background.js 用它推出厂窗口宽度;
+// 放这里是因为 background 是独立打包入口,从 views 里引会把整份 CSS 字符串
+// 拖进后台包,只为了一个数字。
+export const SEPARATE_WINDOW_CONTENT_WIDTH = 720;
+
 // 主题模式常量
 export const THEME_LIGHT = "light"; // 浅色模式
 export const THEME_DARK = "dark"; // 深色模式

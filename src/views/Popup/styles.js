@@ -1,3 +1,5 @@
+import { SEPARATE_WINDOW_CONTENT_WIDTH } from "../../config/app";
+
 export const POPUP_STYLES = String.raw`
 .kt-popup-shell {
   width: 396px;
@@ -20,7 +22,7 @@ export const POPUP_STYLES = String.raw`
 
 .kt-popup-shell--window .kt-popup-text-panel,
 .kt-popup-shell--window .kt-popup-loading {
-  width: min(720px, 100%);
+  width: min(${SEPARATE_WINDOW_CONTENT_WIDTH}px, 100%);
   margin-inline: auto;
 }
 

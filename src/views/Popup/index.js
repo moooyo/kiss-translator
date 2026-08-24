@@ -16,6 +16,8 @@ import Header from "./Header";
 import {
   MSG_OPEN_OPTIONS,
   MSG_OPEN_SEPARATE_WINDOW,
+  MSG_FIT_SEPARATE_WINDOW,
+  SEPARATE_WINDOW_CONTENT_WIDTH,
   DEFAULT_SETTING,
   GLOBLA_RULE,
   resolveApiPromptList,
@@ -28,6 +30,43 @@ import { isAutoTranslateClipboardSupported } from "../../libs/client";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
 import { POPUP_STYLES } from "./styles";
 import { loadPopupData } from "./loadData";
+
+/**
+ * 独立窗口打开后,量出内容真正需要多高,请后台把窗口收到那个尺寸。
+ *
+ * 为什么不在后台直接算:高度取决于界面语言(标签换不换行)、浏览器缩放、
+ * 系统字号 —— 这些只有页面自己渲染完才知道。宽度反过来不测,它有设计上限
+ * (SEPARATE_WINDOW_CONTENT_WIDTH),再宽一行文字就长到扫不过来了。
+ *
+ * 只量一次:内容会随着输入和译文返回变高,跟着变会让窗口在用户打字时乱跳。
+ *
+ * @param {boolean} enabled 是否处于独立窗口且内容已经渲染
+ * @returns {void}
+ */
+function useFitSeparateWindow(enabled) {
+  useEffect(() => {
+    if (!enabled) return undefined;
+
+    // 等一帧,让布局落定再量,否则量到的是上一帧的高度
+    const frame = requestAnimationFrame(() => {
+      const panel = document.querySelector(".kt-popup-text-panel");
+      if (!panel) return;
+
+      // outer - inner 就是标题栏和边框占掉的部分,各平台不一样,只能实测
+      const chromeHeight = Math.max(0, window.outerHeight - window.innerHeight);
+      const chromeWidth = Math.max(0, window.outerWidth - window.innerWidth);
+
+      sendBgMsg(MSG_FIT_SEPARATE_WINDOW, {
+        width: SEPARATE_WINDOW_CONTENT_WIDTH + chromeWidth,
+        height: Math.ceil(panel.scrollHeight) + chromeHeight,
+        availWidth: window.screen?.availWidth,
+        availHeight: window.screen?.availHeight,
+      });
+    });
+
+    return () => cancelAnimationFrame(frame);
+  }, [enabled]);
+}
 
 /**
  * 文本翻译面板组件 (用于直接在 Popup 中输入文本进行翻译)
@@ -102,6 +141,10 @@ export function Trantab({ isSeparate = false }) {
     window.addEventListener("focus", translateClipboard);
     return () => window.removeEventListener("focus", translateClipboard);
   }, [isSeparate, translateClipboard]);
+
+  // 必须等设置加载完 —— 在那之前渲染的是 260px 高的加载态,
+  // 这时候量会把窗口收成一条缝。
+  useFitSeparateWindow(isSeparate && Boolean(setting?.tranboxSetting));
 
   if (!setting?.tranboxSetting) {
     return (

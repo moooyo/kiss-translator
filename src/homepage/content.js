@@ -64,7 +64,7 @@ const baseContent = {
     title:
       "Minimalist. Open-source. An all-scenario geek-style translation tool.",
     subtitle:
-      "KISS Translator brings page translation, selection lookup, input-box translation, and YouTube subtitles into one lightweight browser extension and userscript.",
+      "KISS Translator M3 brings page translation, selection lookup, input-box translation, and YouTube subtitles into one lightweight browser extension and userscript.",
     installExtension: "Install Extension",
     installUserscript: "Install Userscript",
     openOptions: "Open Script Settings",
@@ -72,10 +72,10 @@ const baseContent = {
     status: ["Extension", "Userscript", "AI APIs", "Rules", "Sync"],
     installTitle: "Install targets",
     installSubtitle: "Pick the client that fits your browser and workflow.",
-    videoTitle: "See KISS Translator in action",
+    videoTitle: "See KISS Translator M3 in action",
     videoSubtitle:
       "Watch these introductions to explore the main features and workflows.",
-    videoLabel: "KISS Translator introduction video",
+    videoLabel: "KISS Translator M3 introduction video",
     watchOnYouTube: "Watch on YouTube",
     featureTitle: "Translation workspace",
     featureSubtitle:
@@ -289,7 +289,7 @@ const translations = {
     eyebrow: "开源翻译工具箱",
     title: "简约。开源。全场景极客式翻译工具。",
     subtitle:
-      "KISS Translator 将网页翻译、划词查询、输入框翻译和 YouTube 字幕整合到一个轻量的浏览器扩展与油猴脚本中。",
+      "KISS Translator M3 将网页翻译、划词查询、输入框翻译和 YouTube 字幕整合到一个轻量的浏览器扩展与油猴脚本中。",
     installExtension: "安装扩展",
     installUserscript: "安装脚本",
     openOptions: "打开脚本设置",
@@ -299,8 +299,8 @@ const translations = {
     installSubtitle: "选择适合你的浏览器和使用方式的客户端。",
     videoTitle: "视频介绍",
     videoSubtitle:
-      "通过这些介绍视频了解 KISS Translator 的主要功能和使用方式。",
-    videoLabel: "KISS Translator 介绍视频",
+      "通过这些介绍视频了解 KISS Translator M3 的主要功能和使用方式。",
+    videoLabel: "KISS Translator M3 介绍视频",
     watchOnYouTube: "在 YouTube 观看",
     featureTitle: "翻译工作台",
     featureSubtitle:
@@ -356,7 +356,7 @@ const translations = {
     eyebrow: "開源翻譯工具箱",
     title: "簡約。開源。全場景極客式翻譯工具。",
     subtitle:
-      "KISS Translator 將網頁翻譯、劃詞查詢、輸入框翻譯和 YouTube 字幕整合到輕量的瀏覽器擴充套件與使用者腳本中。",
+      "KISS Translator M3 將網頁翻譯、劃詞查詢、輸入框翻譯和 YouTube 字幕整合到輕量的瀏覽器擴充套件與使用者腳本中。",
     installExtension: "安裝擴充套件",
     installUserscript: "安裝腳本",
     openOptions: "開啟腳本設定",
@@ -366,8 +366,8 @@ const translations = {
     installSubtitle: "選擇適合你的瀏覽器與工作流程的用戶端。",
     videoTitle: "影片介紹",
     videoSubtitle:
-      "透過這些介紹影片瞭解 KISS Translator 的主要功能與使用方式。",
-    videoLabel: "KISS Translator 介紹影片",
+      "透過這些介紹影片瞭解 KISS Translator M3 的主要功能與使用方式。",
+    videoLabel: "KISS Translator M3 介紹影片",
     watchOnYouTube: "在 YouTube 觀看",
     featureTitle: "翻譯工作台",
     featureSubtitle: "覆蓋閱讀、劃詞、寫作、影片字幕和自訂介面的緊湊能力面板。",
@@ -422,7 +422,7 @@ const translations = {
     eyebrow: "オープンソース翻訳ツールキット",
     title: "ミニマル。オープンソース。全シーン対応のギークスタイル翻訳ツール。",
     subtitle:
-      "KISS Translator はページ翻訳、選択テキスト翻訳、入力欄翻訳、YouTube 字幕翻訳を軽量な拡張機能とユーザースクリプトにまとめます。",
+      "KISS Translator M3 はページ翻訳、選択テキスト翻訳、入力欄翻訳、YouTube 字幕翻訳を軽量な拡張機能とユーザースクリプトにまとめます。",
     installExtension: "拡張機能を入手",
     installUserscript: "スクリプトを入手",
     openOptions: "スクリプト設定を開く",
@@ -432,8 +432,8 @@ const translations = {
     installSubtitle: "ブラウザと使い方に合うクライアントを選べます。",
     videoTitle: "紹介動画",
     videoSubtitle:
-      "紹介動画で KISS Translator の主な機能と使い方をご覧ください。",
-    videoLabel: "KISS Translator 紹介動画",
+      "紹介動画で KISS Translator M3 の主な機能と使い方をご覧ください。",
+    videoLabel: "KISS Translator M3 紹介動画",
     watchOnYouTube: "YouTube で見る",
     featureTitle: "翻訳ワークスペース",
     featureSubtitle:
@@ -489,7 +489,7 @@ const translations = {
     eyebrow: "오픈 소스 번역 도구",
     title: "미니멀. 오픈 소스. 모든 상황을 위한 긱(Geek) 스타일 번역 도구.",
     subtitle:
-      "KISS Translator는 웹페이지 번역, 선택 번역, 입력창 번역, YouTube 자막 번역을 가벼운 브라우저 확장과 유저스크립트로 제공합니다.",
+      "KISS Translator M3는 웹페이지 번역, 선택 번역, 입력창 번역, YouTube 자막 번역을 가벼운 브라우저 확장과 유저스크립트로 제공합니다.",
     installExtension: "확장 설치",
     installUserscript: "스크립트 설치",
     openOptions: "스크립트 설정 열기",
@@ -499,8 +499,8 @@ const translations = {
     installSubtitle: "브라우저와 작업 방식에 맞는 클라이언트를 선택하세요.",
     videoTitle: "소개 동영상",
     videoSubtitle:
-      "소개 동영상에서 KISS Translator의 주요 기능과 사용 방법을 확인하세요.",
-    videoLabel: "KISS Translator 소개 동영상",
+      "소개 동영상에서 KISS Translator M3의 주요 기능과 사용 방법을 확인하세요.",
+    videoLabel: "KISS Translator M3 소개 동영상",
     watchOnYouTube: "YouTube에서 보기",
     featureTitle: "번역 작업 공간",
     featureSubtitle:
@@ -557,7 +557,7 @@ const translations = {
     title:
       "Minimaliste. Open source. Un outil de traduction style geek tout-terrain.",
     subtitle:
-      "KISS Translator regroupe traduction de pages, selection de texte, champs de saisie et sous-titres YouTube dans une extension et un userscript legers.",
+      "KISS Translator M3 regroupe traduction de pages, selection de texte, champs de saisie et sous-titres YouTube dans une extension et un userscript legers.",
     installExtension: "Installer l'extension",
     installUserscript: "Installer le script",
     openOptions: "Ouvrir les paramètres du script",
@@ -568,8 +568,8 @@ const translations = {
       "Choisissez le client adapte a votre navigateur et a votre flux de travail.",
     videoTitle: "Vidéos de présentation",
     videoSubtitle:
-      "Découvrez les principales fonctions et méthodes de travail de KISS Translator.",
-    videoLabel: "Vidéo de présentation de KISS Translator",
+      "Découvrez les principales fonctions et méthodes de travail de KISS Translator M3.",
+    videoLabel: "Vidéo de présentation de KISS Translator M3",
     watchOnYouTube: "Regarder sur YouTube",
     featureTitle: "Espace de traduction",
     featureSubtitle:
@@ -626,7 +626,7 @@ const translations = {
     title:
       "Minimalistisch. Open-Source. Ein Allround-Geek-Style-Ubersetzungstool.",
     subtitle:
-      "KISS Translator bundelt Seitenubersetzung, Auswahlubersetzung, Eingabefeld-Ubersetzung und YouTube-Untertitel in einer schlanken Erweiterung und einem Userscript.",
+      "KISS Translator M3 bundelt Seitenubersetzung, Auswahlubersetzung, Eingabefeld-Ubersetzung und YouTube-Untertitel in einer schlanken Erweiterung und einem Userscript.",
     installExtension: "Erweiterung installieren",
     installUserscript: "Script installieren",
     openOptions: "Skripteinstellungen öffnen",
@@ -637,8 +637,8 @@ const translations = {
       "Wahlen Sie den Client fur Ihren Browser und Arbeitsablauf.",
     videoTitle: "Einführungsvideos",
     videoSubtitle:
-      "Lernen Sie die wichtigsten Funktionen und Arbeitsabläufe von KISS Translator kennen.",
-    videoLabel: "KISS Translator Einführungsvideo",
+      "Lernen Sie die wichtigsten Funktionen und Arbeitsabläufe von KISS Translator M3 kennen.",
+    videoLabel: "KISS Translator M3 Einführungsvideo",
     watchOnYouTube: "Auf YouTube ansehen",
     featureTitle: "Ubersetzungsarbeitsplatz",
     featureSubtitle:
@@ -695,7 +695,7 @@ const translations = {
     title:
       "Minimalista. Codigo abierto. Una herramienta de traduccion estilo geek para cualquier situacion.",
     subtitle:
-      "KISS Translator une traduccion de paginas, seleccion de texto, campos de entrada y subtitulos de YouTube en una extension y un userscript ligeros.",
+      "KISS Translator M3 une traduccion de paginas, seleccion de texto, campos de entrada y subtitulos de YouTube en una extension y un userscript ligeros.",
     installExtension: "Instalar extension",
     installUserscript: "Instalar script",
     openOptions: "Abrir configuración del script",
@@ -706,8 +706,8 @@ const translations = {
       "Elige el cliente que encaje con tu navegador y flujo de trabajo.",
     videoTitle: "Vídeos de introducción",
     videoSubtitle:
-      "Descubre las funciones y los flujos de trabajo principales de KISS Translator.",
-    videoLabel: "Vídeo de introducción de KISS Translator",
+      "Descubre las funciones y los flujos de trabajo principales de KISS Translator M3.",
+    videoLabel: "Vídeo de introducción de KISS Translator M3",
     watchOnYouTube: "Ver en YouTube",
     featureTitle: "Espacio de traduccion",
     featureSubtitle:
@@ -764,7 +764,7 @@ const translations = {
     title:
       "Tối giản. Mã nguồn mở. Công cụ dịch thuật phong cách geek cho mọi tình huống.",
     subtitle:
-      "KISS Translator kết hợp dịch trang web, tra cứu văn bản được chọn, dịch trong ô nhập và phụ đề YouTube vào một tiện ích trình duyệt cùng userscript gọn nhẹ.",
+      "KISS Translator M3 kết hợp dịch trang web, tra cứu văn bản được chọn, dịch trong ô nhập và phụ đề YouTube vào một tiện ích trình duyệt cùng userscript gọn nhẹ.",
     installExtension: "Cài đặt tiện ích",
     installUserscript: "Cài đặt userscript",
     openOptions: "Mở cài đặt tập lệnh",
@@ -775,8 +775,8 @@ const translations = {
       "Chọn ứng dụng phù hợp với trình duyệt và cách làm việc của bạn.",
     videoTitle: "Video giới thiệu",
     videoSubtitle:
-      "Khám phá các tính năng và quy trình làm việc chính của KISS Translator qua các video này.",
-    videoLabel: "Video giới thiệu KISS Translator",
+      "Khám phá các tính năng và quy trình làm việc chính của KISS Translator M3 qua các video này.",
+    videoLabel: "Video giới thiệu KISS Translator M3",
     watchOnYouTube: "Xem trên YouTube",
     installMeta: {
       extension: "Tiện ích trình duyệt",
@@ -836,7 +836,7 @@ const translations = {
     eyebrow: "Инструменты перевода с открытым исходным кодом",
     title: "Минимализм. Открытый код. Переводчик в стиле гик для любых задач.",
     subtitle:
-      "KISS Translator объединяет перевод веб-страниц, выделенного текста, полей ввода и субтитров YouTube в лёгком браузерном расширении и userscript.",
+      "KISS Translator M3 объединяет перевод веб-страниц, выделенного текста, полей ввода и субтитров YouTube в лёгком браузерном расширении и userscript.",
     installExtension: "Установить расширение",
     installUserscript: "Установить userscript",
     openOptions: "Открыть настройки скрипта",
@@ -847,8 +847,8 @@ const translations = {
       "Выберите клиент, подходящий для вашего браузера и рабочего процесса.",
     videoTitle: "Обзорные видео",
     videoSubtitle:
-      "Познакомьтесь с основными функциями и сценариями работы KISS Translator.",
-    videoLabel: "Обзорное видео KISS Translator",
+      "Познакомьтесь с основными функциями и сценариями работы KISS Translator M3.",
+    videoLabel: "Обзорное видео KISS Translator M3",
     watchOnYouTube: "Смотреть на YouTube",
     installMeta: {
       extension: "Расширение браузера",

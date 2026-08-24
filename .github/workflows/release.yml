@@ -10,6 +10,18 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          # merge-base 需要完整历史，默认的浅克隆拿不到。
+          fetch-depth: 0
+
+      # dev-newui 是这个 fork 的发布分支。工作流由 tag 触发，从任何分支打 tag
+      # 都会跑到这里，所以在花掉一整轮构建之前先把「tag 不在发布分支上」挡掉。
+      - name: Tag must be on dev-newui
+        run: |
+          git fetch origin dev-newui --depth=200
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/dev-newui \
+            || { echo "::error::tag $GITHUB_REF_NAME is not on dev-newui"; exit 1; }
+
       # 版本不写死：action-setup v4 会读 package.json 的 packageManager。
       # 必须是 9.14.4 —— pnpm 10+ 不再读 pnpm.overrides，会把 pnpm-lock.yaml
       # 里的 overrides 块整个删掉，那是 CVE-2026-54466 的三个 pin。
@@ -93,5 +105,5 @@ jobs:
         with:
           upload_url: ${{ needs.create-release.outputs.upload_url }}
           asset_path: ./build/${{ matrix.client }}.zip
-          asset_name: kiss-translator_${{ github.ref_name }}_${{ matrix.client }}.zip
+          asset_name: kiss-translator-m3_${{ github.ref_name }}_${{ matrix.client }}.zip
           asset_content_type: application/zip

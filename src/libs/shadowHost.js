@@ -1,5 +1,7 @@
+import { APP_LCNAME } from "../config/app";
+
 const IMPORTANT = "important";
-export const SHADOW_HOST_ATTRIBUTE = "data-kiss-translator-shadow-host";
+export const SHADOW_HOST_ATTRIBUTE = `data-${APP_LCNAME}-shadow-host`;
 
 export function isolateShadowHost(host) {
   if (!host) return host;

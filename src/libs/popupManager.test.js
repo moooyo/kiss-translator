@@ -1,5 +1,6 @@
-const POPUP_MANAGER_KEY = Symbol.for("kiss-translator.popup-manager");
-const POPUP_MANAGER_BRAND = Symbol.for("kiss-translator.popup-manager.brand");
+const { APP_LCNAME } = require("../config/app");
+const POPUP_MANAGER_KEY = Symbol.for(`${APP_LCNAME}.popup-manager`);
+const POPUP_MANAGER_BRAND = Symbol.for(`${APP_LCNAME}.popup-manager.brand`);
 
 jest.mock(
   "./shadowDomManager",
@@ -33,7 +34,9 @@ jest.mock(
 jest.mock("../views/Action", () => () => null);
 
 jest.mock("../config", () => ({
-  APP_CONSTS: { popupID: "kiss-translator-popup" },
+  APP_CONSTS: {
+    popupID: `${require("../config/app").APP_LCNAME}-popup`,
+  },
   EVENT_KISS_INNER: "kiss-inner",
   MSG_POPUP_TOGGLE: "popup-toggle",
 }));
@@ -97,7 +100,7 @@ describe("PopupManager singleton", () => {
 
   test("preserves a foreign element that uses the configured popup ID", () => {
     const foreignElement = document.createElement("div");
-    foreignElement.id = "kiss-translator-popup";
+    foreignElement.id = `${APP_LCNAME}-popup`;
     document.body.appendChild(foreignElement);
 
     const manager = new PopupManager({
@@ -106,11 +109,9 @@ describe("PopupManager singleton", () => {
     });
     manager.show();
 
-    expect(document.getElementById("kiss-translator-popup")).toBe(
-      foreignElement
-    );
+    expect(document.getElementById(`${APP_LCNAME}-popup`)).toBe(foreignElement);
     expect(manager.hostElement).not.toBe(foreignElement);
-    expect(manager.hostElement.id).toBe("kiss-translator-popup-1");
+    expect(manager.hostElement.id).toBe(`${APP_LCNAME}-popup-1`);
   });
 
   test("avoids an ID claimed by a foreign element before the first mount", () => {
@@ -119,18 +120,18 @@ describe("PopupManager singleton", () => {
       processActions: jest.fn(),
     });
     const foreignElement = document.createElement("div");
-    foreignElement.id = "kiss-translator-popup";
+    foreignElement.id = `${APP_LCNAME}-popup`;
     document.body.appendChild(foreignElement);
 
     manager.show();
 
     expect(foreignElement.isConnected).toBe(true);
-    expect(manager.hostElement.id).toBe("kiss-translator-popup-1");
+    expect(manager.hostElement.id).toBe(`${APP_LCNAME}-popup-1`);
   });
 
   test("removes the previous manager host without removing a foreign host", () => {
     const foreignElement = document.createElement("div");
-    foreignElement.id = "kiss-translator-popup";
+    foreignElement.id = `${APP_LCNAME}-popup`;
     document.body.appendChild(foreignElement);
 
     const first = new PopupManager({
@@ -150,7 +151,7 @@ describe("PopupManager singleton", () => {
     expect(destroyFirst).toHaveBeenCalledTimes(1);
     expect(firstHost.isConnected).toBe(false);
     expect(foreignElement.isConnected).toBe(true);
-    expect(second.hostElement.id).toBe("kiss-translator-popup-1");
+    expect(second.hostElement.id).toBe(`${APP_LCNAME}-popup-1`);
   });
 
   test("does not let a replaced manager remount from a stale callback", () => {
@@ -169,7 +170,7 @@ describe("PopupManager singleton", () => {
     first.show();
     first.toggle();
 
-    expect(document.querySelectorAll("#kiss-translator-popup")).toHaveLength(1);
+    expect(document.querySelectorAll(`#${APP_LCNAME}-popup`)).toHaveLength(1);
     expect(globalThis[POPUP_MANAGER_KEY]).toBe(second);
   });
 });

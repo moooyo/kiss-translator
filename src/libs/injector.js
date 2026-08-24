@@ -1,8 +1,9 @@
 import { trustedTypesHelper } from "./trustedTypes";
+import { APP_LCNAME } from "../config/app";
 
 // 向宿主页面注入行内 JavaScript 脚本。
 // 结合 Trusted Types 机制处理代码，兼容高安全 CSP (Content Security Policy) 要求的网站。
-export const injectInlineJs = (code, id = "kiss-translator-inline-js") => {
+export const injectInlineJs = (code, id = `${APP_LCNAME}-inline-js`) => {
   // 避免重复注入相同 ID 的脚本
   if (document.getElementById(id)) {
     return;
@@ -21,7 +22,7 @@ export const injectInlineJs = (code, id = "kiss-translator-inline-js") => {
 // REVIEW: 此函数直接对 textContent 赋值了未做 Trusted Types 包装的原始 code 字符串。
 // 在严格启用了 CSP (Trusted Types 限制) 的网站（例如 GitHub/Google）中，该方法会抛出安全异常并导致注入失败。
 // 建议非必要时统一使用 injectInlineJs。
-export const injectInlineJsBg = (code, id = "kiss-translator-inline-js") => {
+export const injectInlineJsBg = (code, id = `${APP_LCNAME}-inline-js`) => {
   if (document.getElementById(id)) {
     return;
   }
@@ -36,7 +37,7 @@ export const injectInlineJsBg = (code, id = "kiss-translator-inline-js") => {
 };
 
 // 向页面注入外部引用的 JavaScript 脚本文件。
-export const injectExternalJs = (src, id = "kiss-translator-external-js") => {
+export const injectExternalJs = (src, id = `${APP_LCNAME}-external-js`) => {
   if (document.getElementById(id)) {
     return;
   }

@@ -1,3 +1,5 @@
+const { APP_LCNAME } = require("../config/app");
+
 import {
   OPT_STYLE_DASHLINE,
   OPT_STYLE_DASHLINE_BOLD,
@@ -53,7 +55,9 @@ describe("built-in translation styles", () => {
         styleCode: "opacity: 0.4; transform: scale(0.9);",
       },
     ]);
-    const entranceRule = css.match(/\.kiss-translator-inner\{([^}]*)\}/)?.[1];
+    const entranceRule = css.match(
+      new RegExp(`\\.${APP_LCNAME}-inner\\{([^}]*)\\}`)
+    )?.[1];
     const customRule = css.match(
       new RegExp(`\\.${classMap["custom-motion"]}\\{([^}]*)\\}`)
     )?.[1];

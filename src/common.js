@@ -1,4 +1,4 @@
-import { OPT_HIGHLIGHT_WORDS_DISABLE } from "./config";
+import { APP_LCNAME, APP_NAME, OPT_HIGHLIGHT_WORDS_DISABLE } from "./config";
 import {
   getFabWithDefault,
   getSettingWithDefault,
@@ -35,7 +35,7 @@ function runSettingPage() {
     window.addEventListener(ping, handlePing);
     injectInlineJs(
       `(${injectScript})("${ping}")`,
-      "kiss-translator-options-injector"
+      `${APP_LCNAME}-options-injector`
     );
   }
 }
@@ -92,7 +92,7 @@ function ensureUserscriptGM() {
  * @param {string} message 错误内容信息
  */
 function showErr(message) {
-  const bannerId = "KISS-Translator-Message";
+  const bannerId = `${APP_NAME}-Message`;
   const existingBanner = document.getElementById(bannerId);
   if (existingBanner) {
     existingBanner.remove();
@@ -130,7 +130,7 @@ function showErr(message) {
     fontWeight: "bold",
   });
 
-  const messageText = document.createTextNode(`KISS-Translator: ${message}`);
+  const messageText = document.createTextNode(`${APP_NAME}: ${message}`);
   banner.appendChild(messageText);
   banner.appendChild(closeButton);
 
@@ -346,7 +346,7 @@ export async function run(isUserscript = false) {
         logger.info("stop failed runtime", cleanupError);
       }
     }
-    console.error("[KISS-Translator]", err);
+    console.error(`[${APP_NAME}]`, err);
     if (!isExtensionContextInvalidatedError(err)) {
       showErr(err.message); // 向前台页面绘制报错 Banner，便于用户感知与排查问题
     }

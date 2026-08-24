@@ -15,6 +15,7 @@ jest.mock("./detect", () => ({
 const { apiMicrosoftDict, apiTranslate, apiYoudaoDict } = require("../apis");
 const { tryDetectLang } = require("./detect");
 const {
+  APP_LCNAME,
   DEFAULT_API_SETTING,
   EVENT_FAVORITE_WORD_CHANGE,
   OPT_DICT_BING,
@@ -788,9 +789,9 @@ describe("Translator rule styles", () => {
       <main id="root">
         <h3>
           <a href="/discussion/1">How to fix playback buttons?</a>
-          <kiss-translator class="kiss-translator-wrapper notranslate">
-            <font lang="zh-CN" class="kiss-translator-inner">Existing translation</font>
-          </kiss-translator>
+          <${APP_LCNAME} class="${APP_LCNAME}-wrapper notranslate">
+            <font lang="zh-CN" class="${APP_LCNAME}-inner">Existing translation</font>
+          </${APP_LCNAME}>
         </h3>
       </main>
     `;
@@ -823,10 +824,10 @@ describe("Translator rule styles", () => {
       <main id="root">
         <h3>
           <a href="/discussion/1">How to fix playback buttons?</a>
-          <kiss-translator class="kiss-translator-wrapper notranslate">
+          <${APP_LCNAME} class="${APP_LCNAME}-wrapper notranslate">
             <br>
-            <font lang="zh-CN" class="kiss-translator-inner">Existing translation</font>
-          </kiss-translator>
+            <font lang="zh-CN" class="${APP_LCNAME}-inner">Existing translation</font>
+          </${APP_LCNAME}>
         </h3>
       </main>
     `;
@@ -861,13 +862,13 @@ describe("Translator rule styles", () => {
     document.body.innerHTML = `
       <main id="root">
         <h3>
-          <kiss-translator class="kiss-translator-wrapper notranslate">
+          <${APP_LCNAME} class="${APP_LCNAME}-wrapper notranslate">
             <br hidden>
-            <font lang="zh-CN" class="kiss-translator-inner">Existing translation</font>
-            <template class="kiss-translator-backup">
+            <font lang="zh-CN" class="${APP_LCNAME}-inner">Existing translation</font>
+            <template class="${APP_LCNAME}-backup">
               <a href="/discussion/1">How to fix playback buttons?</a>
             </template>
-          </kiss-translator>
+          </${APP_LCNAME}>
         </h3>
       </main>
     `;
@@ -898,7 +899,7 @@ describe("Translator rule styles", () => {
     document.body.innerHTML = `
       <main id="root">
         <div id="page-host">Page content</div>
-        <div id="kiss-translator-fab">
+        <div id="${APP_LCNAME}-fab">
           <div id="plugin-child">Plugin content</div>
         </div>
       </main>
@@ -1768,7 +1769,7 @@ describe("Translator rule styles", () => {
 
     const style = shadowRoot.querySelector("style");
     expect(style).not.toBeNull();
-    expect(style.id).toBe("kiss-translator-fallback-style");
+    expect(style.id).toBe(`${APP_LCNAME}-fallback-style`);
     expect(style.textContent.length).toBeGreaterThan(0);
     expect(shadowRoot.querySelectorAll("style")).toHaveLength(1);
   });
@@ -1858,7 +1859,7 @@ describe("Translator rule styles", () => {
 
     const style = shadowRoot.querySelector("style");
     expect(style).not.toBeNull();
-    expect(style.id).toBe("kiss-translator-fallback-style");
+    expect(style.id).toBe(`${APP_LCNAME}-fallback-style`);
     expect(style.textContent.length).toBeGreaterThan(0);
     expect(shadowRoot.querySelectorAll("style")).toHaveLength(1);
   });

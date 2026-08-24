@@ -4,10 +4,11 @@
  */
 
 import DOMPurify from "dompurify";
+import { APP_LCNAME } from "../config/app";
 
 // JSDoc 类型的 Trusted Types 辅助工具类
 export const trustedTypesHelper = (() => {
-  const POLICY_NAME = "kiss-translator-policy";
+  const POLICY_NAME = `${APP_LCNAME}-policy`;
   let policy = null;
   let policyUnavailable = false;
 

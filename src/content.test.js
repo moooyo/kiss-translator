@@ -1,3 +1,6 @@
+const { APP_LCNAME } = require("./config/app");
+const { SHADOW_HOST_ATTRIBUTE } = require("./libs/shadowHost");
+
 const mockRun = jest.fn();
 const mockGetURL = jest.fn();
 
@@ -76,8 +79,8 @@ describe("content runtime marker", () => {
     require("./content");
     const firstRuntime = globalThis[marker];
     const activeHost = document.createElement("div");
-    activeHost.id = "kiss-translator-fab";
-    activeHost.setAttribute("data-kiss-translator-shadow-host", "");
+    activeHost.id = `${APP_LCNAME}-fab`;
+    activeHost.setAttribute(SHADOW_HOST_ATTRIBUTE, "");
     document.body.appendChild(activeHost);
     jest.resetModules();
     require("./content");
@@ -196,19 +199,19 @@ describe("content runtime marker", () => {
     await flushPromises();
 
     const staleHost = document.createElement("div");
-    staleHost.id = "kiss-translator-fab";
+    staleHost.id = `${APP_LCNAME}-fab`;
     staleHost.className = "notranslate";
     const staleShadow = staleHost.attachShadow({ mode: "open" });
     const staleWrapper = document.createElement("div");
-    staleWrapper.className = "kiss-translator-fab_wrapper notranslate";
+    staleWrapper.className = `${APP_LCNAME}-fab_wrapper notranslate`;
     staleShadow.appendChild(staleWrapper);
     document.body.appendChild(staleHost);
 
     mockRun.mockImplementationOnce(() => {
       expect(staleHost.isConnected).toBe(false);
       const replacementHost = document.createElement("div");
-      replacementHost.id = "kiss-translator-fab";
-      replacementHost.setAttribute("data-kiss-translator-shadow-host", "");
+      replacementHost.id = `${APP_LCNAME}-fab`;
+      replacementHost.setAttribute(SHADOW_HOST_ATTRIBUTE, "");
       document.body.appendChild(replacementHost);
       return Promise.resolve(newManager);
     });
@@ -229,36 +232,36 @@ describe("content runtime marker", () => {
 
     expect(oldManager.stop).toHaveBeenCalledTimes(1);
     expect(newManager.stop).not.toHaveBeenCalled();
-    expect(document.querySelectorAll("#kiss-translator-fab")).toHaveLength(1);
+    expect(document.querySelectorAll(`#${APP_LCNAME}-fab`)).toHaveLength(1);
   });
 
   test("removes legacy KISS shadow hosts but preserves foreign ID collisions", () => {
     const staleBox = document.createElement("div");
-    staleBox.id = "kiss-translator-box";
+    staleBox.id = `${APP_LCNAME}-box`;
     staleBox.className = "notranslate";
     const staleBoxShadow = staleBox.attachShadow({ mode: "open" });
     const staleBoxWrapper = document.createElement("div");
-    staleBoxWrapper.className = "kiss-translator-box_wrapper notranslate";
+    staleBoxWrapper.className = `${APP_LCNAME}-box_wrapper notranslate`;
     staleBoxShadow.appendChild(staleBoxWrapper);
 
     const staleFab = document.createElement("div");
-    staleFab.id = "kiss-translator-fab";
+    staleFab.id = `${APP_LCNAME}-fab`;
     staleFab.className = "notranslate";
     const staleFabShadow = staleFab.attachShadow({ mode: "open" });
     const staleFabWrapper = document.createElement("div");
-    staleFabWrapper.className = "kiss-translator-fab_wrapper notranslate";
+    staleFabWrapper.className = `${APP_LCNAME}-fab_wrapper notranslate`;
     staleFabShadow.appendChild(staleFabWrapper);
 
     const stalePopup = document.createElement("div");
-    stalePopup.id = "kiss-translator-popup-1";
+    stalePopup.id = `${APP_LCNAME}-popup-1`;
     stalePopup.className = "notranslate";
     const stalePopupShadow = stalePopup.attachShadow({ mode: "open" });
     const stalePopupWrapper = document.createElement("div");
-    stalePopupWrapper.className = "kiss-translator-popup-1_wrapper notranslate";
+    stalePopupWrapper.className = `${APP_LCNAME}-popup-1_wrapper notranslate`;
     stalePopupShadow.appendChild(stalePopupWrapper);
 
     const foreignPopup = document.createElement("div");
-    foreignPopup.id = "kiss-translator-popup";
+    foreignPopup.id = `${APP_LCNAME}-popup`;
 
     document.body.append(staleBox, staleFab, stalePopup, foreignPopup);
     mockRun.mockResolvedValueOnce();

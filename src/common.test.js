@@ -1,9 +1,15 @@
+const { APP_NAME, APP_LCNAME } = require("./config/app");
+
 const mockTranslatorManagerStart = jest.fn();
 const mockTranslatorManagerStop = jest.fn();
 let mockIsIframe = false;
 
 jest.mock("./config", () => ({
   OPT_HIGHLIGHT_WORDS_DISABLE: "-",
+  // common.js 用这两个拼注入器 id 和错误 banner id，mock 里漏掉会让它们变成
+  // "undefined-..."，断言表面上还能过，实际测的是错的东西。
+  APP_NAME: require("./config/app").APP_NAME,
+  APP_LCNAME: require("./config/app").APP_LCNAME,
 }));
 
 jest.mock("./libs/storage", () => ({
@@ -216,7 +222,7 @@ describe("common iframe startup", () => {
     await expect(run()).rejects.toThrow("load failed");
 
     expect(TranslatorManager).not.toHaveBeenCalled();
-    expect(document.getElementById("KISS-Translator-Message")).not.toBeNull();
+    expect(document.getElementById(`${APP_NAME}-Message`)).not.toBeNull();
     jest.runOnlyPendingTimers();
     jest.useRealTimers();
     consoleError.mockRestore();
@@ -415,7 +421,7 @@ describe("common iframe startup", () => {
 
       expect(injectInlineJs).toHaveBeenCalledTimes(1);
       expect(injectInlineJs.mock.calls[0][1]).toBe(
-        "kiss-translator-options-injector"
+        `${APP_LCNAME}-options-injector`
       );
       expectNoNormalUserscriptStartup();
     } finally {
@@ -465,7 +471,7 @@ describe("common iframe startup", () => {
 
       expect(injectInlineJs).toHaveBeenCalledTimes(1);
       expect(injectInlineJs.mock.calls[0][1]).toBe(
-        "kiss-translator-options-injector"
+        `${APP_LCNAME}-options-injector`
       );
       expectNoNormalUserscriptStartup();
     } finally {
@@ -485,7 +491,7 @@ describe("common iframe startup", () => {
 
       expect(injectInlineJs).toHaveBeenCalledTimes(1);
       expect(injectInlineJs.mock.calls[0][1]).toBe(
-        "kiss-translator-options-injector"
+        `${APP_LCNAME}-options-injector`
       );
       expectNoNormalUserscriptStartup();
     } finally {
@@ -505,7 +511,7 @@ describe("common iframe startup", () => {
 
       expect(injectInlineJs).toHaveBeenCalledTimes(1);
       expect(injectInlineJs.mock.calls[0][1]).toBe(
-        "kiss-translator-options-injector"
+        `${APP_LCNAME}-options-injector`
       );
       expectNoNormalUserscriptStartup();
     } finally {

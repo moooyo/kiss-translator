@@ -1,6 +1,8 @@
 import { act } from "react";
 
-const POPUP_MANAGER_KEY = Symbol.for("kiss-translator.popup-manager");
+const { APP_LCNAME } = require("../config/app");
+
+const POPUP_MANAGER_KEY = Symbol.for(`${APP_LCNAME}.popup-manager`);
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 

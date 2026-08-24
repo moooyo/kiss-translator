@@ -1,3 +1,4 @@
+import { APP_LCNAME } from "../config/app";
 import {
   OPT_STYLE_NONE,
   OPT_STYLE_LINE,
@@ -196,11 +197,11 @@ export const genTextClass = (customStyles = []) => {
       from { opacity: 0; transform: translateY(14px) scale(.97); }
       to { opacity: 1; transform: none; }
     }
-    .kiss-translator-inner {
+    .${APP_LCNAME}-inner {
       animation: kt-translation-up .5s cubic-bezier(.3,1.4,.4,1);
     }
     @media (prefers-reduced-motion: reduce) {
-      .kiss-translator-inner { animation: none; }
+      .${APP_LCNAME}-inner { animation: none; }
     }
   `;
   Object.entries(styles).forEach(([k, v]) => {

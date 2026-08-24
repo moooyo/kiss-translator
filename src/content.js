@@ -1,5 +1,5 @@
 import { run } from "./common";
-import { APP_CONSTS } from "./config";
+import { APP_CONSTS, APP_NAME } from "./config";
 import { browser, isExtensionContextInvalidatedError } from "./libs/browser";
 import { removeStaleShadowHosts } from "./libs/shadowHost";
 
@@ -22,7 +22,7 @@ const stopRuntimeManager = (manager) => {
     manager?.stop?.();
   } catch (error) {
     if (!isExtensionContextInvalidatedError(error)) {
-      console.error("[KISS-Translator] Failed to stop content runtime", error);
+      console.error(`[${APP_NAME}] Failed to stop content runtime`, error);
     }
   }
 };
@@ -48,7 +48,7 @@ if (
     } catch (cleanupError) {
       if (!isExtensionContextInvalidatedError(cleanupError)) {
         console.error(
-          "[KISS-Translator] Failed to dispose stale content runtime",
+          `[${APP_NAME}] Failed to dispose stale content runtime`,
           cleanupError
         );
       }
@@ -101,7 +101,7 @@ if (shouldStart) {
   const handleStartupFailure = (error) => {
     currentRuntime.dispose();
     if (isExtensionContextInvalidatedError(error)) return;
-    console.error("[KISS-Translator] Failed to start content runtime", error);
+    console.error(`[${APP_NAME}] Failed to start content runtime`, error);
   };
 
   try {

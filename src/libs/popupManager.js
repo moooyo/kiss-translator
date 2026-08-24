@@ -1,9 +1,10 @@
 import ShadowDomManager from "./shadowDomManager";
+import { APP_LCNAME } from "../config/app";
 import { APP_CONSTS, EVENT_KISS_INNER, MSG_POPUP_TOGGLE } from "../config";
 import Action from "../views/Action";
 
-const POPUP_MANAGER_KEY = Symbol.for("kiss-translator.popup-manager");
-const POPUP_MANAGER_BRAND = Symbol.for("kiss-translator.popup-manager.brand");
+const POPUP_MANAGER_KEY = Symbol.for(`${APP_LCNAME}.popup-manager`);
+const POPUP_MANAGER_BRAND = Symbol.for(`${APP_LCNAME}.popup-manager.brand`);
 
 const getAvailablePopupID = () => {
   const baseID = APP_CONSTS.popupID;

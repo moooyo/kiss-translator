@@ -960,7 +960,7 @@ export class Translator {
 
   #attachShadowRootListener() {
     if (!this.#isShadowRootJsInjected) {
-      const id = "kiss-translator-inject-shadowroot-js";
+      const id = `${APP_LCNAME}-inject-shadowroot-js`;
       injectJs(INJECTOR.shadowroot, id);
 
       this.#isShadowRootJsInjected = true;

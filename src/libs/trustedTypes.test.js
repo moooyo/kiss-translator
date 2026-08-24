@@ -1,4 +1,6 @@
-const POLICY_NAME = "kiss-translator-policy";
+const { APP_LCNAME } = require("../config/app");
+
+const POLICY_NAME = `${APP_LCNAME}-policy`;
 
 const loadTrustedTypesHelper = () => {
   jest.resetModules();
@@ -86,7 +88,7 @@ describe("trustedTypesHelper", () => {
       createScriptURL: jest.fn((value) => `url:${value}`),
     };
     const createPolicy = jest.fn(() => {
-      throw new Error("Policy kiss-translator-policy already exists");
+      throw new Error(`Policy ${POLICY_NAME} already exists`);
     });
     const get = jest.fn(() => existingPolicy);
     globalThis.trustedTypes = {
@@ -111,7 +113,7 @@ describe("trustedTypesHelper", () => {
   test("sanitizes HTML and does not retry when CSP blocks policy creation", () => {
     const createPolicy = jest.fn(() => {
       throw new Error(
-        "Creating a TrustedTypePolicy named 'kiss-translator-policy' violates the following Content Security policy directive: \"trusted-types gIqNx7 default\". The action has been blocked."
+        `Creating a TrustedTypePolicy named '${POLICY_NAME}' violates the following Content Security policy directive: "trusted-types gIqNx7 default". The action has been blocked.`
       );
     });
     globalThis.trustedTypes = {
@@ -135,7 +137,7 @@ describe("trustedTypesHelper", () => {
   test("treats allow-duplicates CSP rejection as unavailable policy", () => {
     const createPolicy = jest.fn(() => {
       throw new Error(
-        "Creating a TrustedTypePolicy named 'kiss-translator-policy' violates the following Content Security policy directive: \"trusted-types fast-html dompurify 1DSScriptURL MeControlScriptURL @azure/ms-rest-js#xml.browser lit-html npsTrustedTypePolicy default 'allow-duplicates'\". The action has been blocked."
+        `Creating a TrustedTypePolicy named '${POLICY_NAME}' violates the following Content Security policy directive: "trusted-types fast-html dompurify 1DSScriptURL MeControlScriptURL @azure/ms-rest-js#xml.browser lit-html npsTrustedTypePolicy default 'allow-duplicates'". The action has been blocked.`
       );
     });
     globalThis.trustedTypes = {

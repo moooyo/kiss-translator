@@ -157,13 +157,18 @@ function hasDictionaryPayload(dictResult) {
 // 悬停多久才弹提示框。短了会在扫读时乱弹。
 const TOOLTIP_OPEN_DELAY = 300;
 
-// 离开单词后多久收起提示框。
+// 提示框**不随鼠标离开而收起**。
 //
-// 这里必须给足鼠标**走过去**的时间:提示框固定显示在播放器右上角,而字幕在
-// 底部中间,一次移动要跨半个播放器。原来是 100ms —— 走不到,所以提示框里的
-// 收藏和关闭两个按钮**从来就点不到**,不是「× 坏了」而是根本够不着。
-// 指针一旦进入提示框,这个计时器就会被取消(见 showWordTooltip)。
-const TOOLTIP_HIDE_DELAY = 500;
+// 它里面有收藏和关闭两个按钮,所以它是 popover 而不是 hover card。而它固定
+// 显示在播放器右上角、字幕在底部中间 —— 鼠标要跨半个播放器才够得着。
+// 早先靠「离开后 N 毫秒收起」来留出这段时间,那是在赌用户能在超时前走到:
+// 播放器多大、鼠标多快都会翻盘,实测就是点不到。
+//
+// 现在只有这四件事会收起它,都与时间无关:
+//   1. 点 ×
+//   2. 点提示框以外的地方
+//   3. 悬停另一个单词(换成新的)
+//   4. 字幕管理器销毁
 
 export class WordTooltipController {
   constructor({
@@ -171,31 +176,43 @@ export class WordTooltipController {
     getTimestamp,
     autoFavWord = false,
     i18n = () => "",
-    onTooltipHoverChange,
+    onTooltipOpenChange,
   } = {}) {
     this.getVideoContainer = getVideoContainer;
     this.getTimestamp = getTimestamp;
     this.autoFavWord = autoFavWord;
     this.i18n = i18n;
-    // 指针是否停在提示框上。字幕管理器用它决定要不要恢复播放 ——
+    // 提示框开着的时候通知外面:字幕管理器据此决定要不要恢复播放 ——
     // 用户正在读释义时把视频放走,等于让字幕从他眼皮底下跑掉。
-    this.onTooltipHoverChange = onTooltipHoverChange;
+    this.onTooltipOpenChange = onTooltipOpenChange;
     this.tooltipEl = null;
     this.hoverTimeout = null;
     this.activeWordEl = null;
+    this.dismissListener = null;
   }
 
   /**
-   * 安排收起提示框,可被指针重新进入取消。
+   * 在 document 上装一次性的「点外面就关」监听。
+   *
+   * 提示框既然不会自己消失,就必须留一个不用瞄准 × 的退出口 ——
+   * 否则用户点到别处时它会一直挂在画面上。
+   *
    * @returns {void}
    */
-  #scheduleHideTooltip() {
-    if (this.hoverTimeout) {
-      clearTimeout(this.hoverTimeout);
-    }
-    this.hoverTimeout = setTimeout(() => {
+  #listenForOutsideDismiss() {
+    this.#stopListeningForOutsideDismiss();
+    this.dismissListener = (event) => {
+      if (this.tooltipEl?.contains(event.target)) return;
       this.hideWordTooltip();
-    }, TOOLTIP_HIDE_DELAY);
+    };
+    // 捕获阶段:页面自己的处理器可能会 stopPropagation
+    document.addEventListener("pointerdown", this.dismissListener, true);
+  }
+
+  #stopListeningForOutsideDismiss() {
+    if (!this.dismissListener) return;
+    document.removeEventListener("pointerdown", this.dismissListener, true);
+    this.dismissListener = null;
   }
 
   attachSpanListeners(root, getTimestamp = this.getTimestamp) {
@@ -255,7 +272,11 @@ export class WordTooltipController {
       this.activeWordEl = null;
     }
 
-    this.#scheduleHideTooltip();
+    // 还没弹出来就取消,已经弹出来的**留着** —— 用户正要走过去点它。
+    if (!this.tooltipEl && this.hoverTimeout) {
+      clearTimeout(this.hoverTimeout);
+      this.hoverTimeout = null;
+    }
   }
 
   async showWordTooltip(word, { timestamp = 0 } = {}) {
@@ -284,22 +305,6 @@ export class WordTooltipController {
       }
     });
 
-    // 指针停在提示框上时不能收起它 —— 否则收藏和关闭两个按钮永远够不着:
-    // 离开单词就启动了收起计时器,而提示框在播放器另一头。
-    // 同时通知外面别恢复播放,不然用户刚要点,字幕就从眼皮底下跑掉了。
-    tooltipEl.addEventListener("pointerenter", () => {
-      if (this.hoverTimeout) {
-        clearTimeout(this.hoverTimeout);
-        this.hoverTimeout = null;
-      }
-      this.onTooltipHoverChange?.(true);
-    });
-
-    tooltipEl.addEventListener("pointerleave", () => {
-      this.#scheduleHideTooltip();
-      this.onTooltipHoverChange?.(false);
-    });
-
     const videoContainer = this.getVideoContainer?.();
     if (videoContainer) {
       const containerRect = videoContainer.getBoundingClientRect();
@@ -318,6 +323,8 @@ export class WordTooltipController {
     }
 
     document.body.appendChild(tooltipEl);
+    this.#listenForOutsideDismiss();
+    this.onTooltipOpenChange?.(true);
 
     try {
       const dictResult = await apiMicrosoftDict(word);
@@ -368,12 +375,12 @@ export class WordTooltipController {
   }
 
   hideWordTooltip() {
+    this.#stopListeningForOutsideDismiss();
     if (this.tooltipEl) {
       this.tooltipEl.remove();
       this.tooltipEl = null;
-      // 提示框没了,指针当然也就不在它上面 —— 不通知的话,
-      // 「按住不放」的状态会一直挂着,视频再也不会自己恢复。
-      this.onTooltipHoverChange?.(false);
+      // 必须通知,否则「提示框开着」的状态会一直挂着,视频再也不会自己恢复。
+      this.onTooltipOpenChange?.(false);
     }
   }
 

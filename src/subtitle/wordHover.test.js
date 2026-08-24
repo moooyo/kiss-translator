@@ -190,14 +190,12 @@ describe("WordTooltipController", () => {
   });
 });
 
-// 实机测出来的:提示框固定显示在播放器右上角,而字幕在底部中间。离开单词后
-// 只留 100ms 就收起,鼠标根本走不到 —— 收藏和关闭两个按钮**从来就点不到**。
-// 所以这里钉的是「够得着」,不是「点了有反应」。
+// 实机测出来的:提示框里的收藏和关闭两个按钮**从来就点不到**。
 //
-// 这些用例必须走真实路径:通过 attachSpanListeners 挂上监听,再在单词 span 上
-// 派发 pointerenter/pointerleave。直接在提示框上派发事件是测不出东西的 ——
-// 撤掉修复后根本没有计时器被安排,断言会照样通过。
-describe("WordTooltipController reachability", () => {
+// 它固定显示在播放器右上角,字幕在底部中间 —— 够到它要跨半个播放器。
+// 早先靠「离开单词后 N 毫秒收起」留出这段时间,那是在赌用户能在超时前走到,
+// 播放器多大、鼠标多快都会翻盘。现在它是 popover:开着就一直开着。
+describe("WordTooltipController popover lifecycle", () => {
   const OPEN_DELAY = 300;
 
   beforeEach(() => {
@@ -224,7 +222,6 @@ describe("WordTooltipController reachability", () => {
 
     span.dispatchEvent(new Event("pointerenter"));
     jest.advanceTimersByTime(OPEN_DELAY);
-    // showWordTooltip 是异步的,放行词典请求那几个微任务
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -241,84 +238,87 @@ describe("WordTooltipController reachability", () => {
     controller.destroy();
   });
 
-  // 核心:离开单词已经安排了收起,指针走到提示框上必须把它取消掉。
-  test("keeps the tooltip alive once the pointer reaches it", async () => {
+  // 核心:这是让按钮够得着的唯一原因。多久都不该自己消失。
+  test("stays open indefinitely after the pointer leaves the word", async () => {
     const controller = new WordTooltipController({});
     const { span, tooltip } = await hoverWordUntilTooltip(controller);
 
     span.dispatchEvent(new Event("pointerleave"));
-    tooltip.dispatchEvent(new Event("pointerenter"));
-    jest.advanceTimersByTime(10000);
+    jest.advanceTimersByTime(60000);
 
     expect(controller.tooltipEl).toBe(tooltip);
     expect(tooltip.isConnected).toBe(true);
     controller.destroy();
   });
 
-  // 修复前离开单词只留 100ms,而提示框在播放器另一头,鼠标那时还在半路上。
-  test("still shows the tooltip 100ms after leaving the word", async () => {
+  test("closes when the close button is clicked", async () => {
     const controller = new WordTooltipController({});
     const { span, tooltip } = await hoverWordUntilTooltip(controller);
-
     span.dispatchEvent(new Event("pointerleave"));
-    jest.advanceTimersByTime(100);
 
-    expect(controller.tooltipEl).toBe(tooltip);
+    tooltip.querySelector(".kiss-word-tooltip-close").click();
+
+    expect(controller.tooltipEl).toBeNull();
+    expect(tooltip.isConnected).toBe(false);
     controller.destroy();
   });
 
-  test("hides when the pointer never arrives", async () => {
+  // 不会自己消失,就必须留一个不用瞄准 × 的退出口。
+  test("closes when the pointer goes down outside it", async () => {
     const controller = new WordTooltipController({});
-    const { span } = await hoverWordUntilTooltip(controller);
+    await hoverWordUntilTooltip(controller);
 
-    span.dispatchEvent(new Event("pointerleave"));
-    jest.advanceTimersByTime(10000);
+    document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
 
     expect(controller.tooltipEl).toBeNull();
     controller.destroy();
   });
 
-  test("hides again after the pointer leaves the tooltip", async () => {
+  test("survives a pointer press inside it", async () => {
     const controller = new WordTooltipController({});
-    const { span, tooltip } = await hoverWordUntilTooltip(controller);
+    const { tooltip } = await hoverWordUntilTooltip(controller);
 
-    span.dispatchEvent(new Event("pointerleave"));
-    tooltip.dispatchEvent(new Event("pointerenter"));
-    jest.advanceTimersByTime(10000);
+    tooltip.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+
     expect(controller.tooltipEl).toBe(tooltip);
-
-    tooltip.dispatchEvent(new Event("pointerleave"));
-    jest.advanceTimersByTime(10000);
-
-    expect(controller.tooltipEl).toBeNull();
     controller.destroy();
   });
 
-  test("reports pointer presence so the caller can hold playback", async () => {
-    const onTooltipHoverChange = jest.fn();
-    const controller = new WordTooltipController({ onTooltipHoverChange });
+  // 字幕管理器据此决定要不要恢复播放:开着说明用户在读释义,
+  // 这时候放视频走,等于让字幕从他眼皮底下跑掉。
+  test("reports open and closed so the caller can hold playback", async () => {
+    const onTooltipOpenChange = jest.fn();
+    const controller = new WordTooltipController({ onTooltipOpenChange });
     const { tooltip } = await hoverWordUntilTooltip(controller);
 
-    tooltip.dispatchEvent(new Event("pointerenter"));
-    expect(onTooltipHoverChange).toHaveBeenLastCalledWith(true);
+    expect(onTooltipOpenChange).toHaveBeenLastCalledWith(true);
 
-    tooltip.dispatchEvent(new Event("pointerleave"));
-    expect(onTooltipHoverChange).toHaveBeenLastCalledWith(false);
+    tooltip.querySelector(".kiss-word-tooltip-close").click();
+    expect(onTooltipOpenChange).toHaveBeenLastCalledWith(false);
     controller.destroy();
   });
 
-  // 提示框消失了指针当然也不在它上面。漏掉这条通知,「按住不放」会一直挂着,
-  // 视频再也不会自己恢复播放。
-  test("clears pointer presence when the tooltip goes away", async () => {
-    const onTooltipHoverChange = jest.fn();
-    const controller = new WordTooltipController({ onTooltipHoverChange });
-    const { tooltip } = await hoverWordUntilTooltip(controller);
-    tooltip.dispatchEvent(new Event("pointerenter"));
-    onTooltipHoverChange.mockClear();
+  // 漏掉关闭通知,「开着」会一直挂着,视频再也不会自己恢复。
+  test("reports closed when torn down while still open", async () => {
+    const onTooltipOpenChange = jest.fn();
+    const controller = new WordTooltipController({ onTooltipOpenChange });
+    await hoverWordUntilTooltip(controller);
+    onTooltipOpenChange.mockClear();
 
-    controller.hideWordTooltip();
+    controller.destroy();
 
-    expect(onTooltipHoverChange).toHaveBeenCalledWith(false);
+    expect(onTooltipOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  // 换一个词要换掉旧的,不能两个并存。
+  test("replaces the tooltip when another word is hovered", async () => {
+    const controller = new WordTooltipController({});
+    const { tooltip: first } = await hoverWordUntilTooltip(controller);
+
+    await controller.showWordTooltip("second");
+
+    expect(first.isConnected).toBe(false);
+    expect(document.querySelectorAll(".kiss-word-tooltip")).toHaveLength(1);
     controller.destroy();
   });
 });

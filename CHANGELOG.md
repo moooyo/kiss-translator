@@ -1,3 +1,13 @@
+## v0.0.1
+
+- 从 fishjar/kiss-translator 分家为独立产品 **KISS Translator M3**，版本号自 0.0.1 重新起算。
+- 扩展 id、油猴脚本 id、存储键、注入 DOM ID、译文 CSS 类前缀、WebDAV 目录与更新地址全部与原版分开，两者可同时安装但数据不互通。
+- 修复油猴脚本会把自身更新成上游构建的问题：`@namespace` / `@downloadURL` / `@updateURL` 改为指向本仓库。
+- 补上 Firefox 缺失的扩展 id，Thunderbird 不再沿用上游作者邮箱作为 id，Safari bundle identifier 改为本项目。
+- 修复应用名含数字时 Popup 静默挂载失败（Emotion cache key 只接受小写字母与连字符）。
+- 隔离三处两个扩展共存时会互相破坏的标识符：Trusted Types 策略名、shadow 宿主标记属性、popup manager 全局符号。
+- 发布流程改为强制校验 tag 位于 `dev-newui` 分支，发布资产名带上项目名与版本号。
+
 ## v2.0.32
 
 - 新增 Google Cloud、Qwen MT、Yandex Cloud 等翻译接口，并补充免费翻译接口选择。

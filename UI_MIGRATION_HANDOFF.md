@@ -6,7 +6,7 @@
 2026-08-24 起这个 fork 与上游分家成独立产品 **KISS Translator M3**。
 这份文档写的是**现在的状态和约束**,不是过程流水 —— 过程在 git log 里。
 
-接手时先看「现状」和「唯一未完成的事」,动代码前看「改这些地方前必须知道的约束」,
+接手时先看「现状」和「未完成的事」,动代码前看「改这些地方前必须知道的约束」,
 想搬 `newui` 的东西前看「已否决」,那里记的是**查证过的结论,不要重复评估**。
 
 ---
@@ -16,11 +16,11 @@
 | | |
 |---|---|
 | 代码 | 无已知开放技术项 |
-| 测试 | **1092 通过 / 0 失败**(121 suite) |
+| 测试 | **1113 通过 / 0 失败**(122 suite) |
 | CI | 每次 push 和 PR 都跑:jest + chrome/web 两个 target 构建 + lockfile 校验 + manifest 产物校验,约 2 分钟 |
 | 上游 | `dev-newui` 与 `upstream/dev` 齐平(领先 61,落后 0),无待同步工作,无在途 PR |
 | 身份 | 已与上游分家(存储 / DOM / 油猴 / 扩展 id / 更新 URL),见「产品身份」 |
-| 未完成 | **两项实机验证**,见下一节 |
+| 未完成 | **实机验证**(4 项,见下一节)。清单本身 2026-08-24 才第一次被执行过 |
 
 有两件事**不是待办、但必须知道**:跨 realm 设置写入竞态只是被收窄、没有彻底关掉
 (见「跨 realm 写入竞态」);以及 `ffcfbb1` 的内容页运行时泄漏修复**从未实机验证过**。
@@ -56,20 +56,24 @@ fork 上仅剩 `dev` / `dev-newui` / `gh-pages` / `newui` 四个分支。2026-08
 > 查自己的 CI 运行记录必须显式带 `-R moooyo/kiss-translator-m3`,否则看到的是上游的历史,
 > 会误判成「Actions 没触发」。按 AGENTS.md 上游是只读的。
 
-## 唯一未完成的事:两项实机验证
+## 未完成的事:实机验证
 
-需要**装未打包扩展 + 真实 YouTube 页面**,仓库内证明不了。完整步骤、期望、以及「没过说明什么」
+需要**装未打包扩展**,仓库内证明不了。完整步骤、期望、以及「没过说明什么」
 都在文末附录,构建产物在 `build/chrome`。
 
-两项的**机制早已被测试钉死**(DOMPurify 剥 `on*`、`destroy()` 时恢复播放),留着实机跑一遍
-是为了盖住集成层 —— 装错构建、监听没挂上这类仓库内证明不了的东西。第 1 项已经查到只剩
-「委托监听在真实页面上确实被触发」一件事。
+> **2026-08-24 这份清单第一次被真正执行,原有两项当场垮掉。** 一项的步骤
+> 根本无法执行(见附录第 2 项),另一项测的功能压根不能用(见附录第 1 项)。
+> 此前它是**从代码推出来的、从没人跑过**的 —— 那种清单看着扎实,证明不了任何事。
+> 附录里每一条现在都注明了是否真被执行过。
 
 > **不能让 agent 代跑(2026-08-24 实测)**:预览浏览器被限制在 localhost,导航到
 > `https://www.youtube.com/` 会直接弹回 `localhost:3000`;页面里也没有 `chrome.runtime`,
 > 不是扩展上下文,装不了未打包扩展。**只能人工做。**
+>
+> 但 popup 和独立窗口**可以**在 dev server 里看(`/popup.html`、`/popup.html#tranbox`),
+> 那条路径已经跑通,布局问题不必等实机。
 
-原本还有第 3 项(SPA 反复导航下样式累积),**已改由测试覆盖,不必手工做**:
+曾经列在这里的「SPA 反复导航下样式累积」**已改由测试覆盖,不必手工做**:
 `translator.test.js` 连跑 4 轮「注入 → stop」,`document` 与 shadow root 的 `adoptedStyleSheets`
 每轮都回到 0;把 `stop()` 里的 `#removeTextStyles()` 去掉这条测试立刻变红、且只有它红。
 触发链也查证过:`TranslatorManager.restart()` → `#destroyRuntimeModules()` → `translator.stop()`
@@ -231,6 +235,24 @@ M3 改版把 header 从 36px 提到 56px、又加了卡片边框,这个常量当
 **改这三处 CSS 中的任何一处,都要回来改这个常量**,并同步下面三个测试里写死的数字:
 `tranboxPosition.test.js`、`useTranBoxState.test.js`(3 处)、`useSelectionController.test.js`(1 处)。
 后两者的断言里都写了推导算式,照着改即可。
+
+## 查词气泡是 popover,**不要让它自己消失**(`wordHover.js`)
+
+它里面有收藏(♡)和关闭(×)两个按钮,而它固定显示在播放器右上角、字幕在
+底部中间 —— 够到它要跨半个播放器。**任何「离开就收起」的实现都会让这两个
+按钮点不到**,不管超时给多长:播放器多大、鼠标多快都会翻盘。
+
+这不是假设。2026-08-24 实机测出来的原话是「鼠标一移出去马上就没了」,
+当时是 100ms。第一次修把它提到 500ms 并加了「指针进入就取消」,**实测依旧不行**,
+才换成现在的模型。
+
+只有这四件事会关掉它,都与时间无关:点 ×、在它外面按下指针、悬停另一个单词、
+管理器销毁。离开单词只取消**还没弹出来**的那次。
+
+播放恢复用同一套逻辑:`BilingualSubtitleManager` 看两个状态位
+(指针是否在字幕上、提示框是否开着),**两个都为假才恢复**,没有计时器。
+`pointerenter` 里 `#wasPlayingBeforeHover` 必须用 `||=` 而不是直接赋值 ——
+从提示框走回字幕时视频还停着,直接赋值会把「本来在播」的记录冲掉,之后永不恢复。
 
 ## 查词气泡的异步守卫(`wordHover.js`)
 
@@ -615,11 +637,18 @@ persisted 侧为 `{}` 时脏草稿会塌缩成只剩被编辑的字段。
 
 ---
 
-# 附录:实机验证清单(两项)
+# 附录:实机验证清单
 
-两项都需要**未打包扩展 + 真实 YouTube 页面**。dev server 里的浏览器加载不了扩展,
-`YouTubeCaptionProvider.test.js` 又把 XHR 拦截整个 mock 了,所以仓库内无法证明。
-建议一次做完 —— 前置条件相同。
+> **这份清单在 2026-08-24 被实际执行过一次,两条原有项目当场垮掉。**
+>
+> 它此前是**从代码推出来的、从没人跑过**:第 2 项的步骤根本无法执行,
+> 第 1 项测的功能压根不能用。写检查清单时如果没真跑一遍,
+> 得到的是一份看着很扎实、实际证明不了任何事的东西。
+> 下面每一条都注明了它是否真被执行过。
+
+需要**未打包扩展**。dev server 里的浏览器加载不了扩展
+(2026-08-24 实测:预览浏览器被限制在 localhost,页面里也没有 `chrome.runtime`),
+所以这几项只能人工做。
 
 ## 前置(做一次)
 
@@ -628,79 +657,109 @@ CI=true pnpm run build:chrome
 ```
 
 Chrome → `chrome://extensions` → 开发者模式 → 「加载已解压的扩展程序」→ 选 `build/chrome`。
+**已经装过的话点卡片上的刷新图标**,否则测的是旧产物。
 
-**装上之后先顺手确认三件改名相关的事**(都在扩展页和任意网页上,不需要 YouTube):
+### 0. 装上就能确认的四件事(不需要 YouTube)
 
-1. 扩展列表里显示的是 **KISS Translator M3**,ID 是
+1. 扩展列表里显示 **简约翻译 M3 / KISS Translator M3**,ID 是
    `enhckapfllnpbdljjmkdkihlcjjikpob`
 2. **把同一份 `build/chrome` 复制到另一个目录再 Load unpacked 一次,两个 ID 应该相同** ——
    这是 `key` 字段唯一能实机验的地方(没有它时 ID 跟着目录路径走,用户换个目录就丢数据)。
-   验完记得把多装的那份删掉
-3. 随便打开一个网页,Console 跑
-   `document.querySelector('[id^="kiss-translator-m3"]')` 应该有东西;
-   点开 Popup 应该正常弹出 —— Popup 能弹说明 Emotion cache key 那个坑真的躲过了
-   (应用名带数字时它会**静默挂不上**,不报错)
+   验完把多装的那份删掉
+3. 点开 Popup:能弹出、标题是 M3、右上角**只有独立窗口和设置两个按钮**。
+   能弹出这件事本身就是结论 —— Emotion cache key 不接受数字,应用名带 `M3` 时
+   它会**静默挂不上**而不是报错
+4. 拨「翻译此页」开关:状态文字跟着变,**底部不再弹绿色提示条**
 
-打开一个**有英文字幕**的 YouTube 视频,确认:
+## 1. 查词提示框能点到 — `ecbb950d`
 
-- 字幕翻译已启用、`Start automatically` 已开。**第 2 项依赖 `autoTranslate`** ——
-  `#reProcessEvents()` 开头就是 `if (!this.#setting.autoTranslate) return;`,
-  关着的话整条路径不触发、**看起来像通过了**
-- 悬停查词没被关掉。默认值 `mobile_off` 在桌面端就是启用的
-  (`isSubtitleModeEnabled`:`mobile_off && !isMobile` → true),不用改,只要确认不是 `off`
+**2026-08-24 执行过,当场失败,已重做。**
 
-## 1. 划词提示框的 × 能关掉 — `96d8c1d`
+**步骤:** 悬停某个英文字幕单词 → 提示框在播放器右上角弹出 →
+**不用急,慢慢把鼠标移过去** → 点 ♡ 或 ×
+**期望:** 提示框一直在,♡ 能收藏、× 能关闭;点它外面任意处也会关闭
 
-**步骤:** 悬停某个英文字幕单词 → 出现查词提示框 → 点右上角 ×
-**期望:** 提示框消失
-**修复前:** 点 × 毫无反应。三处关闭按钮当时写成内联 `onclick`,而所有 `innerHTML` 都要过
-`trustedTypesHelper.createHTML` → 无配置的 `DOMPurify.sanitize`,`on*` 属性被一律剥掉。
-**四个发行渠道都是坏的**,不是 CSP 或 YouTube 特有
+**第一次执行的结果:** 「鼠标一移出去马上就没了」。原因不是 × 坏了 ——
+提示框在播放器右上角、字幕在底部中间,够到它要跨半个播放器,
+而离开单词后只留 100ms 就收起。**♡ 和 × 从来就点不到**,整张卡片是装饰。
+
+**中间还错过一次:** 先把收起延时提到 500ms 并加了「指针进入就取消」。
+那仍然是赌用户能在超时前走到,播放器多大、鼠标多快都会翻盘,实测依旧不行。
+带按钮的东西是 popover 不是 hover card —— 最终改成**不会自己消失**。
 
 **顺带看:**
-- 查一个 Bing 词典没有释义的生僻词,应显示「No definition found」而不是空的释义框
+- 查一个必应词典没有释义的生僻词,应显示「No definition found」而不是空释义框
 - **快速掠过两个不同的单词**(`e41c0578`):第二个词的气泡里不应出现第一个词的标题或释义
+- 提示框开着时视频保持暂停,关掉后才恢复
 
-> **这一项已经被查到只剩「点击真的会触发」一件事。** 2026-08-24 逐条排掉的:
->
-> - `wordHover.test.js` **没有 mock DOMPurify**,跑的是真库
-> - `trustedTypesHelper.createHTML` 的**两条分支都调同一个 `DOMPurify.sanitize`** ——
->   有 Trusted Types 时走策略,策略体本身就是那句 sanitize;没有时直接调。
->   jsdom 走后者、真实浏览器走前者,**行为无差**(浏览器里实测 `window.trustedTypes`
->   存在,且一个原样返回的策略确实会保留 `onclick` —— 剥离来自 DOMPurify 而不是 TT)
-> - **发布产物已核对**:`build/chrome/content.js` 里关闭按钮是
->   `<button type="button" class="kiss-word-tooltip-close">`,**没有内联 onclick**;
->   委托监听 `...kiss-word-tooltip-close")&&this.hideWordTooltip()})` 也在
->
-> 也就是说下面「没过说明什么」里的第一种可能(加载了旧构建)已经排除。
+## 2. ~~悬停暂停后能恢复播放~~ — **这条已删除,它无法执行**
 
-## 2. 悬停暂停后能恢复播放 — `96d8c1d`
+**不要再把它加回来。**
 
-**步骤:** 悬停某个字幕单词(视频自动暂停)→ **鼠标别动** → 从播放器内字幕菜单改
-`segSlug`(AI 断句)或 `aiContextSlug`(智能上下文)
-**期望:** 字幕窗口重建,视频**恢复播放**
-**修复前:** 视频永远停在暂停,而字幕窗口已消失、无从恢复。改这两个设置会走
-`#reProcessEvents()` → `#destroyManager()`(`YouTubeCaptionProvider.js:798`)→
-`BilingualSubtitleManager.destroy()`,后者移除的正是光标底下的容器,`pointerleave` 因此永不触发
+原步骤是「悬停单词(视频暂停)→ **鼠标别动** → 改播放器内菜单的 `segSlug`」。
+**做不到**:要碰任何控件就得移开鼠标,一移开 `pointerleave` 正常触发、视频恢复,
+那条「容器在光标底下被拆掉」的路径永远进不去。SPA 导航那个等效路径同理。
 
-**等效路径:** 悬停单词时直接 SPA 导航到另一个视频
+**但修复要留着。** 那个状态不需要用户操作也会到达 —— 只要 `destroy()` 发生时
+鼠标恰好停在字幕上:provider 的异步链会反复销毁重建 manager、广告开始结束、
+字幕轨切换、从另一个窗口改设置经存储订阅传过来。手动触发不了,不等于不会发生。
 
-## 如果哪一项没过,说明什么
+拆成两半,两半都可执行:
 
-两项的**机制**都被测试钉死了(DOMPurify 剥 `on*`、`destroy()` 时 `pointerleave` 不触发),
-每条测试都验证过「破坏对应修复它就红、且只有它红」。所以实机不通过的话,
-问题几乎一定在**集成层**而不是修复本身:
+| 要验的 | 怎么验 | 状态 |
+|---|---|---|
+| 机制:`destroy()` 时会恢复播放 | `BilingualSubtitleManager.test.js` 的 `resumes hover-paused playback when the caption window is torn down` | 已绿 |
+| 路由:改 `segSlug` 真的走到 `destroy()` | 正常改设置(鼠标随便动),Console 里应出现 `Bilingual Subtitle Manager: Destroying...` | 10 秒 |
 
-- **第 1 项点 × 仍无反应** —— Console 看 `document.querySelector(".kiss-word-tooltip-close").outerHTML`。
-  带 `onclick` 说明加载的是旧构建;不带但点击无效,说明委托监听没挂上,
-  查 `showWordTooltip` 里那个 `addEventListener("click", ...)`
-- **第 2 项视频仍卡暂停** —— 触发路径和记录的不一致。观察改设置时是否真的走到
-  `#destroyManager()`;若走别的路径,那条路径也要补 `#resumeVideoPausedForHover()`
-
-> 曾经试过给第 2 项的触发路径补自动化测试(断言改 `segSlug` 会让 manager 被 destroy),
+> 曾经试过给这条触发路径补自动化测试(断言改 `segSlug` 会让 manager 被 destroy),
 > **没做成,已回退**:provider 的异步处理链本身就会反复销毁重建 manager,
 > 断言在「把 `segSlug` 的路由整个改掉」之后照样通过 —— 是条空跑的测试。
 > 要补的话得先给 provider 一个可控的静止点,别再照原样试一遍。
+
+## 3. 独立翻译窗口 — 未执行
+
+**步骤:** Popup 右上角点「独立窗口」图标
+**期望:**
+- 打开时就能看全整个表单,**不需要手动拉大**;位置在当前窗口中央
+- **最大化后**内容居中、左右留白对称,不是贴左边、右侧一大片空白
+
+布局本身已在 dev server 里量过(1400px 视口下面板 720px、左右各 340px)。
+**测不了的是开窗与按内容收窄** —— 那要真实的 `browser.windows` API。
+所以这一项看的是「打开那一瞬间的尺寸对不对」。
+
+## 4. 内容页运行时泄漏(`ffcfbb1`)— 从未验证过
+
+做上面几项时顺手看一眼:在 YouTube 里**点链接**在视频间反复跳转 10 次以上
+(别刷新,刷新会重置一切),每隔几次在 Console 跑:
+
+```js
+(() => {
+  let sheets = 0, roots = 0;
+  const walk = (node) => node.querySelectorAll("*").forEach((el) => {
+    if (el.shadowRoot) {
+      roots++;
+      sheets += (el.shadowRoot.adoptedStyleSheets || []).length;
+      walk(el.shadowRoot);
+    }
+  });
+  walk(document);
+  return { roots, sheets, doc: (document.adoptedStyleSheets || []).length };
+})()
+```
+
+**期望:** `sheets` 稳定在小数值,不随导航次数单调增长。
+
+## 如果哪一项没过,说明什么
+
+- **第 1 项提示框仍然会自己消失** —— 装的是旧产物。Console 跑
+  `document.querySelector(".kiss-word-tooltip")`,离开单词几秒后它应该还在
+- **第 1 项按钮点了没反应** —— 看 `.kiss-word-tooltip-close` 的 `outerHTML`。
+  带 `onclick` 说明是旧构建(那个属性会被 DOMPurify 剥掉);
+  不带但点击无效,查 `showWordTooltip` 里那个 `addEventListener("click", ...)`
+- **第 2 项 Console 里没有 `Destroying...`** —— 改设置走的不是 `#destroyManager()`,
+  那条路径也要补 `#resumeVideoPausedForHover()`
+- **第 3 项窗口还是很小** —— 之前存过窗口尺寸。清掉
+  `chrome.storage.local` 里的 `KISS-Translator-M3_separate_window` 再试
 
 ## iOS 的 `@grant` 已排除,无需验证
 

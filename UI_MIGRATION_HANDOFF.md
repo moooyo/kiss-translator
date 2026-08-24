@@ -1,8 +1,9 @@
-# UI 迁移 Handoff
+# KISS Translator M3 · Handoff
 
-**最后更新:** 2026-08-24 · `dev-newui` @ `8a96de1f`
+**最后更新:** 2026-08-24 · `moooyo/kiss-translator-m3` @ `dev-newui`
 
-`newui` 那个单体分支上的 M3 重构,已经切成可评审的小块逐步落到 `dev-newui`。
+`newui` 那个单体分支上的 M3 重构,已经切成可评审的小块逐步落到 `dev-newui`;
+2026-08-24 起这个 fork 与上游分家成独立产品 **KISS Translator M3**。
 这份文档写的是**现在的状态和约束**,不是过程流水 —— 过程在 git log 里。
 
 接手时先看「现状」和「唯一未完成的事」,动代码前看「改这些地方前必须知道的约束」,
@@ -15,9 +16,10 @@
 | | |
 |---|---|
 | 代码 | 无已知开放技术项 |
-| 测试 | **1083 通过 / 0 失败**(119 suite) |
+| 测试 | **1087 通过 / 0 失败**(120 suite) |
 | CI | 每次 push 和 PR 都跑:jest + chrome/web 两个 target 构建 + lockfile 校验 + manifest 产物校验,约 2 分钟 |
 | 上游 | `dev-newui` 与 `upstream/dev` 齐平(领先 61,落后 0),无待同步工作,无在途 PR |
+| 身份 | 已与上游分家(存储 / DOM / 油猴 / 扩展 id / 更新 URL),见「产品身份」 |
 | 未完成 | **两项实机验证**,见下一节 |
 
 有两件事**不是待办、但必须知道**:跨 realm 设置写入竞态只是被收窄、没有彻底关掉
@@ -25,17 +27,21 @@
 
 ## 分支与仓库约定
 
+仓库是 **`moooyo/kiss-translator-m3`**,站点是 **https://moooyo.github.io/kiss-translator-m3/** 。
+2026-08-24 从 `moooyo/kiss-translator` 改名而来,GitHub 为旧名和旧 Pages 地址保留了重定向。
+
 | 分支 | 用途 |
 |---|---|
-| `dev` | `fishjar/kiss-translator:dev` 的**纯镜像**,不要直接提交 |
-| `dev-newui` | **我们自己的发布分支**。所有新 UI 工作从这里切、合回这里。**永远不要合进 `dev`** |
+| `dev-newui` | **默认分支兼发布分支**。所有工作从这里切、合回这里,tag 也从这里打 |
+| `dev` | `fishjar/kiss-translator:dev` 的**纯镜像**,不要直接提交,**永远不要把 `dev-newui` 合进去** |
 | `newui` | 原始单体分支,包含完整重构。停更于 2026-08-09,**落后大量上游特性**。仍是 M3 移植的唯一参照物,**不要删** |
 | `gh-pages` | 网站产物 |
 | `archive/atomic-setting-patch`(**标签**) | 已归档的三 commit 栈。本文档多处按 SHA 引用它,**不要删这个标签** |
 | `archive/live-settings-combined`(**标签**) | 已归档的 `8414d5f5`(原 `backup/live-settings-combined-20260723`)。内容已全部有归宿,见「已否决」 |
 
-**`dev-newui` 不走上游。** 它是这个 fork 自己的发布分支 —— `.github/workflows/release.yml` 由 `v*` 标签触发,
-产出 5 个渠道的 zip。上游 PR #1004 / #1013 已于 2026-08-22 由作者本人关闭。
+**`dev-newui` 不走上游。** `.github/workflows/release.yml` 由 `v*` 标签触发,产出 5 个渠道的 zip,
+**第一步会校验 tag 确实在 `dev-newui` 上,不在就直接失败**(那一步需要 `fetch-depth: 0`,
+浅克隆拿不到 `merge-base`)。上游 PR #1004 / #1013 已于 2026-08-22 由作者本人关闭。
 
 `archive/atomic-setting-patch` 里三个 commit 的归宿:`cdf403a` **否决**、`b47873c` **已合入 `a6bf0b1`**、
 `94fcf96` **核心已重写为 `storage.patchObj`**。详情见「已否决」。
@@ -47,7 +53,7 @@ fork 上仅剩 `dev` / `dev-newui` / `gh-pages` / `newui` 四个分支。2026-08
 删前逐文件比对过,660 个文件的内容全部已存在于仓库对象库。
 
 > **`gh` 默认指向上游。** 在这个 checkout 里 `gh` 解析到 `fishjar/kiss-translator` 而不是 fork。
-> 查自己的 CI 运行记录必须显式带 `-R moooyo/kiss-translator`,否则看到的是上游的历史,
+> 查自己的 CI 运行记录必须显式带 `-R moooyo/kiss-translator-m3`,否则看到的是上游的历史,
 > 会误判成「Actions 没触发」。按 AGENTS.md 上游是只读的。
 
 ## 唯一未完成的事:两项实机验证
@@ -105,6 +111,70 @@ fork 上仅剩 `dev` / `dev-newui` / `gh-pages` / `newui` 四个分支。2026-08
 ---
 
 # 改这些地方前必须知道的约束
+
+## 产品身份:改名会牵动哪些东西
+
+2026-08-24 从上游分家成独立产品 `KISS Translator M3`。**这是一个新项目,不做任何迁移** ——
+不兼容上游的数据,也不兼容我们自己 v2.0.28–30 的数据。
+
+`.env` 的 `REACT_APP_NAME` 是总开关。`src/config/app.js` 从它推导 `APP_NAME`
+(`.trim().split(/\s+/).join("-")`)和 `APP_LCNAME`,再连锁决定:
+
+```
+存储键前缀   KISS-Translator-M3_setting_v2 等全部 STOKEY_*
+CacheStorage KISS-Translator-M3_cache
+DOM ID       #kiss-translator-m3-fab / -box / -popup
+译文 CSS 类  .kiss-translator-m3-wrapper / -inner / -term ... 共 10 个
+WebDAV 目录  /kiss-translator-m3/
+```
+
+**动 `REACT_APP_NAME` 就是动上面全部五项**,而且没有任何迁移兜底。
+
+### 不由 `APP_NAME` 推导、必须单独维护的身份面
+
+| 位置 | 值 | 为什么必须是我们自己的 |
+|---|---|---|
+| `manifest.firefox.json` / `.thunderbird.json` 的 `gecko.id` | `kiss-translator-m3@moooyo.github.io` | 上游 thunderbird 那份写的是**上游作者的邮箱**,不改就是同一个扩展 |
+| `build-safari.mjs` 的 `identifier` | `com.moooyo.kiss-translator-m3` | Safari bundle id |
+| `config-overrides.js` 的 banner | `@name` + `@namespace` | 油猴管理器认的就是这两个的组合 |
+| `config-overrides.js` 的 entry key | `kiss-translator-m3.user` | 决定产物文件名,`build-ios.mjs` 里也硬编码了两处 |
+| `src/config/storage.js` 的 `KV_*_KEY` / `KV_SALT_*` | `kiss-m3-*` / `KISS-Translator-M3-*` | WebDAV 靠目录分家,但 Gist / KISS-Worker 是扁平的,只有文件名能分 |
+
+Chrome MV3 没有 `id` 字段,也**没有加 `key`** —— 那需要自管密钥对,而未打包安装本来就是各自不同的 ID。
+
+### 三个「会互相破坏」的碰撞面(改名时最容易漏)
+
+这三个不改的话,两个扩展装在一起会**真的把对方弄坏**,不是「显示重复」那么轻:
+
+- **Trusted Types 策略名**(`libs/trustedTypes.js`)。同一个文档里 `createPolicy` 重名会**直接抛**,
+  后装的那个拿不到策略,所有 `innerHTML` 消毒路径失效
+- **`data-<app>-shadow-host` 属性**(`libs/shadowHost.js`)。`content.js` 的 `removeStaleShadowHosts`
+  按它清理陈旧宿主 —— 沿用同一个属性名就会**把对方的宿主一起删掉**
+- **`Symbol.for("<app>.popup-manager")`**(`libs/popupManager.js`)。全局符号注册表是整页共享的,
+  两个扩展会抢同一个 popup manager 单例
+
+**反过来,`injectors/xmlhttp.js` 刻意不改。** 它的 `__KISS_TRANSLATOR_XHR_INTERCEPTOR__` 守卫
+让两个扩展**共用一份** XHR 拦截器,而 `KISS_XHR_DATA_YOUTUBE` 本来就是广播消息 —— 各自装一份
+反而会双重包装 `XMLHttpRequest.open`、字幕数据收两遍。
+
+### Emotion cache key 不接受数字
+
+`@emotion/cache` 的 `key` **只允许小写字母和连字符**,传进数字直接抛
+"Emotion key must only contain lower case alphabetical characters and -"。
+而 `ShadowDomManager` 捕获后只记一条 warn —— 表现是**整个组件静默挂不上**,不是报错。
+
+应用名带了 `M3`,`kiss-translator-m3-popup` 当场就踩中。已在
+`shadowDomManager.js` 的 `toEmotionCacheKey()` 里统一兜住(`kiss-translator-m-popup`),
+`shadowDomManager.test.js` 钉着。**新增 ShadowDomManager 调用方时不用再各自处理。**
+
+### 一个副产物:旧版迁移代码已经不可达
+
+`STOKEY_SETTING_OLD` / `STOKEY_RULES_OLD` / `STOKEY_SETTING_BACKUP_V1_BEFORE_V2` 都是
+`${APP_NAME}_*` 拼的,改名后它们指向的键**从来没被写过**,`runDataMigration()`
+(`src/libs/storage.js`)和 v1→v2→v3 那套迁移永远不会触发。
+
+没在改名这一轮删它 —— 那会牵动 `background.js` / `common.js` / `Options/index.js` 三个调用点
+和一批测试,混在一起不好评审。**留作单独一轮清理**,现在只是死代码,不影响行为。
 
 ## 字幕设置页(`Subtitle.js`)
 

@@ -2,6 +2,11 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
+> **これは [fishjar/kiss-translator](https://github.com/fishjar/kiss-translator) のフォークです。**
+> UI を Material 3 で再構築し、**独立した拡張機能**として配布しています。拡張機能 ID・
+> ユーザースクリプト ID・ストレージキー・更新 URL はすべて別物で、両方を同時に
+> インストールできますが**データは共有されません**。原作者 Gabe、GPL-3.0。
+
 シンプルでオープンソースの [バイリンガル対照翻訳拡張機能＆ユーザースクリプト](https://github.com/fishjar/kiss-translator)です。
 
 [kiss-translator.webm](https://github.com/fishjar/kiss-translator/assets/1157624/f7ba8a5c-e4a8-4d5a-823a-5c5c67a0a47f)
@@ -74,19 +79,18 @@
 > - ユーザースクリプトはより多くの問題（クロスドメイン問題、スクリプトの競合など）に遭遇する可能性があります
 
 - [x] ブラウザ拡張機能
-  - [x] Chrome [インストール](https://chrome.google.com/webstore/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof?hl=ja)
+  - [x] Chrome [インストール](https://github.com/moooyo/kiss-translator-m3/releases)
     - [x] Kiwi (Android)
     - [x] Orion (iOS)
-  - [x] Edge [インストール](https://microsoftedge.microsoft.com/addons/detail/%E7%AE%80%E7%BA%A6%E7%BF%BB%E8%AF%91/jemckldkclkinpjighnoilpbldbdmmlh?hl=ja)
-  - [x] Firefox [インストール](https://addons.mozilla.org/ja/firefox/addon/kiss-translator/)
+  - [x] Edge [インストール](https://github.com/moooyo/kiss-translator-m3/releases)
+  - [x] Firefox [インストール](https://github.com/moooyo/kiss-translator-m3/releases)
   - [ ] Safari
     - [ ] Safari (Mac)
     - [ ] Safari (iOS) 
-  - [x] Thunderbird [ダウンロード](https://github.com/fishjar/kiss-translator/releases)
+  - [x] Thunderbird [ダウンロード](https://github.com/moooyo/kiss-translator-m3/releases)
 - [x] ユーザースクリプト
-  - [x] Chrome/Edge/Firefox ([Tampermonkey](https://www.tampermonkey.net/)/[Violentmonkey](https://violentmonkey.github.io/)) [インストールリンク](https://fishjar.github.io/kiss-translator/kiss-translator.user.js)
-    - [Greasy Fork](https://greasyfork.org/zh-CN/scripts/472840-kiss-translator)
-  - [x] iOS Safari ([Userscripts Safari](https://github.com/quoid/userscripts)) [インストールリンク](https://fishjar.github.io/kiss-translator/kiss-translator-ios-safari.user.js)
+  - [x] Chrome/Edge/Firefox ([Tampermonkey](https://www.tampermonkey.net/)/[Violentmonkey](https://violentmonkey.github.io/)) [インストールリンク](https://moooyo.github.io/kiss-translator-m3/kiss-translator-m3.user.js)
+  - [x] iOS Safari ([Userscripts Safari](https://github.com/quoid/userscripts)) [インストールリンク](https://moooyo.github.io/kiss-translator-m3/kiss-translator-m3-ios-safari.user.js)
 
 ## 関連プロジェクト
 
@@ -121,7 +125,7 @@ APIテストの失敗には、一般的に以下の原因が考えられます�
   - 例えば `Ollama` にはネイティブAPIアドレスと `Openai` 互換のアドレスがありますが、本プラグインは現在、`Openai` 互換アドレスをサポートしており、`Ollama` ネイティブAPIアドレスはサポートしていません
 - 一部のAIモデルが統合翻訳をサポートしていない：
   - この場合、統合翻訳を無効にするか、カスタムAPIを使用して対応できます。
-  - または、カスタムAPIを使用して対応します。詳細は[カスタムAPIサンプルドキュメント](https://github.com/fishjar/kiss-translator/blob/master/custom-api_v2.md)を参照してください
+  - または、カスタムAPIを使用して対応します。詳細は[カスタムAPIサンプルドキュメント](https://github.com/moooyo/kiss-translator-m3/blob/dev-newui/custom-api_v2.md)を参照してください
 - 一部のAIモデルでパラメータが一致しない：
   - 例えば `Gemini` のネイティブAPIはパラメータの不一致が大きく、一部のバージョンのモデルが特定のパラメータをサポートしていないためエラーが返されることがあります。
   - この場合、`Hook` を使用してリクエスト `body` を変更するか、`Gemini2` (`Openai` 互換アドレス) に切り替えることができます
@@ -136,11 +140,11 @@ APIテストの失敗には、一般的に以下の原因が考えられます�
 
 カスタムAPI機能は非常に強力で柔軟性があり、理論的にはどんな翻訳APIにも接続できます。
 
-サンプル参照： [custom-api_v2.md](https://github.com/fishjar/kiss-translator/blob/master/custom-api_v2.md)
+サンプル参照： [custom-api_v2.md](https://github.com/moooyo/kiss-translator-m3/blob/dev-newui/custom-api_v2.md)
 
 ### ユーザースクリプトの設定ページに直接アクセスする方法
 
-設定ページアドレス： https://fishjar.github.io/kiss-translator/options.html
+設定ページアドレス： https://moooyo.github.io/kiss-translator-m3/options.html
 
 ## 今後の計画 
 
@@ -153,12 +157,12 @@ APIテストの失敗には、一般的に以下の原因が考えられます�
 - [x] **YouTube字幕サポートの最適化**：ストリーミング字幕の結合と翻訳体験を改善し、途切れを減らします。
 - [ ] **ルール共同構築メカニズムのアップグレード**：より柔軟なルールの共有、バージョン管理、コミュニティレビュープロセスを導入します。
  
- 特定の方向に興味がある場合は、[Issues](https://github.com/fishjar/kiss-translator/issues) で議論したり、PRを送信したりすることを歓迎します！
+ 特定の方向に興味がある場合は、[Issues](https://github.com/moooyo/kiss-translator-m3/issues) で議論したり、PRを送信したりすることを歓迎します！
 
 ## 開発ガイド
 
 ```sh
-git clone [https://github.com/fishjar/kiss-translator.git](https://github.com/fishjar/kiss-translator.git)
+git clone [https://github.com/moooyo/kiss-translator-m3.git](https://github.com/moooyo/kiss-translator-m3.git)
 cd kiss-translator
 git checkout dev # PRを送信する場合はdevブランチにプッシュすることをお勧めします
 pnpm install

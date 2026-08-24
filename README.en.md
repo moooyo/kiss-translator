@@ -2,6 +2,11 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
+> **This is a fork of [fishjar/kiss-translator](https://github.com/fishjar/kiss-translator).**
+> The UI is rebuilt on Material 3 and it ships as a **separate extension** — the extension id,
+> userscript id, storage keys and update URLs are all distinct, so both can be installed side by
+> side, but **they do not share data**. Original work by Gabe, GPL-3.0.
+
 A simple, open source [bilingual translation extension & Greasemonkey script](https://github.com/fishjar/kiss-translator).
 
 [kiss-translator.webm](https://github.com/fishjar/kiss-translator/assets/1157624/f7ba8a5c-e4a8-4d5a-823a-5c5c67a0a47f)
@@ -74,19 +79,18 @@ A simple, open source [bilingual translation extension & Greasemonkey script](ht
 > - Grease Monkey script will encounter more usage problems (cross domain issues, script conflicts, etc.)
 
 - [x] Browser extension
-  - [x] Chrome [Installation address](https://chrome.google.com/webstore/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof?hl=en)
+  - [x] Chrome [Installation address](https://github.com/moooyo/kiss-translator-m3/releases)
     - [x] Kiwi (Android)
     - [x] Orion (iOS)
-  - [x] Edge [Installation address](https://microsoftedge.microsoft.com/addons/detail/%E7%AE%80%E7%BA%A6%E7%BF%BB%E8%AF%91/jemckldkclkinpjighnoilpbldbdmmlh?hl=en)
-  - [x] Firefox [Installation address](https://addons.mozilla.org/en-US/firefox/addon/kiss-translator/)
+  - [x] Edge [Installation address](https://github.com/moooyo/kiss-translator-m3/releases)
+  - [x] Firefox [Installation address](https://github.com/moooyo/kiss-translator-m3/releases)
   - [ ] Safari
     - [ ] Safari (Mac)
     - [ ] Safari (iOS)
-  - [x] Thunderbird [Download address](https://github.com/fishjar/kiss-translator/releases)
+  - [x] Thunderbird [Download address](https://github.com/moooyo/kiss-translator-m3/releases)
 - [x] GreaseMonkey Script
-  - [x] Chrome/Edge/Firefox ([Tampermonkey](https://www.tampermonkey.net/)/[Violentmonkey](https://violentmonkey.github.io/)) [Installation link](https://fishjar.github.io/kiss-translator/kiss-translator.user.js)
-    - [Greasy Fork](https://greasyfork.org/zh-CN/scripts/472840-kiss-translator)
-  - [x] iOS Safari ([Userscripts Safari](https://github.com/quoid/userscripts)) [Installation link](https://fishjar.github.io/kiss-translator/kiss-translator-ios-safari.user.js)
+  - [x] Chrome/Edge/Firefox ([Tampermonkey](https://www.tampermonkey.net/)/[Violentmonkey](https://violentmonkey.github.io/)) [Installation link](https://moooyo.github.io/kiss-translator-m3/kiss-translator-m3.user.js)
+  - [x] iOS Safari ([Userscripts Safari](https://github.com/quoid/userscripts)) [Installation link](https://moooyo.github.io/kiss-translator-m3/kiss-translator-m3-ios-safari.user.js)
 
 ## Associated Projects
 
@@ -121,7 +125,7 @@ Common reasons for API test failures include:
   - For example, `Ollama` has a native API address and an `Openai`-compatible address. This plugin currently supports the `Openai`-compatible address and does not support the `Ollama` native API address.
 - Some AI models do not support batch translation:
   - In this case, you can choose to disable batch translation or use a custom API.
-  - Alternatively, you can use a custom API. For details, please refer to: [Custom API Example Documentation](https://github.com/fishjar/kiss-translator/blob/master/custom-api_v2.md)
+  - Alternatively, you can use a custom API. For details, please refer to: [Custom API Example Documentation](https://github.com/moooyo/kiss-translator-m3/blob/dev-newui/custom-api_v2.md)
 - Some AI models have inconsistent parameters:
   - For example, the parameters of the `Gemini` native API are highly inconsistent. Some model versions do not support certain parameters, leading to errors.
   - In this case, you can modify the request body using a `Hook`, or replace it with `Gemini2` (an OpenAI-compatible address).
@@ -136,11 +140,11 @@ Tampermonkey scripts require adding domains to the whitelist; otherwise, request
 
 Custom APIs are very powerful and flexible, and can theoretically connect to any translation API.
 
-Example reference: [custom-api_v2.md](https://github.com/fishjar/kiss-translator/blob/master/custom-api_v2.md)
+Example reference: [custom-api_v2.md](https://github.com/moooyo/kiss-translator-m3/blob/dev-newui/custom-api_v2.md)
 
 ### How to directly access the Tampermonkey script settings page
 
-Settings page address: https://fishjar.github.io/kiss-translator/options.html
+Settings page address: https://moooyo.github.io/kiss-translator-m3/options.html
 
 ## Future Plans 
 
@@ -153,12 +157,12 @@ Settings page address: https://fishjar.github.io/kiss-translator/options.html
 - [x] **Improved YouTube Subtitle Support**: Enhance merging and translation experience for streaming subtitles, reducing sentence fragmentation.
 - [ ] **Upgraded Rule Collaboration System**: Introduce more flexible rule sharing, version management, and community review processes.
 
- If you're interested in any of these directions, feel free to discuss in [Issues](https://github.com/fishjar/kiss-translator/issues) or submit a PR!
+ If you're interested in any of these directions, feel free to discuss in [Issues](https://github.com/moooyo/kiss-translator-m3/issues) or submit a PR!
 
 ## Development Guidelines
 
 ```sh
-git clone https://github.com/fishjar/kiss-translator.git
+git clone https://github.com/moooyo/kiss-translator-m3.git
 cd kiss-translator
 git checkout dev # Submit a PR suggestion to push to the dev branch
 pnpm install

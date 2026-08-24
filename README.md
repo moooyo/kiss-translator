@@ -2,6 +2,10 @@
 
 [English](README.en.md) | [中文](README.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
 
+> **这是 [fishjar/kiss-translator](https://github.com/fishjar/kiss-translator) 的一个 fork。**
+> 界面已按 Material 3 重构，并作为**独立扩展**发布 —— 扩展 id、油猴脚本 id、存储键与更新地址
+> 都和原版分开，**两者可以同时安装，但数据不互通**。原项目由 Gabe 创作，遵循 GPL-3.0。
+
 一个简约、开源的 [双语对照翻译扩展 & 油猴脚本](https://github.com/fishjar/kiss-translator)。
 
 [kiss-translator.webm](https://github.com/fishjar/kiss-translator/assets/1157624/f7ba8a5c-e4a8-4d5a-823a-5c5c67a0a47f)
@@ -74,19 +78,18 @@
 > - 油猴脚本会遇到更多使用上的问题（跨域问题、脚本冲突等）
 
 - [x] 浏览器扩展
-  - [x] Chrome [安装地址](https://chrome.google.com/webstore/detail/kiss-translator/bdiifdefkgmcblbcghdlonllpjhhjgof?hl=zh-CN)
+  - [x] Chrome [安装地址](https://github.com/moooyo/kiss-translator-m3/releases)
     - [x] Kiwi (Android)
     - [x] Orion (iOS)
-  - [x] Edge [安装地址](https://microsoftedge.microsoft.com/addons/detail/%E7%AE%80%E7%BA%A6%E7%BF%BB%E8%AF%91/jemckldkclkinpjighnoilpbldbdmmlh?hl=zh-CN)
-  - [x] Firefox [安装地址](https://addons.mozilla.org/zh-CN/firefox/addon/kiss-translator/)
+  - [x] Edge [安装地址](https://github.com/moooyo/kiss-translator-m3/releases)
+  - [x] Firefox [安装地址](https://github.com/moooyo/kiss-translator-m3/releases)
   - [ ] Safari
     - [ ] Safari (Mac)
     - [ ] Safari (iOS) 
-  - [x] Thunderbird [下载地址](https://github.com/fishjar/kiss-translator/releases)
+  - [x] Thunderbird [下载地址](https://github.com/moooyo/kiss-translator-m3/releases)
 - [x] 油猴脚本
-  - [x] Chrome/Edge/Firefox ([Tampermonkey](https://www.tampermonkey.net/)/[Violentmonkey](https://violentmonkey.github.io/)) [安装链接](https://fishjar.github.io/kiss-translator/kiss-translator.user.js)
-    - [Greasy Fork](https://greasyfork.org/zh-CN/scripts/472840-kiss-translator)
-  - [x] iOS Safari ([Userscripts Safari](https://github.com/quoid/userscripts)) [安装链接](https://fishjar.github.io/kiss-translator/kiss-translator-ios-safari.user.js)
+  - [x] Chrome/Edge/Firefox ([Tampermonkey](https://www.tampermonkey.net/)/[Violentmonkey](https://violentmonkey.github.io/)) [安装链接](https://moooyo.github.io/kiss-translator-m3/kiss-translator-m3.user.js)
+  - [x] iOS Safari ([Userscripts Safari](https://github.com/quoid/userscripts)) [安装链接](https://moooyo.github.io/kiss-translator-m3/kiss-translator-m3-ios-safari.user.js)
 
 ## 关联项目
 
@@ -121,7 +124,7 @@
   - 比如 `Ollama` 有原生接口地址和 `Openai` 兼容的地址，本插件目前统一支持 `Openai` 兼容的地址，不支持 `Ollama` 原生接口地址
 - 某些AI模型不支持聚合翻译：
   - 此种情况可以选择禁用聚合翻译或通过自定义接口的方式来使用。
-  - 或通过自定义接口的方式来使用，详情参考： [自定义接口示例文档](https://github.com/fishjar/kiss-translator/blob/master/custom-api_v2.md)
+  - 或通过自定义接口的方式来使用，详情参考： [自定义接口示例文档](https://github.com/moooyo/kiss-translator-m3/blob/dev-newui/custom-api_v2.md)
 - 某些AI模型的参数不一致：
   - 比如 `Gemini` 原生接口参数非常不一致，部分版本的模型不支持某些参数会导致返回错误。
   - 此种情况可以通过 `Hook` 修改请求 `body` ,或者更换为 `Gemini2` (`Openai` 兼容的地址)
@@ -136,11 +139,11 @@
 
 自定义接口功能非常强大、灵活，理论可以接入任何翻译接口。
 
-示例参考： [custom-api_v2.md](https://github.com/fishjar/kiss-translator/blob/master/custom-api_v2.md)
+示例参考： [custom-api_v2.md](https://github.com/moooyo/kiss-translator-m3/blob/dev-newui/custom-api_v2.md)
 
 ### 如何直接进入油猴脚本设置页面
 
-设置页面地址： https://fishjar.github.io/kiss-translator/options.html
+设置页面地址： https://moooyo.github.io/kiss-translator-m3/options.html
 
 ## 未来规划 
 
@@ -153,12 +156,12 @@
 - [x] **优化 YouTube 字幕支持**：改进流式字幕的合并与翻译体验，减少断句。
 - [ ] **规则共建机制升级**：引入更灵活的规则分享、版本管理与社区评审流程。
  
- 如果你对某个方向感兴趣，欢迎在 [Issues](https://github.com/fishjar/kiss-translator/issues) 中讨论或提交 PR！
+ 如果你对某个方向感兴趣，欢迎在 [Issues](https://github.com/moooyo/kiss-translator-m3/issues) 中讨论或提交 PR！
 
 ## 开发指引
 
 ```sh
-git clone https://github.com/fishjar/kiss-translator.git
+git clone https://github.com/moooyo/kiss-translator-m3.git
 cd kiss-translator
 git checkout dev # 提交PR建议推送到dev分支
 pnpm install

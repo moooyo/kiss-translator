@@ -234,6 +234,10 @@ const webWebpack = (config, env) => {
     main: paths.appIndexJs,
     options: paths.appSrc + "/options.js",
     content: paths.appSrc + "/userscript.js",
+    // popup 只在这个 dev 配置里打包 —— 扩展产物走 extWebpack,油猴产物不含 popup。
+    // 没有它的话,弹窗和独立翻译窗口是三个主要界面里唯一无法在浏览器里过目的,
+    // 只能靠装扩展才能看一眼。/popup.html 是普通弹窗,/popup.html#tranbox 是独立窗口。
+    popup: paths.appSrc + "/popup.js",
   };
 
   config.output.filename = "[name].js";
@@ -261,6 +265,12 @@ const webWebpack = (config, env) => {
       chunks: ["content"],
       template: paths.appPublic + "/content.html",
       filename: "content.html",
+    }),
+    new HtmlWebpackPlugin({
+      inject: true,
+      chunks: ["popup"],
+      template: paths.appHtml,
+      filename: "popup.html",
     })
   );
 

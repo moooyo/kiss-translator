@@ -1144,8 +1144,8 @@ const genOpenRouter = ({
   const headers = {
     "Content-type": "application/json",
     Authorization: `Bearer ${key}`,
-    "HTTP-Referer": "https://fishjar.github.io/kiss-translator/",
-    "X-OpenRouter-Title": "KISS Translator",
+    "HTTP-Referer": "https://moooyo.github.io/kiss-translator-m3/",
+    "X-OpenRouter-Title": "KISS Translator M3",
   };
 
   return { url, body, headers, userMsg };
@@ -1195,8 +1195,8 @@ const genOrcaRouter = ({
     "Content-type": "application/json",
     Authorization: `Bearer ${key}`,
     // 聚合网关的调用来源标识，便于在 OrcaRouter 控制台区分本扩展的用量
-    "HTTP-Referer": "https://fishjar.github.io/kiss-translator/",
-    "X-Title": "KISS Translator",
+    "HTTP-Referer": "https://moooyo.github.io/kiss-translator-m3/",
+    "X-Title": "KISS Translator M3",
   };
 
   return { url, body, headers, userMsg };

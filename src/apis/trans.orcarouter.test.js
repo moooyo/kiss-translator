@@ -122,8 +122,8 @@ describe("OrcaRouter interface", () => {
     expect(init.headers).toMatchObject({
       Authorization: "Bearer sk-orca-test-key",
       "Content-type": "application/json",
-      "HTTP-Referer": "https://fishjar.github.io/kiss-translator/",
-      "X-Title": "KISS Translator",
+      "HTTP-Referer": "https://moooyo.github.io/kiss-translator-m3/",
+      "X-Title": "KISS Translator M3",
     });
 
     const body = JSON.parse(init.body);

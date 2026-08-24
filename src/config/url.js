@@ -21,5 +21,7 @@ export const URL_KISS_PROXY = "https://github.com/fishjar/kiss-proxy"; // 翻译
 export const URL_KISS_RULES = "https://github.com/fishjar/kiss-rules"; // 网页翻译适配规则项目地址
 export const URL_KISS_RULES_NEW_ISSUE =
   "https://github.com/fishjar/kiss-rules/issues/new"; // 反馈网页翻译规则故障的 Issue 链接
+// 访问 GitHub 原始文件的 URL 前缀 (用于拉取最新的 README 等)。
+// 分支必须跟着发布分支走 —— dev-newui 是这个仓库的默认兼发布分支。
 export const URL_RAW_PREFIX =
-  "https://raw.githubusercontent.com/fishjar/kiss-translator/master"; // 访问 GitHub 原始文件的 URL 前缀 (用于拉取最新的 README 等)
+  "https://raw.githubusercontent.com/moooyo/kiss-translator-m3/dev-newui";

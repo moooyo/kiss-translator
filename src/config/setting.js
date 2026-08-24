@@ -39,7 +39,7 @@ export const TRANS_NEWLINE_LENGTH = 20; // 文本被认定为需要单独换行�
 
 // 默认不参与整页翻译的网站黑名单 (例如翻译工具本身、特定系统页，避免死循环翻译)
 export const DEFAULT_BLACKLIST = [
-  "https://fishjar.github.io/kiss-translator/options.html",
+  "https://moooyo.github.io/kiss-translator-m3/options.html",
   "https://translate.google.com",
   "https://www.deepl.com/translator",
 ];

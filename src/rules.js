@@ -12,7 +12,7 @@ import { BUILTIN_RULES } from "./config/rules";
     const data = JSON.stringify(BUILTIN_RULES, null, 2);
     // 生成的目标路径在打包输出文件夹的 web 目录下
     const dir = path.resolve(__dirname, "../build/web");
-    const file = path.join(dir, "kiss-translator-rules.json");
+    const file = path.join(dir, "kiss-translator-m3-rules.json");
     // 完整 build 里 build:web 排在前面，目录一定存在；但单独跑 pnpm build:rules
     // (新克隆、或只想刷新规则文件时) 目录还没有，writeFileSync 会 ENOENT，
     // 被下面的 catch 吞成一行 console.error，退出码仍是 0 —— 规则文件静默缺失。

@@ -6,12 +6,14 @@
 import { APP_NAME, APP_VERSION } from "./app";
 
 // --- 云端同步时的 JSON 数据文件名 (包含主版本号做兼容性隔离) ---
-export const KV_RULES_KEY = `kiss-rules_v${APP_VERSION[0]}.json`; // 同步的自定义规则文件名
-export const KV_WORDS_KEY = "kiss-words.json"; // 同步的生词本文件名
-export const KV_RULES_SHARE_KEY = `kiss-rules-share_v${APP_VERSION[0]}.json`; // 共享/订阅规则文件名
-export const KV_SETTING_KEY = `kiss-setting_v${APP_VERSION[0]}.json`; // 同步的全局设置文件名
-export const KV_SALT_SYNC = "KISS-Translator-SYNC"; // 导出同步配置加密时的 Salt
-export const KV_SALT_SHARE = "KISS-Translator-SHARE"; // 导出共享配置加密时的 Salt
+// 文件名带 kiss-m3- 前缀而不是上游的 kiss-：WebDAV 靠 `/${APP_LCNAME}` 目录分家，
+// 但 Gist / KISS-Worker 是扁平存储，只有文件名能把我们和上游分开。
+export const KV_RULES_KEY = `kiss-m3-rules_v${APP_VERSION[0]}.json`; // 同步的自定义规则文件名
+export const KV_WORDS_KEY = "kiss-m3-words.json"; // 同步的生词本文件名
+export const KV_RULES_SHARE_KEY = `kiss-m3-rules-share_v${APP_VERSION[0]}.json`; // 共享/订阅规则文件名
+export const KV_SETTING_KEY = `kiss-m3-setting_v${APP_VERSION[0]}.json`; // 同步的全局设置文件名
+export const KV_SALT_SYNC = "KISS-Translator-M3-SYNC"; // 导出同步配置加密时的 Salt
+export const KV_SALT_SHARE = "KISS-Translator-M3-SHARE"; // 导出共享配置加密时的 Salt
 
 // --- 浏览器本地存储 (chrome.storage 或 localStorage) 的键名 ---
 export const STOKEY_BDAUTH = `${APP_NAME}_bdauth`; // 百度翻译授权 Token 缓存键名

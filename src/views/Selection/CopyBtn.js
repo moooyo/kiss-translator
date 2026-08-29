@@ -32,8 +32,9 @@ export default function CopyBtn({ text, title = "copy" }) {
     <IconButton
       size="small"
       sx={{
-        opacity: 0.5,
-        "&:hover": {
+        opacity: 0.72,
+        transition: "opacity 160ms ease",
+        "&:hover, &.Mui-focusVisible": {
           opacity: 1,
         },
       }}

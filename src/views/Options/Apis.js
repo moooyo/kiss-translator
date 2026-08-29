@@ -1592,7 +1592,7 @@ function ApiListItem({
           borderColor: dragOver
             ? theme.palette.primary.main
             : theme.palette.divider,
-          borderRadius: 2.5,
+          borderRadius: "12px",
           backgroundColor: theme.palette.background.paper,
           boxShadow: dragOver
             ? `0 0 0 2px ${theme.palette.primary.main}`

@@ -287,7 +287,7 @@ export default function DraggableResizable({
         gridTemplateColumns: `${lineWidth * 2}px ${size.w}px ${lineWidth * 2}px`,
         gridTemplateRows: `${lineWidth * 2}px auto ${lineWidth * 2}px`,
         zIndex: 2147483647,
-        borderRadius: "12px",
+        borderRadius: "16px",
         overflow: "hidden",
       }}
       {...props}
@@ -336,7 +336,7 @@ export default function DraggableResizable({
           width: size.w,
           maxWidth: size.w,
           minWidth: 0,
-          borderRadius: 4,
+          borderRadius: "16px",
           overflow: "hidden",
           backgroundColor: theme.palette.background.paper,
           boxShadow: glowShadow,
@@ -392,7 +392,7 @@ export default function DraggableResizable({
               },
               "&::-webkit-scrollbar-thumb": {
                 backgroundColor: scrollbarThumbColor,
-                borderRadius: 8,
+                borderRadius: "999px",
                 border: `2px solid ${theme.palette.background.paper}`,
               },
               "&::-webkit-scrollbar-thumb:hover": {

@@ -32,6 +32,7 @@ function Label({ children }) {
  */
 function MenuItem({ children, onClick, disabled = false }) {
   const [hover, setHover] = useState(false);
+  const highlighted = hover && !disabled;
 
   return (
     <div
@@ -40,15 +41,16 @@ function MenuItem({ children, onClick, disabled = false }) {
         justifyContent: "space-between",
         alignItems: "center",
         padding: "0px 8px",
-        opacity: hover ? 1 : 0.8,
-        background: `rgba(255, 255, 255, ${hover ? 0.1 : 0})`,
+        opacity: disabled ? 0.5 : highlighted ? 1 : 0.8,
+        background: `rgba(255, 255, 255, ${highlighted ? 0.1 : 0})`,
         cursor: disabled ? "default" : "pointer",
         transition: "background 0.2s, opacity 0.2s",
         borderRadius: 5,
       }}
-      onMouseEnter={() => setHover(true)}
+      onMouseEnter={() => !disabled && setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onClick={onClick}
+      onClick={disabled ? undefined : onClick}
+      aria-disabled={disabled || undefined}
     >
       {children}
     </div>
@@ -86,6 +88,7 @@ function Switch({ label, name, value, onChange, disabled }) {
           borderRadius: 12,
           background: value ? "rgba(32,156,238,.8)" : "rgba(255,255,255,.3)",
           position: "relative",
+          transition: "background 180ms ease",
         }}
       >
         {/* 开关滑块 (Thumb) */}
@@ -99,6 +102,7 @@ function Switch({ label, name, value, onChange, disabled }) {
             top: 2,
             background: "rgba(255,255,255,.9)",
             transform: `translateX(${value ? 16 : 0}px)`,
+            transition: "transform 180ms ease",
           }}
         ></div>
       </div>
@@ -186,10 +190,13 @@ function Select({ label, name, value, options, onChange, disabled }) {
                     ? "rgba(32,156,238,.3)"
                     : "transparent",
                 opacity: option.value === value ? 1 : 0.8,
-                transition: "all 0.2s",
+                transition: "background 0.2s, opacity 0.2s",
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = "rgba(255,255,255,.1)";
+                e.currentTarget.style.background =
+                  option.value === value
+                    ? "rgba(32,156,238,.4)"
+                    : "rgba(255,255,255,.1)";
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.background =

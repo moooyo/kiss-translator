@@ -722,7 +722,10 @@ export default function TranForm({
               minRows={isPlaygound ? 4 : 1}
               maxRows={10}
               sx={{
-                "& textarea": {
+                "& .MuiFilledInput-root": {
+                  overflow: "visible",
+                },
+                '& textarea:not([aria-hidden="true"])': {
                   resize: "vertical",
                 },
               }}

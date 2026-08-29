@@ -68,7 +68,7 @@ export default function M3Theme({
         },
         divider: color.outlineVariant,
       },
-      shape: { borderRadius: 18 },
+      shape: { borderRadius: 12 },
       typography: {
         htmlFontSize,
         fontFamily: M3_FONT_FAMILY,
@@ -106,12 +106,17 @@ export default function M3Theme({
         },
         MuiIconButton: {
           styleOverrides: {
-            root: {
-              color: color.onSurfaceVariant,
+            root: ({ ownerState }) => ({
+              ...(ownerState.color === "default" && {
+                color: color.onSurfaceVariant,
+                "&:hover": {
+                  backgroundColor: color.surfaceContainer,
+                  "@media (hover: none)": { backgroundColor: "transparent" },
+                },
+              }),
               transition: "background .3s, color .3s, transform .15s",
-              "&:hover": { backgroundColor: color.surfaceContainer },
               "&:active": { transform: "scale(.94)" },
-            },
+            }),
           },
         },
         MuiTextField: {
@@ -124,10 +129,12 @@ export default function M3Theme({
               minHeight: 48,
               overflow: "hidden",
               border: "1px solid transparent",
-              borderRadius: 16,
+              borderRadius: 12,
               backgroundColor: color.surfaceContainer,
               transition: "background .25s, border-color .25s",
-              "&:hover": { backgroundColor: color.surfaceHigh },
+              "&:not(.Mui-disabled):hover": {
+                backgroundColor: color.surfaceHigh,
+              },
               "&.Mui-focused": {
                 borderColor: color.primary,
                 backgroundColor: color.surface,
@@ -158,8 +165,10 @@ export default function M3Theme({
               overflow: "hidden",
               borderRadius: 999,
               color: color.onSurfaceVariant,
+              fontWeight: 650,
               textOverflow: "ellipsis",
               textTransform: "none",
+              transition: "background-color .2s ease, color .2s ease",
               whiteSpace: "nowrap",
               "&.Mui-selected": {
                 backgroundColor: color.secondaryContainer,
@@ -173,7 +182,7 @@ export default function M3Theme({
           styleOverrides: {
             root: {
               border: `1px solid ${color.outlineVariant}`,
-              borderRadius: 22,
+              borderRadius: 12,
               boxShadow: "none",
             },
           },
@@ -184,17 +193,17 @@ export default function M3Theme({
             root: {
               overflow: "hidden",
               border: `1px solid ${color.outlineVariant}`,
-              borderRadius: "20px !important",
+              borderRadius: "12px !important",
               boxShadow: "none",
               "&::before": { display: "none" },
             },
           },
         },
         MuiAlert: {
-          styleOverrides: { root: { borderRadius: 16 } },
+          styleOverrides: { root: { borderRadius: 12 } },
         },
         MuiSnackbarContent: {
-          styleOverrides: { root: { borderRadius: 14 } },
+          styleOverrides: { root: { borderRadius: 8 } },
         },
         ...options.components,
       },

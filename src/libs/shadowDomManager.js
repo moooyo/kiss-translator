@@ -45,7 +45,7 @@ export default class ShadowDomManager {
     cacheKey = id,
     reactComponent,
     props = {},
-    rootElement = document.body,
+    rootElement = document.documentElement,
   }) {
     if (!id || !reactComponent) {
       throw new Error("ID and a React Component must be provided.");

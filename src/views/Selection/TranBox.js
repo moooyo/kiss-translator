@@ -1,5 +1,3 @@
-import { SettingProvider } from "../../hooks/Setting";
-import ThemeProvider from "../../hooks/M3Theme";
 import DraggableResizable from "./DraggableResizable";
 import Box from "@mui/material/Box";
 import ClickAwayListener from "@mui/material/ClickAwayListener";
@@ -27,7 +25,6 @@ import { useTheme, alpha } from "@mui/material/styles";
 import Logo from "../../components/Logo";
 import { isValidWord } from "../../libs/utils";
 import { useDarkMode } from "../../hooks/ColorMode";
-import { SELECTION_STYLES } from "./styles";
 
 /**
  * 划词翻译框的顶部导航栏组件
@@ -206,7 +203,7 @@ function TranBoxContent({
         },
         "&::-webkit-scrollbar-thumb": {
           backgroundColor: scrollbarThumbColor,
-          borderRadius: 8,
+          borderRadius: "999px",
           border: `2px solid ${theme.palette.background.paper}`,
         },
         "&::-webkit-scrollbar-thumb:hover": {
@@ -266,57 +263,47 @@ export default function TranBox(props) {
     realApiSlugs = [];
   }
 
-  return (
-    // 为子组件提供独立翻译框专属的 Setting 上下文
-    <SettingProvider context="tranbox">
-      {/* 提供独立翻译框专属的自定义样式 CSS 作用的主题 */}
-      <ThemeProvider styles={props.extStyles}>
-        <style>{SELECTION_STYLES}</style>
-        {props.showBox && (
-          // 渲染可拖动可缩放的外壳
-          <DraggableResizable
-            position={props.boxPosition}
-            size={props.boxSize}
-            setSize={props.setBoxSize}
-            setPosition={props.setBoxPosition}
-            autoHeight={props.tranboxSetting.autoHeight}
-            header={
-              <TranBoxHeader
-                setShowBox={props.setShowBox}
-                simpleStyle={simpleStyle}
-                setSimpleStyle={setSimpleStyle}
-                hideClickAway={hideClickAway}
-                setHideClickAway={setHideClickAway}
-                followSelection={followSelection}
-                setFollowSelection={setFollowSelection}
-                mouseHover={mouseHover}
-              />
-            }
-            onClick={(e) => e.stopPropagation()}
-            onMouseEnter={() => setMouseHover(true)}
-            onMouseLeave={() => setMouseHover(false)}
-          >
-            <TranBoxContent
-              simpleStyle={simpleStyle}
-              text={props.text}
-              setText={props.setText}
-              apiSlugs={realApiSlugs}
-              fromLang={props.tranboxSetting.fromLang}
-              toLang={props.tranboxSetting.toLang}
-              toLang2={props.tranboxSetting.toLang2}
-              transApis={props.transApis}
-              prompts={props.prompts}
-              langDetector={props.langDetector}
-              translateVariants={props.translateVariants}
-              enDict={props.tranboxSetting.enDict}
-              enSug={props.tranboxSetting.enSug}
-              aiDictApiSlug={props.tranboxSetting.aiDictApiSlug}
-              aiDictPromptSlug={props.tranboxSetting.aiDictPromptSlug}
-              selectionContext={props.selectionContext}
-            />
-          </DraggableResizable>
-        )}
-      </ThemeProvider>
-    </SettingProvider>
-  );
+  return props.showBox ? (
+    <DraggableResizable
+      position={props.boxPosition}
+      size={props.boxSize}
+      setSize={props.setBoxSize}
+      setPosition={props.setBoxPosition}
+      autoHeight={props.tranboxSetting.autoHeight}
+      header={
+        <TranBoxHeader
+          setShowBox={props.setShowBox}
+          simpleStyle={simpleStyle}
+          setSimpleStyle={setSimpleStyle}
+          hideClickAway={hideClickAway}
+          setHideClickAway={setHideClickAway}
+          followSelection={followSelection}
+          setFollowSelection={setFollowSelection}
+          mouseHover={mouseHover}
+        />
+      }
+      onClick={(e) => e.stopPropagation()}
+      onMouseEnter={() => setMouseHover(true)}
+      onMouseLeave={() => setMouseHover(false)}
+    >
+      <TranBoxContent
+        simpleStyle={simpleStyle}
+        text={props.text}
+        setText={props.setText}
+        apiSlugs={realApiSlugs}
+        fromLang={props.tranboxSetting.fromLang}
+        toLang={props.tranboxSetting.toLang}
+        toLang2={props.tranboxSetting.toLang2}
+        transApis={props.transApis}
+        prompts={props.prompts}
+        langDetector={props.langDetector}
+        translateVariants={props.translateVariants}
+        enDict={props.tranboxSetting.enDict}
+        enSug={props.tranboxSetting.enSug}
+        aiDictApiSlug={props.tranboxSetting.aiDictApiSlug}
+        aiDictPromptSlug={props.tranboxSetting.aiDictPromptSlug}
+        selectionContext={props.selectionContext}
+      />
+    </DraggableResizable>
+  ) : null;
 }

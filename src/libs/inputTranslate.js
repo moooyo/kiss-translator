@@ -415,8 +415,29 @@ export class InputTranslator {
       this.createFloatButtonDOM();
     }
 
-    this.#floatBtn.style.display = "flex";
+    const floatButton = this.#floatBtn;
+    floatButton.dataset.visible = "true";
+    floatButton.style.display = "flex";
+    floatButton.style.visibility = "visible";
+    floatButton.style.pointerEvents = "auto";
+    floatButton.style.transitionDelay = "0s, 0s, 0s";
     this.updateBtnPosition();
+
+    const reveal = () => {
+      if (
+        this.#floatBtn !== floatButton ||
+        floatButton.dataset.visible !== "true"
+      ) {
+        return;
+      }
+      floatButton.style.opacity = "1";
+      floatButton.style.transform = "scale(1)";
+    };
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(reveal);
+    } else {
+      reveal();
+    }
   }
 
   // 将创建逻辑抽离，保持代码整洁
@@ -430,15 +451,18 @@ export class InputTranslator {
         position: fixed;
         width: ${size}; height: ${size};
         background: #209CEE;
-        border-radius: 50%;
+        border-radius: 8px;
         z-index: 2147483647;
         cursor: pointer;
         display: flex; align-items: center; justify-content: center;
+        opacity: 0; visibility: hidden; pointer-events: none;
+        transform: scale(.92);
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        transition: opacity 0.2s;
+        transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
         font-size: 13px; color: white;
         user-select: none; -webkit-user-select: none;
       `;
+    this.#floatBtn.dataset.visible = "false";
     this.#floatBtn.innerText = "译";
 
     const preventFocusLoss = (e) => {
@@ -467,7 +491,12 @@ export class InputTranslator {
   // 仅仅隐藏（失焦时用）
   hideFloatButton() {
     if (this.#floatBtn) {
-      this.#floatBtn.style.display = "none";
+      this.#floatBtn.dataset.visible = "false";
+      this.#floatBtn.style.opacity = "0";
+      this.#floatBtn.style.transform = "scale(.92)";
+      this.#floatBtn.style.visibility = "hidden";
+      this.#floatBtn.style.pointerEvents = "none";
+      this.#floatBtn.style.transitionDelay = "0s, 0s, 160ms";
     }
   }
 
@@ -485,7 +514,7 @@ export class InputTranslator {
       !this.#activeInput ||
       !this.#activeInput.isConnected || // 检查元素是否已被移除
       !this.#floatBtn ||
-      this.#floatBtn.style.display === "none"
+      this.#floatBtn.dataset.visible !== "true"
     ) {
       // 如果输入框都不在了，直接隐藏按钮
       if (this.#floatBtn) this.hideFloatButton();

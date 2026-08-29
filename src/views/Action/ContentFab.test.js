@@ -84,6 +84,19 @@ describe("ContentFab action menu", () => {
     Array.from(document.querySelectorAll(".kt-content-fab-menu__item"));
   const clickFab = () => act(() => fab().click());
 
+  test("uses Material 3 regular FAB geometry for edge snapping", () => {
+    render();
+
+    expect(draggableProps).toEqual(
+      expect.objectContaining({
+        width: 56,
+        height: 56,
+        snapEdge: true,
+        fitContent: true,
+      })
+    );
+  });
+
   test("opens the action menu on click and lists every action", () => {
     render();
     expect(menuItems()).toHaveLength(0);

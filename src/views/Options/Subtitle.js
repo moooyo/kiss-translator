@@ -303,7 +303,7 @@ function SubtitleStylePreview({
       <Box
         sx={{
           bgcolor: "#ffffff",
-          borderRadius: 1,
+          borderRadius: "12px",
           border: "1px solid",
           borderColor: "divider",
           overflow: "hidden",
@@ -1043,7 +1043,7 @@ export default function SubtitleSetting() {
             sx={{
               border: "1px solid",
               borderColor: "divider",
-              borderRadius: 1,
+              borderRadius: "12px",
               p: 2,
             }}
           >

@@ -308,7 +308,10 @@ export default function TranCont({
             : undefined
         }
         sx={{
-          "& textarea": {
+          "& .MuiFilledInput-root": {
+            overflow: "visible",
+          },
+          '& textarea:not([aria-hidden="true"])': {
             resize: "vertical",
           },
         }}

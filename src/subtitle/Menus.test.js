@@ -49,6 +49,20 @@ describe("subtitle Menus", () => {
     expect(DEFAULT_SUBTITLE_SETTING.autoTranslate).toBe(true);
   });
 
+  test("animates the in-player switch without changing its shape", () => {
+    const view = renderMenus();
+    const track = Array.from(view.container.querySelectorAll("div")).find(
+      (element) =>
+        element.style.width === "40px" && element.style.height === "24px"
+    );
+
+    expect(track.style.borderRadius).toBe("12px");
+    expect(track.style.transition).toContain("background");
+    expect(track.firstElementChild.style.borderRadius).toBe("10px");
+    expect(track.firstElementChild.style.transition).toContain("transform");
+    view.cleanup();
+  });
+
   test("keeps automatic subtitle word favorites disabled by default", () => {
     expect(DEFAULT_SUBTITLE_SETTING.autoFavWord).toBe(false);
   });

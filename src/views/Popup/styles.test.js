@@ -95,7 +95,7 @@ describe("popup translation controls", () => {
       /\.kt-popup-language-menu\.MuiPaper-root\s*\{([^}]*)\}/
     )?.[1];
 
-    expect(menuRule).toContain("border-radius: 16px");
+    expect(menuRule).toContain("border-radius: 12px");
     expect(menuRule).toContain("background: var(--kt-sf1)");
     expect(menuRule).toContain("color: var(--kt-on)");
     expect(menuRule).toContain("overflow-y: auto");
@@ -141,6 +141,25 @@ describe("popup translation controls", () => {
     expect(moreStyleRule).toContain("flex-direction: row");
     expect(moreStyleRule).toContain("background: var(--kt-sf2)");
     expect(moreStyleRule).not.toContain("margin:");
+  });
+
+  test("uses restrained shapes while preserving semantic pill controls", () => {
+    const heroRule = POPUP_STYLES.match(/\.kt-popup-hero\s*\{([^}]*)\}/)?.[1];
+    const serviceRule = POPUP_STYLES.match(
+      /\.kt-popup-service\s*\{([^}]*)\}/
+    )?.[1];
+    const inputRule = POPUP_STYLES.match(
+      /\.kt-popup-translation-input\s*\{([^}]*)\}/
+    )?.[1];
+    const compareRule = POPUP_STYLES.match(
+      /\.kt-popup-translation-compare\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(heroRule).toContain("border-radius: 16px");
+    expect(serviceRule).toContain("border-radius: 8px");
+    expect(inputRule).toContain("overflow: visible");
+    expect(inputRule).toContain("border-radius: 16px");
+    expect(compareRule).toContain("border-radius: 999px");
   });
 });
 

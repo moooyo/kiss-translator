@@ -44,6 +44,13 @@ describe("M3 global motion", () => {
   test("respects reduced motion preferences", () => {
     expect(M3_GLOBAL_CSS).toContain("prefers-reduced-motion: reduce");
   });
+
+  test("preserves MUI button typography while resetting native controls", () => {
+    expect(M3_GLOBAL_CSS).toContain(
+      ".kt-m3-root button:not(.MuiButtonBase-root)"
+    );
+    expect(M3_GLOBAL_CSS).not.toMatch(/\.kt-m3-root button,\s*\n/);
+  });
 });
 
 describe("M3 keyboard focus", () => {

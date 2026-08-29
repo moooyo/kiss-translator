@@ -163,7 +163,7 @@ export default function AiDictCont({
         "& code": {
           px: 0.5,
           py: 0.1,
-          borderRadius: 0.5,
+          borderRadius: "4px",
           bgcolor: "action.hover",
         },
       }}

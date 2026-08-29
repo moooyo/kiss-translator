@@ -1,6 +1,6 @@
 import { apiMicrosoftDict } from "../apis";
 import { saveFavoriteWordIfMissing } from "./favoriteWords";
-import { WordTooltipController } from "./wordHover";
+import { addWordHoverStyles, WordTooltipController } from "./wordHover";
 
 jest.mock("../apis", () => ({ apiMicrosoftDict: jest.fn() }));
 jest.mock("../libs/log", () => ({ logger: { info: jest.fn() } }));
@@ -22,6 +22,20 @@ describe("WordTooltipController", () => {
     apiMicrosoftDict.mockReset();
     saveFavoriteWordIfMissing.mockReset();
     saveFavoriteWordIfMissing.mockResolvedValue(false);
+  });
+
+  test("keeps the close button circular before hover and focus", () => {
+    addWordHoverStyles();
+    const css = document.getElementById("kiss-word-hover-styles").textContent;
+    const baseRule = css.match(/\.kiss-word-tooltip-close\s*\{([^}]*)\}/)?.[1];
+    const hoverRule = css.match(
+      /\.kiss-word-tooltip-close:hover,[\s\S]*?:focus-visible\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(baseRule).toContain("border-radius: 50%");
+    expect(baseRule).toContain("transition: background 160ms ease");
+    expect(hoverRule).not.toContain("border-radius");
+    document.getElementById("kiss-word-hover-styles").remove();
   });
 
   // 关闭按钮曾经写成内联 onclick，而所有 innerHTML 都要过

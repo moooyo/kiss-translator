@@ -31,7 +31,7 @@ export const getNearestEdge = ({
   }
 };
 
-// 按指定边缘计算吸附坐标；悬浮时完全展开，否则隐藏一半
+// Position the control on one edge while keeping the cross-axis fully visible.
 export const getEdgePosition = ({
   x: left,
   y: top,
@@ -39,21 +39,28 @@ export const getEdgePosition = ({
   height,
   windowWidth,
   windowHeight,
-  hover,
+  revealed,
   edge,
 }) => {
+  const maxLeft = Math.max(0, windowWidth - width);
+  const maxTop = Math.max(0, windowHeight - height);
+
   switch (edge) {
     case "right":
-      left = hover ? windowWidth - width : windowWidth - width / 2;
+      left = revealed ? windowWidth - width : windowWidth - width / 2;
+      top = limitNumber(top, 0, maxTop);
       break;
     case "left":
-      left = hover ? 0 : -width / 2;
+      left = revealed ? 0 : -width / 2;
+      top = limitNumber(top, 0, maxTop);
       break;
     case "bottom":
-      top = hover ? windowHeight - height : windowHeight - height / 2;
+      left = limitNumber(left, 0, maxLeft);
+      top = revealed ? windowHeight - height : windowHeight - height / 2;
       break;
     default:
-      top = hover ? 0 : -height / 2;
+      left = limitNumber(left, 0, maxLeft);
+      top = revealed ? 0 : -height / 2;
   }
   return { x: left, y: top };
 };
@@ -88,19 +95,22 @@ export default function Draggable({
   handler, // 点击并开始拖拽的触发区域
   children, // 容器内部的主体渲染元素
   usePaper,
-  // 容器带 willChange: transform，因此它是内部 fixed 定位子节点的包含块。
-  // 悬浮球的动作菜单正是这样一个子节点，被 58px 的固定宽度圈住就会被裁掉。
-  // 置 true 让容器按内容收缩；贴边吸附的计算仍然走上面的 width 参数，不受影响。
+  // The transformed wrapper is the containing block for fixed descendants.
+  // Let it fit the action menu while edge snapping still uses the explicit width.
   fitContent,
-  expanded, // children 里有展开中的浮层时置 true，避免贴边透明度把它一起吞掉
+  expanded, // Keep the anchor revealed while a child overlay is expanded.
 }) {
   const [hover, setHover] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
+  const [positionTransitionEnabled, setPositionTransitionEnabled] =
+    useState(false);
   const [origin, setOrigin] = useState(null); // 拖动起始的参考原点坐标和 client 坐标
   const [edge, setEdge] = useState(
     FAB_EDGES.includes(savedEdge) ? savedEdge : null
   );
   const containerRef = useRef(null);
   const draggedRef = useRef(false);
+  const revealed = hover || focusWithin || expanded || Boolean(origin);
 
   // 用百分比的形式保存位置，以便在视口大小 resize 时等比例缩放位置
   // REVIEW: 这里的 left / windowWidth 和 top / windowHeight 在首帧 windowWidth/Height 为 0 的异常场景下，
@@ -152,7 +162,7 @@ export default function Draggable({
           height,
           windowWidth: newWindowWidth,
           windowHeight: newWindowHeight,
-          hover,
+          revealed,
           edge: latestEdge.current,
         });
         applyTransform(edgePosition.x, edgePosition.y);
@@ -164,7 +174,7 @@ export default function Draggable({
 
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
-  }, [applyTransform, height, hover, snapEdge, width]);
+  }, [applyTransform, height, revealed, snapEdge, width]);
 
   // 贴边自动吸附效果逻辑
   useEffect(() => {
@@ -197,7 +207,7 @@ export default function Draggable({
       height,
       windowWidth,
       windowHeight,
-      hover,
+      revealed,
       edge: activeEdge,
     });
 
@@ -212,7 +222,7 @@ export default function Draggable({
   }, [
     edge,
     origin,
-    hover,
+    revealed,
     width,
     height,
     windowWidth,
@@ -223,6 +233,10 @@ export default function Draggable({
     position.y,
     applyTransform,
   ]);
+
+  useEffect(() => {
+    setPositionTransitionEnabled(true);
+  }, []);
 
   // 鼠标/手指按下，标记拖拽开始并记录起始坐标
   const handlePointerDown = (e) => {
@@ -241,8 +255,8 @@ export default function Draggable({
 
   // 鼠标/手指拖动，计算当前位移偏差并移动 DOM
   const handlePointerMove = (e) => {
-    onMove && onMove();
     if (!origin) return;
+    onMove && onMove();
     draggedRef.current = true;
     const { clientX, clientY } = isMobile ? e.targetTouches[0] : e;
     const dx = clientX - origin.clientX;
@@ -298,15 +312,28 @@ export default function Draggable({
     setHover(false);
   };
 
-  // 根据拖拽状态及贴边设定，动态计算当前的半透明度 (非 hover 或没被拖拽时呈透明隐藏状态)
-  // expanded 也要算作「露出」：菜单展开时容器若停在 0.2，整个菜单会跟着一起变透明，
-  // 几乎看不清——而这时指针并不在悬浮球上，hover 是 false。
+  const handleFocusCapture = () => {
+    setFocusWithin(true);
+  };
+
+  const handleBlurCapture = (e) => {
+    if (!e.currentTarget.contains(e.relatedTarget)) {
+      setFocusWithin(false);
+    }
+  };
+
+  // M3 FABs remain fully opaque; non-snapped panels still soften while dragging.
   const opacity = useMemo(() => {
     if (snapEdge) {
-      return hover || origin || expanded ? 1 : 0.2;
+      return 1;
     }
     return origin ? 0.8 : 1;
-  }, [origin, snapEdge, hover, expanded]);
+  }, [origin, snapEdge]);
+
+  const transition =
+    positionTransitionEnabled && !origin
+      ? "opacity 160ms ease, transform 180ms cubic-bezier(.2, 0, 0, 1)"
+      : "opacity 160ms ease";
 
   // 根据移动端/PC端不同绑定不同的触摸/指针监听属性
   // cancel 分支不是可选的：pointercancel / touchcancel 之后浏览器不会再补发
@@ -333,15 +360,18 @@ export default function Draggable({
       style={{
         width: fitContent ? undefined : width,
         opacity,
+        transition,
         position: "fixed",
         top: 0,
         left: 0,
         zIndex: 2147483647,
         display: show ? "block" : "none",
-        willChange: "transform",
+        willChange: "transform, opacity",
       }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onFocusCapture={handleFocusCapture}
+      onBlurCapture={handleBlurCapture}
       onClick={handleClick}
     >
       <DraggableWrapper usePaper={usePaper}>

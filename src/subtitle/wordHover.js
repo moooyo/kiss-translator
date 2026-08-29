@@ -66,12 +66,14 @@ export const addWordHoverStyles = () => {
       display: flex;
       align-items: center;
       justify-content: center;
+      border-radius: 50%;
+      transition: background 160ms ease, color 160ms ease;
     }
 
-    .kiss-word-tooltip-close:hover {
+    .kiss-word-tooltip-close:hover,
+    .kiss-word-tooltip-close:focus-visible {
       color: white;
       background: rgba(255, 255, 255, 0.1);
-      border-radius: 50%;
     }
 
     /* 释义加载中状态文案 */

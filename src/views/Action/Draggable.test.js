@@ -1,6 +1,6 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import Draggable from "./Draggable";
+import Draggable, { getEdgePosition } from "./Draggable";
 import { putFab } from "../../libs/storage";
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
@@ -118,6 +118,30 @@ describe("Draggable FAB edge locking", () => {
     return nextFab;
   }
 
+  test("keeps the cross-axis fully visible at viewport corners", () => {
+    const dimensions = {
+      x: 580,
+      y: 390,
+      width: 56,
+      height: 56,
+      windowWidth: 600,
+      windowHeight: 400,
+    };
+
+    expect(
+      getEdgePosition({ ...dimensions, revealed: false, edge: "right" })
+    ).toEqual({ x: 572, y: 344 });
+    expect(
+      getEdgePosition({ ...dimensions, revealed: true, edge: "right" })
+    ).toEqual({ x: 544, y: 344 });
+    expect(
+      getEdgePosition({ ...dimensions, revealed: false, edge: "bottom" })
+    ).toEqual({ x: 544, y: 372 });
+    expect(
+      getEdgePosition({ ...dimensions, revealed: true, edge: "bottom" })
+    ).toEqual({ x: 544, y: 344 });
+  });
+
   test("keeps the right edge during immediate and debounced viewport resize", () => {
     const fab = renderFab();
     expect(draggable.style.width).toBe("40px");
@@ -159,18 +183,55 @@ describe("Draggable FAB edge locking", () => {
 
   test("hovering expands the FAB without changing its saved edge", () => {
     renderFab();
+    expect(draggable.style.opacity).toBe("1");
+    expect(draggable.style.transition).toContain("opacity");
+    expect(draggable.style.transition).toContain("transform");
 
     act(() =>
       draggable.dispatchEvent(new MouseEvent("mouseover", { bubbles: true }))
     );
     expect(draggable.style.transform).toBe("translate(560px, 200px)");
+    expect(draggable.style.opacity).toBe("1");
 
     act(() =>
       draggable.dispatchEvent(new MouseEvent("mouseout", { bubbles: true }))
     );
     act(() => jest.runOnlyPendingTimers());
     expect(draggable.style.transform).toBe("translate(580px, 200px)");
+    expect(draggable.style.opacity).toBe("1");
     expect(putFab).toHaveBeenLastCalledWith({ x: 580, y: 200, edge: "right" });
+  });
+
+  test("keyboard focus reveals the snapped FAB and blur hides it halfway", () => {
+    const outside = document.createElement("button");
+    document.body.appendChild(outside);
+    renderFab({ handler: <button type="button">fab</button> });
+    const handler = draggable.querySelector("button");
+
+    act(() => handler.focus());
+    expect(draggable.style.transform).toBe("translate(560px, 200px)");
+
+    act(() => outside.focus());
+    expect(draggable.style.transform).toBe("translate(580px, 200px)");
+    outside.remove();
+  });
+
+  test("ignores pointer movement when no drag is active", () => {
+    const onMove = jest.fn();
+    renderFab({ onMove });
+    const handler = draggable.firstElementChild.firstElementChild;
+
+    act(() => {
+      handler.dispatchEvent(
+        new MouseEvent("pointermove", {
+          bubbles: true,
+          clientX: 300,
+          clientY: 100,
+        })
+      );
+    });
+
+    expect(onMove).not.toHaveBeenCalled();
   });
 
   test("changes the locked edge only after a real drag", () => {
@@ -186,6 +247,7 @@ describe("Draggable FAB edge locking", () => {
         })
       );
     });
+    expect(draggable.style.transition).not.toContain("transform");
     act(() => {
       handler.dispatchEvent(
         new MouseEvent("pointermove", {
@@ -198,6 +260,7 @@ describe("Draggable FAB edge locking", () => {
     act(() => {
       handler.dispatchEvent(new MouseEvent("pointerup", { bubbles: true }));
     });
+    expect(draggable.style.transition).toContain("transform");
     act(() => {
       jest.runOnlyPendingTimers();
     });
@@ -262,13 +325,13 @@ describe("Draggable FAB edge locking", () => {
     expect(draggable.style.width).toBe("");
   });
 
-  // 贴边时容器只有 0.2 不透明度。菜单挂在同一个容器里，不把 expanded 算进来
-  // 的话，展开的菜单会跟着一起变透明——而这时指针并不在悬浮球上。
-  test("an expanded overlay keeps the snapped container fully opaque", () => {
+  test("an expanded overlay reveals the snapped control for touch input", () => {
     const fab = renderFab();
-    expect(draggable.style.opacity).toBe("0.2");
+    expect(draggable.style.opacity).toBe("1");
+    expect(draggable.style.transform).toBe("translate(580px, 200px)");
 
     rerenderFab(fab, { expanded: true });
     expect(draggable.style.opacity).toBe("1");
+    expect(draggable.style.transform).toBe("translate(560px, 200px)");
   });
 });

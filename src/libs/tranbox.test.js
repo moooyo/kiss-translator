@@ -55,6 +55,7 @@ describe("TransboxManager", () => {
     });
 
     const host = document.getElementById(APP_CONSTS.boxID);
+    expect(host.parentElement).toBe(document.documentElement);
     expect(host.style.getPropertyValue("all")).toBe("initial");
     expect(host.style.getPropertyPriority("all")).toBe("important");
     expect(host.style.getPropertyValue("display")).toBe("block");

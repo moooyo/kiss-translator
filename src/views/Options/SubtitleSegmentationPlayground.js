@@ -46,7 +46,10 @@ const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_UPLOAD_EVENTS = 100000;
 // 原始数据和结果框默认显示五行，并允许用户从右下角按需拉高查看区域。
 const RESIZABLE_TEXT_FIELD_SX = {
-  "& textarea": {
+  "& .MuiFilledInput-root": {
+    overflow: "visible",
+  },
+  '& textarea:not([aria-hidden="true"])': {
     resize: "vertical !important",
     overflow: "auto !important",
   },
@@ -819,7 +822,7 @@ export default function SubtitleSegmentationPlayground({
                 top: 8,
                 right: 8,
                 p: 0.25,
-                borderRadius: 1,
+                borderRadius: "8px",
                 bgcolor: "background.paper",
                 boxShadow: 1,
               }}

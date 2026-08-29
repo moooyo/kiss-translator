@@ -51,7 +51,7 @@ describe("settings layout boundaries", () => {
       /\.kt-settings-card\s*\{[^}]*list-style:\s*none;/
     );
     expect(OPTIONS_STYLES).toMatch(
-      /\.kt-overview-settings > \.MuiGrid-container\s*\{[^}]*border:\s*1px solid var\(--kt-linev\);[^}]*border-radius:\s*20px;/
+      /\.kt-overview-settings > \.MuiGrid-container\s*\{[^}]*border:\s*1px solid var\(--kt-linev\);[^}]*border-radius:\s*12px;/
     );
 
     const overviewGridRule = OPTIONS_STYLES.match(
@@ -121,5 +121,45 @@ describe("settings layout boundaries", () => {
     expect(OPTIONS_STYLES).toContain(
       "@container playground (max-width: 760px)"
     );
+  });
+
+  test("keeps resizable Playground fields outside the rounded clip", () => {
+    const textFieldRule = OPTIONS_STYLES.match(
+      /\.kt-options-page \.kt-translation-text-field \.MuiFilledInput-root\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(textFieldRule).toContain("overflow: visible");
+    expect(textFieldRule).toContain("border-radius: 16px");
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-options-page \.kt-translation-text-field__actions\s*\{[^}]*right:\s*16px;[^}]*bottom:\s*16px;/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-options-page \.kt-translation-text-field__actions \.MuiIconButton-root:hover,[\s\S]*?\.Mui-focusVisible\s*\{[^}]*var\(--kt-onsecc\) 8%/
+    );
+  });
+
+  test("retains full shapes only for pill-shaped controls", () => {
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-options-search\s*\{[^}]*border-radius:\s*999px;/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-options-nav__link\s*\{[^}]*border-radius:\s*999px;/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-settings-card\s*\{[^}]*border-radius:\s*12px;/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-playground-config\s*\{[^}]*border-radius:\s*16px;/
+    );
+  });
+
+  test("keeps selected method cards from shifting their content", () => {
+    const selectedRule = OPTIONS_STYLES.match(
+      /\.kt-sync-method\[aria-checked="true"\]\s*\{([^}]*)\}/
+    )?.[1];
+
+    expect(selectedRule).toContain("border-color: var(--kt-pri)");
+    expect(selectedRule).toContain("box-shadow: inset 0 0 0 1px var(--kt-pri)");
+    expect(selectedRule).not.toContain("border: 2px");
   });
 });

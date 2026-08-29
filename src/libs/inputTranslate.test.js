@@ -208,6 +208,24 @@ describe("InputTranslator input button", () => {
     expect(getFloatButton(target).style.top).toBe("165px");
   });
 
+  test("uses a stable rounded shape and animated visibility", () => {
+    const target = document.createElement("input");
+    focusTarget(translator, target);
+    const button = getFloatButton(target);
+
+    expect(button.style.borderRadius).toBe("8px");
+    expect(button.style.transition).toContain("opacity 160ms");
+    expect(button.dataset.visible).toBe("true");
+    expect(button.style.visibility).toBe("visible");
+
+    translator.hideFloatButton();
+
+    expect(button.dataset.visible).toBe("false");
+    expect(button.style.opacity).toBe("0");
+    expect(button.style.visibility).toBe("hidden");
+    expect(button.style.pointerEvents).toBe("none");
+  });
+
   test.each([
     [20, "0px"],
     [900, "768px"],

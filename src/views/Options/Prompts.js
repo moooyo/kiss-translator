@@ -153,7 +153,7 @@ function PromptListItem({ prompt, selected, isPreset, onSelect }) {
           minHeight: 40,
           py: 0.75,
           px: 0.5,
-          borderRadius: 0.5,
+          borderRadius: "8px",
         }}
       >
         {isPreset ? (
@@ -293,7 +293,10 @@ function PromptFields({
           maxRows={14}
           disabled={isPreset}
           sx={{
-            "& textarea": {
+            "& .MuiFilledInput-root": {
+              overflow: "visible",
+            },
+            '& textarea:not([aria-hidden="true"])': {
               resize: "vertical",
             },
           }}
@@ -325,7 +328,10 @@ function PromptFields({
             maxRows={14}
             disabled={isPreset}
             sx={{
-              "& textarea": {
+              "& .MuiFilledInput-root": {
+                overflow: "visible",
+              },
+              '& textarea:not([aria-hidden="true"])': {
                 resize: "vertical",
               },
             }}
@@ -514,7 +520,7 @@ export default function Prompts() {
             flexDirection: "column",
             border: 1,
             borderColor: "divider",
-            borderRadius: "20px",
+            borderRadius: "16px",
             overflow: "hidden",
             "@container options-main (min-width: 760px)": {
               flexDirection: "row",

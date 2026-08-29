@@ -51,6 +51,7 @@ describe("PopupManager Shadow DOM integration", () => {
     const popupHost = document.getElementById(`${APP_CONSTS.popupID}-1`);
     expect(manager.isVisible).toBe(true);
     expect(popupHost).not.toBeNull();
+    expect(popupHost.parentElement).toBe(document.documentElement);
     expect(popupHost.shadowRoot).not.toBeNull();
     expect(document.getElementById(APP_CONSTS.popupID)).toBe(foreignElement);
   });

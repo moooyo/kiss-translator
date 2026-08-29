@@ -141,10 +141,14 @@ function Header({
             onChange={(event) => setLanguage(event.target.value)}
             aria-label={content.languageLabel}
             sx={{
-              borderRadius: 2,
+              borderRadius: "12px",
               fontWeight: 700,
               ".MuiSelect-select": {
                 py: 1,
+              },
+              ".MuiNativeSelect-select:focus": {
+                borderRadius: "inherit",
+                bgcolor: "transparent",
               },
             }}
           >
@@ -169,6 +173,9 @@ function Header({
               bgcolor: tokens.panel,
               width: 40,
               height: 40,
+              "&:hover": {
+                bgcolor: tokens.panelSoft,
+              },
             }}
           >
             {themeMode === "dark" ? <Brightness7Icon /> : <Brightness4Icon />}

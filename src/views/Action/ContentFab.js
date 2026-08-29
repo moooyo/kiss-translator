@@ -64,7 +64,7 @@ export function ContentFabContent({
   processActions,
 }) {
   const i18n = useI18n();
-  const fabWidth = 58; // 悬浮球的固定宽度 58px（M3 标准 FAB 尺寸）
+  const fabWidth = 56; // Material 3 regular FAB size.
   const windowSize = useWindowSize();
   const [moved, setMoved] = useState(false); // 标记是否发生了拖动
   const [showFab, setShowFab] = useState(true);
@@ -182,9 +182,9 @@ export function ContentFabContent({
   return (
     <Draggable
       key="fab"
-      snapEdge // 启用贴边吸附隐藏效果
-      fitContent // 菜单是 fixed 定位的子节点，容器不能被 58px 固定宽度圈住
-      expanded={open} // 菜单展开时不要被贴边透明度压到 0.2
+      snapEdge // Keep the idle FAB partially hidden at the viewport edge.
+      fitContent // The fixed menu must not be constrained by the 56px FAB wrapper.
+      expanded={open} // Keep the anchor fully revealed while the menu is open.
       {...fabProps}
       show={showFab}
       onStart={handleStart}

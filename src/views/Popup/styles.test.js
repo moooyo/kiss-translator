@@ -1,4 +1,5 @@
 import { POPUP_STYLES } from "./styles";
+import { getCssAtRuleBodies } from "../../styles/testUtils";
 
 describe("Safari popup sizing", () => {
   test("uses intrinsic fixed dimensions instead of viewport-relative sizing", () => {
@@ -34,6 +35,27 @@ describe("Safari popup sizing", () => {
     expect(POPUP_STYLES).toMatch(
       /\.kt-popup-main-switch \.MuiSwitch-switchBase\.Mui-checked \+ \.MuiSwitch-track\s*\{[^}]*background:\s*var\(--kt-pri\);/
     );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-main-switch \.MuiSwitch-input\s*\{[^}]*left:\s*0;[^}]*width:\s*46px;[^}]*height:\s*28px;/
+    );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-main-switch \.MuiSwitch-switchBase\.Mui-checked \.MuiSwitch-input\s*\{[^}]*left:\s*-18px;/
+    );
+    expect(POPUP_STYLES).not.toMatch(
+      /\.kt-popup-advanced-row \.MuiSwitch-input/
+    );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-main-switch \.MuiSwitch-switchBase\.Mui-disabled \+ \.MuiSwitch-track\s*\{[^}]*background:\s*var\(--kt-onv\);[^}]*opacity:\s*\.12;/
+    );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-main-switch \.MuiSwitch-switchBase\.Mui-checked\.Mui-disabled \+ \.MuiSwitch-track\s*\{[^}]*background:\s*var\(--kt-onv\);[^}]*opacity:\s*\.12;/
+    );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-advanced-row \.MuiSwitch-root\s*\{[^}]*margin:\s*-2px -4px;[^}]*\}/
+    );
+    expect(POPUP_STYLES).not.toMatch(
+      /\.kt-popup-advanced-row \.MuiSwitch-root\s*\{[^}]*transform:/
+    );
     expect(POPUP_STYLES).not.toMatch(
       /@media\s*\(max-width:\s*395px\)[\s\S]*?\.kt-popup-shell\s*\{\s*width:\s*100vw;/
     );
@@ -41,17 +63,54 @@ describe("Safari popup sizing", () => {
 });
 
 describe("popup keyboard focus", () => {
-  test("does not suppress the compatible global focus outline", () => {
-    expect(POPUP_STYLES).not.toMatch(/:focus\s*\{\s*outline:\s*(?:0|none)/);
+  test("uses the rounded container as the textarea focus indicator", () => {
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-translation-input--focused\s*\{[^}]*border-color:\s*var\(--kt-pri\);[^}]*outline:\s*3px solid var\(--kt-pri\);/
+    );
+    expect(POPUP_STYLES).not.toContain(
+      ".kt-popup-translation-input:focus-within"
+    );
     expect(POPUP_STYLES).toMatch(
       /\.kt-popup-translation-input textarea\s*\{[^}]*outline:\s*0;/
     );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-m3-root \.kt-popup-translation-input textarea:focus\s*\{[^}]*outline:\s*none;/
+    );
+    const focusVisibleBodies = getCssAtRuleBodies(
+      POPUP_STYLES,
+      "@supports selector(:focus-visible)"
+    );
+    expect(
+      focusVisibleBodies.some((body) =>
+        /\.kt-m3-root \.kt-popup-translation-input textarea:focus-visible\s*\{[^}]*outline:\s*none;/.test(
+          body
+        )
+      )
+    ).toBe(true);
   });
 
-  test("restores a solid focus ring for the compact language selector", () => {
+  test("uses a rounded keyboard-only ring for compact language selectors", () => {
     expect(POPUP_STYLES).toMatch(
-      /\.kt-popup-language-select \.MuiSelect-select\.MuiInputBase-input:focus,[\s\S]*?\.MuiInputBase-input:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--kt-pri\);[^}]*outline-offset:\s*2px;/
+      /\.kt-popup-language-select \.MuiSelect-select\s*\{[^}]*border-radius:\s*inherit;/
     );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-language-select \.MuiSelect-select\.MuiInputBase-input:focus\s*\{[^}]*outline:\s*3px solid var\(--kt-pri\);[^}]*background:\s*transparent;/
+    );
+    const focusVisibleBodies = getCssAtRuleBodies(
+      POPUP_STYLES,
+      "@supports selector(:focus-visible)"
+    );
+    expect(
+      focusVisibleBodies.some(
+        (body) =>
+          /\.MuiSelect-select\.MuiInputBase-input:focus\s*\{[^}]*outline:\s*none;/.test(
+            body
+          ) &&
+          /\.MuiSelect-select\.MuiInputBase-input:focus-visible\s*\{[^}]*outline:\s*3px solid var\(--kt-pri\);/.test(
+            body
+          )
+      )
+    ).toBe(true);
   });
 
   test("does not clip service focus rings in the collapsed row", () => {
@@ -95,11 +154,28 @@ describe("popup translation controls", () => {
       /\.kt-popup-language-menu\.MuiPaper-root\s*\{([^}]*)\}/
     )?.[1];
 
-    expect(menuRule).toContain("border-radius: 12px");
+    expect(menuRule).toContain("border-radius: 4px");
     expect(menuRule).toContain("background: var(--kt-sf1)");
     expect(menuRule).toContain("color: var(--kt-on)");
+    expect(menuRule).toContain("max-height: min(280px, calc(100% - 32px))");
     expect(menuRule).toContain("overflow-y: auto");
     expect(menuRule).not.toContain("overflow: hidden");
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-language-select \.MuiSelect-icon\s*\{[^}]*transition:\s*transform/
+    );
+    const hoverBodies = getCssAtRuleBodies(
+      POPUP_STYLES,
+      "@media (hover: hover)"
+    );
+    expect(
+      hoverBodies.some(
+        (body) =>
+          /\.kt-popup-language-menu \.MuiMenuItem-root:hover/.test(body) &&
+          /\.kt-popup-language-menu \.MuiMenuItem-root\.Mui-selected:hover/.test(
+            body
+          )
+      )
+    ).toBe(true);
   });
 
   test("centers the translate action with symmetric vertical padding", () => {
@@ -157,9 +233,16 @@ describe("popup translation controls", () => {
 
     expect(heroRule).toContain("border-radius: 16px");
     expect(serviceRule).toContain("border-radius: 8px");
+    expect(serviceRule).toContain("font-weight: 650");
     expect(inputRule).toContain("overflow: visible");
     expect(inputRule).toContain("border-radius: 16px");
     expect(compareRule).toContain("border-radius: 999px");
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-site__select\s*\{[^}]*border-radius:\s*8px;/
+    );
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-style-chip\s*\{[^}]*font-weight:\s*650;/
+    );
   });
 });
 
@@ -182,6 +265,15 @@ describe("separate translation window layout", () => {
   test("centers the content and caps how wide a line gets", () => {
     expect(centeredRule).toContain("width: min(720px, 100%)");
     expect(centeredRule).toContain("margin-inline: auto");
+  });
+
+  test("does not animate geometry while fitting the standalone window", () => {
+    expect(POPUP_STYLES).toMatch(
+      /\.kt-popup-shell--window \.kt-popup-text-panel\s*\{[^}]*animation:\s*none;/
+    );
+    expect(POPUP_STYLES).not.toMatch(
+      /@media\s*\(max-width:\s*395px\)[\s\S]*?\.kt-popup-shell--window\s*\{[^}]*width:\s*100vw;/
+    );
   });
 
   test("measures full height against the dynamic viewport", () => {

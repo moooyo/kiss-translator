@@ -240,6 +240,12 @@ export default function Draggable({
 
   // 鼠标/手指按下，标记拖拽开始并记录起始坐标
   const handlePointerDown = (e) => {
+    if (
+      usePaper &&
+      e.target.closest?.("button, a, input, select, textarea, [role='button']")
+    ) {
+      return;
+    }
     // 注意：这里不能像 Selection/DraggableResizable 那样加「按在 button 上就不起拖」
     // 的护栏——悬浮球的拖拽触发区本身就是一个 <button>，加了它整个球就拖不动了。
     // 动作菜单挂在 children 上，那一侧没有绑指针监听，本来就不会误触发拖拽。

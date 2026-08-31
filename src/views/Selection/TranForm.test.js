@@ -71,40 +71,56 @@ async function flushEffects() {
   });
 }
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 function renderTranForm(props = {}) {
   const container = document.createElement("div");
+  container.className = "kt-m3-root";
   document.body.appendChild(container);
   const root = createRoot(container);
+  const defaultProps = {
+    text: "library",
+    setText: jest.fn(),
+    apiSlugs: [],
+    fromLang: "en",
+    toLang: "zh-CN",
+    toLang2: "-",
+    transApis: [
+      {
+        apiSlug: "openai",
+        apiName: "OpenAI",
+        apiType: "OpenAI",
+        dictPrompt: "Dictionary prompt",
+      },
+    ],
+    simpleStyle: true,
+    langDetector: "-",
+    enDict: "Bing",
+    enSug: "-",
+    aiDictApiSlug: "openai",
+    selectionContext: "The library is open.",
+  };
+  const render = (nextProps = {}) => {
+    root.render(<TranForm {...defaultProps} {...props} {...nextProps} />);
+  };
 
-  act(() => {
-    root.render(
-      <TranForm
-        text="library"
-        setText={jest.fn()}
-        apiSlugs={[]}
-        fromLang="en"
-        toLang="zh-CN"
-        toLang2="-"
-        transApis={[
-          {
-            apiSlug: "openai",
-            apiName: "OpenAI",
-            apiType: "OpenAI",
-            dictPrompt: "Dictionary prompt",
-          },
-        ]}
-        simpleStyle
-        langDetector="-"
-        enDict="Bing"
-        enSug="-"
-        aiDictApiSlug="openai"
-        selectionContext="The library is open."
-        {...props}
-      />
-    );
-  });
+  act(() => render());
 
-  return { container, root };
+  return {
+    container,
+    root,
+    rerender(nextProps) {
+      act(() => render(nextProps));
+    },
+  };
 }
 
 describe("TranForm Playground presentation", () => {
@@ -153,6 +169,53 @@ describe("TranForm Playground presentation", () => {
     act(() => root.unmount());
   });
 
+  test("ignores stale language detection and keeps the newest request busy", async () => {
+    const first = createDeferred();
+    const second = createDeferred();
+    tryDetectLang
+      .mockReset()
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const view = renderTranForm({
+      text: "first",
+      simpleStyle: false,
+      isPlaygound: true,
+      apiSlugs: ["openai"],
+      fromLang: "auto",
+      toLang: "en",
+      toLang2: "fr",
+      langDetector: "remote",
+    });
+    await flushEffects();
+
+    view.rerender({ text: "second" });
+    await flushEffects();
+    const detectionResult = view.container.querySelector(
+      'input[name="deLang"]'
+    );
+    expect(detectionResult.getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => {
+      first.resolve("de");
+      await first.promise;
+    });
+    expect(detectionResult.value).toBe("");
+    expect(detectionResult.getAttribute("aria-busy")).toBe("true");
+
+    await act(async () => {
+      second.resolve("en");
+      await second.promise;
+    });
+    expect(detectionResult.value).toBe("English");
+    expect(detectionResult.getAttribute("aria-busy")).toBe("false");
+    expect(
+      view.container.querySelector('[data-testid="tran-cont"]').dataset.toLang
+    ).toBe("fr");
+
+    act(() => view.root.unmount());
+    tryDetectLang.mockResolvedValue("en");
+  });
+
   test("shows the service empty state when configured services are unavailable", async () => {
     const { container, root } = renderTranForm({
       simpleStyle: false,
@@ -189,6 +252,12 @@ describe("TranForm Playground presentation", () => {
     const textarea = container.querySelector(
       ".kt-playground-translator__source textarea:not([aria-hidden='true'])"
     );
+    expect(textarea.classList).toContain("kt-resizable-textarea");
+    expect(textarea.closest(".kt-resizable-text-field")).not.toBeNull();
+    expect(
+      getComputedStyle(textarea.closest(".MuiInputBase-root")).overflow
+    ).toBe("visible");
+    expect(getComputedStyle(textarea).resize).toBe("vertical");
     act(() => Simulate.focus(textarea));
     act(() => Simulate.change(textarea, { target: { value: "  after  " } }));
 
@@ -260,6 +329,12 @@ describe("TranForm AI dictionary tab", () => {
 
       const tabs = container.querySelectorAll('[role="tab"]');
       expect(tabs).toHaveLength(2);
+      expect(
+        container.querySelector('[role="tablist"]').getAttribute("aria-label")
+      ).toBe("Dictionary");
+      const defaultPanel = container.querySelector('[role="tabpanel"]');
+      expect(tabs[0].getAttribute("aria-controls")).toBe(defaultPanel.id);
+      expect(defaultPanel.getAttribute("aria-labelledby")).toBe(tabs[0].id);
       expect(apiDict).not.toHaveBeenCalled();
 
       await act(async () => {
@@ -277,6 +352,9 @@ describe("TranForm AI dictionary tab", () => {
           context: "The library is open.",
         })
       );
+      const aiPanel = container.querySelector('[role="tabpanel"]');
+      expect(tabs[1].getAttribute("aria-controls")).toBe(aiPanel.id);
+      expect(aiPanel.getAttribute("aria-labelledby")).toBe(tabs[1].id);
 
       act(() => {
         root.unmount();
@@ -500,6 +578,23 @@ describe("TranForm popup input", () => {
       popupStyle: true,
     });
     const textarea = container.querySelector("textarea");
+    expect(textarea.classList).toContain("kt-resizable-textarea");
+    expect(textarea.parentElement.classList).toContain(
+      "kt-popup-translation-textarea"
+    );
+    const inputContainer = textarea.closest(".kt-popup-translation-input");
+    expect(inputContainer.classList).toContain(
+      "kt-popup-translation-input--focused"
+    );
+
+    act(() => Simulate.blur(textarea));
+    expect(inputContainer.classList).not.toContain(
+      "kt-popup-translation-input--focused"
+    );
+    act(() => Simulate.focus(textarea));
+    expect(inputContainer.classList).toContain(
+      "kt-popup-translation-input--focused"
+    );
 
     act(() => {
       const setTextareaValue = Object.getOwnPropertyDescriptor(
@@ -756,6 +851,11 @@ describe("TranForm translation service selection", () => {
       );
       await Promise.resolve();
     });
+    expect(document.body.style.overflow).toBe("");
+    expect(container.querySelector('[role="listbox"]')).not.toBeNull();
+    expect(
+      getComputedStyle(container.querySelector(".MuiPopover-root")).zIndex
+    ).toBe("2147483647");
 
     await act(async () => {
       [...document.body.querySelectorAll('[role="option"]')]

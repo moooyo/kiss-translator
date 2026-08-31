@@ -2208,6 +2208,7 @@ export class Translator {
     retryIcon.classList.add(Translator.KISS_CLASS.retry);
     retryIcon.setAttribute("role", "button");
     retryIcon.setAttribute("tabindex", "0");
+    retryIcon.setAttribute("aria-label", i18n("retry") || "Retry");
 
     const panel = document.createElement("span");
     panel.className = "notranslate";
@@ -2437,6 +2438,7 @@ export class Translator {
       const inner = document.createElement(transTag);
       inner.lang = toLang;
       inner.className = `${Translator.KISS_CLASS.inner} ${this.#textClass[textStyle] || ""}`;
+      inner.setAttribute("aria-busy", "true");
       if (textExtStyle?.trim()) {
         inner.style.cssText = textExtStyle; // 附加内联样式
       }
@@ -2574,6 +2576,7 @@ export class Translator {
 
       this.#withViewportAnchor(() => {
         inner.innerHTML = trustedHTML;
+        inner.setAttribute("aria-busy", "false");
       });
 
       let originalWrapper = null;
@@ -2659,6 +2662,7 @@ export class Translator {
               this.#translateNodeGroup(nodes, hostNode, deLang);
             });
             inner.appendChild(retryNode);
+            inner.setAttribute("aria-busy", "false");
           }
         }
       } catch (retryErr) {
@@ -2900,6 +2904,22 @@ overflow-wrap: anywhere !important;`;
   // 显示悬停气泡内容并更新其状态与位置
   #showHoverBubble(content, state = "ready") {
     const bubble = this.#ensureHoverBubble();
+    const isLoading = state === "loading";
+    bubble.setAttribute("role", isLoading ? "status" : "tooltip");
+    bubble.setAttribute("aria-busy", String(isLoading));
+    if (isLoading) {
+      bubble.setAttribute("aria-live", "polite");
+      bubble.setAttribute("aria-atomic", "true");
+      bubble.setAttribute(
+        "aria-label",
+        newI18n(this.#setting.uiLang || "zh")("popup_translating") ||
+          "Translating"
+      );
+    } else {
+      bubble.removeAttribute("aria-live");
+      bubble.removeAttribute("aria-atomic");
+      bubble.removeAttribute("aria-label");
+    }
     bubble.style.cssText = this.#getHoverBubbleStyle();
     bubble.dataset.state = state;
     bubble.replaceChildren(

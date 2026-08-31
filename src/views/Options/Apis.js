@@ -1128,11 +1128,10 @@ function ApiFields({ apiSlug, deleteApi, copyApi, onCollapse, onDirtyChange }) {
                 </Grid>
                 <Grid item xs={12} sm={12} md={6} lg={6}>
                   {" "}
-                  <TextField
+                  <ValidationInput
                     size="small"
                     fullWidth
                     label={i18n("context_size")}
-                    type="number"
                     name="contextSize"
                     value={contextSize}
                     onChange={handleChange}
@@ -1549,6 +1548,7 @@ function ApiListItem({
   onDragOver,
   onDrop,
   onDragEnd,
+  onMove,
 }) {
   const handleContentClick = (event) => {
     if (bulkMode) {
@@ -1561,6 +1561,15 @@ function ApiListItem({
 
   const displayName = getApiDisplayName(api);
   const cardSelected = bulkMode ? checked : selected;
+  const handleCardKeyDown = (event) => {
+    if (!event.altKey) return;
+    const direction =
+      event.key === "ArrowUp" ? -1 : event.key === "ArrowDown" ? 1 : 0;
+    if (!direction) return;
+    event.preventDefault();
+    event.stopPropagation();
+    onMove(direction);
+  };
 
   return (
     <ListItem
@@ -1582,6 +1591,8 @@ function ApiListItem({
         role={bulkMode ? "checkbox" : undefined}
         aria-checked={bulkMode ? checked : undefined}
         aria-label={displayName}
+        aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+        onKeyDown={handleCardKeyDown}
         sx={(theme) => ({
           gap: API_LIST_CONTROL_GAP,
           minWidth: 0,
@@ -1601,6 +1612,7 @@ function ApiListItem({
             "background-color",
             "border-color",
             "box-shadow",
+            "color",
           ]),
           "&.Mui-selected": {
             borderColor: theme.palette.primary.main,
@@ -1661,6 +1673,7 @@ function ApiListItem({
           size={38}
           imageSize={22}
           disabled={api.isDisabled}
+          lightSurface
         />
         <Box
           sx={{
@@ -1683,13 +1696,14 @@ function ApiListItem({
           <Typography
             className="kt-api-list__secondary"
             color="text.secondary"
-            sx={{
+            sx={(theme) => ({
               mt: 0.25,
               fontSize: 11,
+              transition: theme.transitions.create(["color", "opacity"]),
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
-            }}
+            })}
           >
             {api.model || api.apiType}
           </Typography>
@@ -1986,6 +2000,19 @@ export default function Apis() {
     setDragOverApiSlug("");
   }, []);
 
+  const handleMoveApi = useCallback(
+    async (apiSlug, direction) => {
+      const currentIndex = apiItems.findIndex(
+        ({ api }) => api.apiSlug === apiSlug
+      );
+      const targetItem = apiItems[currentIndex + direction];
+      if (currentIndex < 0 || !targetItem) return;
+      if (!(await prepareListMutation())) return;
+      reorderApis(apiSlug, targetItem.api.apiSlug);
+    },
+    [apiItems, prepareListMutation, reorderApis]
+  );
+
   return (
     <Box>
       <Stack spacing={3}>
@@ -2068,6 +2095,7 @@ export default function Apis() {
             <Button
               size="small"
               variant={bulkMode ? "contained" : "outlined"}
+              aria-pressed={bulkMode}
               onClick={handleToggleBulkMode}
             >
               {i18n("bulk_actions")}
@@ -2127,6 +2155,8 @@ export default function Apis() {
             anchorEl={anchorEl}
             open={open}
             onClose={handleClose}
+            container={() => anchorEl?.closest(".kt-m3-root")}
+            disableScrollLock
             MenuListProps={{
               "aria-labelledby": "add-api-button",
             }}
@@ -2142,6 +2172,7 @@ export default function Apis() {
                   apiType={apiOption.type}
                   size={38}
                   imageSize={22}
+                  lightSurface
                 />
                 <Box component="span" sx={{ flex: 1 }}>
                   {apiOption.label}
@@ -2169,7 +2200,7 @@ export default function Apis() {
           <List
             disablePadding
             className="kt-api-list"
-            aria-label={i18n("sort_order")}
+            aria-label={i18n("apis_setting")}
             sx={{
               minWidth: 0,
               maxHeight: "min(48vh, 420px)",
@@ -2200,6 +2231,7 @@ export default function Apis() {
                 onDragOver={(event) => handleDragOver(event, api.apiSlug)}
                 onDrop={(event) => handleDrop(event, api.apiSlug)}
                 onDragEnd={handleDragEnd}
+                onMove={(direction) => handleMoveApi(api.apiSlug, direction)}
               />
             ))}
           </List>

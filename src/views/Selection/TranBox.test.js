@@ -124,6 +124,37 @@ describe("TranBox header", () => {
     ]);
   });
 
+  test("supports menu keyboard navigation and restores trigger focus", () => {
+    render();
+    const trigger = actions()[1];
+    openMenu();
+
+    expect(trigger.getAttribute("aria-controls")).toBe(menu().id);
+    expect(menu().getAttribute("aria-labelledby")).toBe(trigger.id);
+    expect(document.activeElement).toBe(menuItems()[0]);
+
+    const press = (key) =>
+      act(() =>
+        document.activeElement.dispatchEvent(
+          new KeyboardEvent("keydown", {
+            key,
+            bubbles: true,
+            cancelable: true,
+          })
+        )
+      );
+
+    press("ArrowDown");
+    expect(document.activeElement).toBe(menuItems()[1]);
+    press("End");
+    expect(document.activeElement).toBe(menuItems()[3]);
+    press("Home");
+    expect(document.activeElement).toBe(menuItems()[0]);
+    press("Escape");
+    expect(menu()).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
   // 这四个开关在改版前是 header 上的常驻按钮。收进溢出菜单后它们依然要能触达，
   // 否则「上 M3」就悄悄弄丢了功能。
   test.each([

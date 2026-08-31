@@ -170,6 +170,51 @@ describe("Draggable FAB edge locking", () => {
     expect(draggable.querySelector(".MuiPaper-root")).not.toBeNull();
   });
 
+  test("does not begin a panel drag from an interactive header control", () => {
+    const onStart = jest.fn();
+    renderFab({
+      width: 360,
+      height: 442,
+      left: 120,
+      top: 40,
+      edge: undefined,
+      snapEdge: false,
+      usePaper: true,
+      onStart,
+      handler: (
+        <div>
+          <button type="button">Close</button>
+          <span data-testid="drag-surface">Header</span>
+        </div>
+      ),
+    });
+
+    const button = draggable.querySelector("button");
+    act(() =>
+      button.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 10,
+          clientY: 10,
+        })
+      )
+    );
+    expect(onStart).not.toHaveBeenCalled();
+    expect(button.setPointerCapture).not.toHaveBeenCalled();
+
+    const surface = draggable.querySelector('[data-testid="drag-surface"]');
+    act(() =>
+      surface.dispatchEvent(
+        new MouseEvent("pointerdown", {
+          bubbles: true,
+          clientX: 10,
+          clientY: 10,
+        })
+      )
+    );
+    expect(onStart).toHaveBeenCalledTimes(1);
+  });
+
   test.each([
     ["left", -20, 200, "translate(-20px, 400px)"],
     ["top", 300, -20, "translate(600px, -20px)"],

@@ -183,9 +183,18 @@ export default function AiDictCont({
           lang={speechLang || fromLang || "en-US"}
           title={i18n("read_aloud")}
         />
-        <CopyBtn text={markdown} title={i18n("copy")} />
+        <CopyBtn
+          text={markdown}
+          title={i18n("copy")}
+          copiedLabel={i18n("copy_success", "Copied")}
+        />
       </Box>
-      {loading && <CircularProgress size={12} sx={{ mr: 1 }} />}
+      {loading && (
+        <CircularProgress
+          size={12}
+          sx={{ position: "absolute", top: 6, right: 72 }}
+        />
+      )}
       <Typography component="div">
         <ReactMarkdown>{markdown}</ReactMarkdown>
       </Typography>

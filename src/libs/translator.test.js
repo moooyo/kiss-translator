@@ -250,6 +250,53 @@ describe("Translator rule styles", () => {
     expect(inner.querySelector(`.${Translator.KISS_CLASS.retry}`)).toBeNull();
   });
 
+  test("keeps inline translation status busy until content is ready", async () => {
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hello world</p></main>';
+    let resolveTranslation;
+    apiTranslate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTranslation = resolve;
+      })
+    );
+
+    createTranslator({}, { minLength: 0, uiLang: "en" });
+    await flushAsync();
+
+    const inner = document.querySelector(`.${Translator.KISS_CLASS.inner}`);
+    expect(inner.hasAttribute("role")).toBe(false);
+    expect(inner.hasAttribute("aria-live")).toBe(false);
+    expect(inner.hasAttribute("aria-atomic")).toBe(false);
+    expect(inner.getAttribute("aria-busy")).toBe("true");
+    expect(inner.hasAttribute("aria-label")).toBe(false);
+    expect(inner.querySelector("svg").getAttribute("aria-hidden")).toBe("true");
+
+    resolveTranslation({ trText: "Translated", isSame: false });
+    await flushAsync();
+
+    expect(inner.getAttribute("aria-busy")).toBe("false");
+    expect(inner.hasAttribute("aria-label")).toBe(false);
+    expect(inner.textContent).toBe("Translated");
+  });
+
+  test("clears inline translation busy state when retry is shown", async () => {
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hello world</p></main>';
+    apiTranslate.mockRejectedValueOnce(new Error("network failed"));
+
+    createTranslator({}, { minLength: 0, uiLang: "zh" });
+    await flushAsync();
+
+    const inner = document.querySelector(`.${Translator.KISS_CLASS.inner}`);
+    expect(inner.hasAttribute("role")).toBe(false);
+    expect(inner.hasAttribute("aria-live")).toBe(false);
+    expect(inner.getAttribute("aria-busy")).toBe("false");
+    expect(inner.hasAttribute("aria-label")).toBe(false);
+    const retry = inner.querySelector(`.${Translator.KISS_CLASS.retry}`);
+    expect(retry).not.toBeNull();
+    expect(retry.getAttribute("aria-label")).toBe("重试");
+  });
+
   test("still appends selectStyle for normal host elements", async () => {
     document.body.innerHTML =
       '<main id="root"><p id="target">Hello world</p></main>';
@@ -1268,6 +1315,52 @@ describe("Translator rule styles", () => {
     expect(bubble.getAttribute("style")).toContain("font-size: 18px");
     expect(bubble.style.position).toBe("fixed");
     expect(bubble.style.zIndex).toBe("2147483647");
+  });
+
+  test("moves hover bubble loading semantics back to tooltip state", async () => {
+    let resolveTranslation;
+    apiTranslate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTranslation = resolve;
+      })
+    );
+    document.body.innerHTML =
+      '<main id="root"><p id="target">Hello hover</p></main>';
+    const target = document.getElementById("target");
+
+    createTranslator(
+      { transOpen: "false" },
+      {
+        preInit: true,
+        uiLang: "en",
+        mouseHoverSetting: {
+          useMouseHover: true,
+          mouseHoverKey: [],
+          mouseHoverKey2: [],
+          displayMode: "bubble",
+        },
+      }
+    );
+    await hoverNode(target);
+
+    const bubble = document.querySelector(
+      `.${Translator.KISS_CLASS.hoverBubble}`
+    );
+    expect(bubble.getAttribute("role")).toBe("status");
+    expect(bubble.getAttribute("aria-live")).toBe("polite");
+    expect(bubble.getAttribute("aria-atomic")).toBe("true");
+    expect(bubble.getAttribute("aria-busy")).toBe("true");
+    expect(bubble.getAttribute("aria-label")).toContain("Translating");
+
+    resolveTranslation({ trText: "Translated", isSame: false });
+    await flushAsync();
+
+    expect(bubble.getAttribute("role")).toBe("tooltip");
+    expect(bubble.getAttribute("aria-busy")).toBe("false");
+    expect(bubble.hasAttribute("aria-live")).toBe(false);
+    expect(bubble.hasAttribute("aria-atomic")).toBe(false);
+    expect(bubble.hasAttribute("aria-label")).toBe(false);
+    expect(bubble.textContent).toBe("Translated");
   });
 
   test("uses the configured translation service only for hover bubbles", async () => {

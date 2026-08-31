@@ -24,6 +24,19 @@ export const addWordHoverStyles = () => {
       text-decoration-thickness: 2px;
     }
 
+    .kiss-subtitle-word {
+      padding: 0;
+      border-radius: 2px;
+      outline: none;
+    }
+
+    .kiss-subtitle-word:focus-visible {
+      box-shadow: 0 0 0 2px #4fc3f7;
+      text-decoration: underline;
+      text-decoration-color: #4fc3f7;
+      text-decoration-thickness: 2px;
+    }
+
     /* 查词气泡弹窗主体样式 */
     .kiss-word-tooltip {
       position: fixed;
@@ -135,7 +148,7 @@ export const addWordHoverStyles = () => {
 export function wrapWordsWithSpans(text) {
   return String(text || "").replace(
     /\b([a-zA-Z]+(?:'[a-zA-Z]+)?)\b/g,
-    '<span class="kiss-subtitle-word" data-word="$1">$1</span>'
+    '<span class="kiss-subtitle-word" data-word="$1" role="button" tabindex="0">$1</span>'
   );
 }
 
@@ -191,6 +204,7 @@ export class WordTooltipController {
     this.hoverTimeout = null;
     this.activeWordEl = null;
     this.dismissListener = null;
+    this.tooltipTriggerEl = null;
   }
 
   /**
@@ -223,11 +237,26 @@ export class WordTooltipController {
     const spans = root.querySelectorAll(".kiss-subtitle-word");
     spans.forEach((span) => {
       if (span.dataset.kissListenerAttached) return;
+      span.setAttribute("role", "button");
+      span.tabIndex = 0;
       const enterHandler = (event) =>
         this.#handleWordHover(event, getTimestamp);
       const leaveHandler = (event) => this.#handleWordHoverOut(event);
+      const keyHandler = (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        if (event.repeat) {
+          event.preventDefault();
+          return;
+        }
+        event.preventDefault();
+        this.showWordTooltip(span.dataset.word, {
+          timestamp: getTimestamp?.() ?? 0,
+          trigger: span,
+        });
+      };
       span.addEventListener("pointerenter", enterHandler);
       span.addEventListener("pointerleave", leaveHandler);
+      span.addEventListener("keydown", keyHandler);
       span.dataset.kissListenerAttached = "1";
     });
   }
@@ -281,7 +310,7 @@ export class WordTooltipController {
     }
   }
 
-  async showWordTooltip(word, { timestamp = 0 } = {}) {
+  async showWordTooltip(word, { timestamp = 0, trigger = null } = {}) {
     if (this.tooltipEl) {
       this.tooltipEl.remove();
     }
@@ -292,9 +321,14 @@ export class WordTooltipController {
     // 所以下面每一处 DOM 写入之前都要先比对身份。
     const tooltipEl = document.createElement("div");
     this.tooltipEl = tooltipEl;
+    this.tooltipTriggerEl = trigger;
     tooltipEl.className = "kiss-word-tooltip";
+    tooltipEl.setAttribute("role", "dialog");
+    tooltipEl.setAttribute("aria-label", word);
+    tooltipEl.setAttribute("aria-busy", "true");
+    tooltipEl.tabIndex = -1;
     tooltipEl.innerHTML = trustedTypesHelper.createHTML(
-      '<div class="kiss-word-loading">Looking up...</div>'
+      '<div class="kiss-word-loading" role="status" aria-live="polite">Looking up...</div>'
     );
 
     // 关闭按钮用事件委托，不能写成内联 onclick：所有 innerHTML 都要过
@@ -303,8 +337,14 @@ export class WordTooltipController {
     // 自身，随元素一起销毁，无需手动解绑。
     tooltipEl.addEventListener("click", (event) => {
       if (event.target?.closest?.(".kiss-word-tooltip-close")) {
-        this.hideWordTooltip();
+        this.hideWordTooltip({ restoreFocus: true });
       }
+    });
+    tooltipEl.addEventListener("keydown", (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      event.stopPropagation();
+      this.hideWordTooltip({ restoreFocus: true });
     });
 
     const videoContainer = this.getVideoContainer?.();
@@ -325,6 +365,7 @@ export class WordTooltipController {
     }
 
     document.body.appendChild(tooltipEl);
+    if (trigger) tooltipEl.focus();
     this.#listenForOutsideDismiss();
     this.onTooltipOpenChange?.(true);
 
@@ -355,6 +396,7 @@ export class WordTooltipController {
       }
       if (this.tooltipEl !== tooltipEl) return;
       this.#renderDictionaryResult(word, dictResult, wordData);
+      tooltipEl.setAttribute("aria-busy", "false");
     } catch (error) {
       logger.info("Dictionary lookup failed for word:", word, error);
       this.#dispatchAddWord({
@@ -373,17 +415,21 @@ export class WordTooltipController {
       </div>
       <div class="kiss-word-definition">Failed to load definition</div>`);
       this.#addFavoriteButton(word, { timestamp });
+      tooltipEl.setAttribute("aria-busy", "false");
     }
   }
 
-  hideWordTooltip() {
+  hideWordTooltip({ restoreFocus = false } = {}) {
     this.#stopListeningForOutsideDismiss();
+    const trigger = this.tooltipTriggerEl;
+    this.tooltipTriggerEl = null;
     if (this.tooltipEl) {
       this.tooltipEl.remove();
       this.tooltipEl = null;
       // 必须通知,否则「提示框开着」的状态会一直挂着,视频再也不会自己恢复。
       this.onTooltipOpenChange?.(false);
     }
+    if (restoreFocus && trigger?.isConnected) trigger.focus();
   }
 
   #extractDictionaryData(dictResult) {
@@ -424,6 +470,10 @@ export class WordTooltipController {
     const header = this.tooltipEl?.querySelector(".kiss-word-tooltip-header");
     const closeButton = header?.querySelector(".kiss-word-tooltip-close");
     if (!header || !closeButton) return;
+
+    const closeLabel = this.i18n("close") || "Close";
+    closeButton.setAttribute("aria-label", closeLabel);
+    closeButton.title = closeLabel;
 
     header.insertBefore(
       createFavoriteButton({ word, data, i18n: this.i18n }),

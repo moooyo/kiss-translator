@@ -82,6 +82,7 @@ export default function PopupCont({
   const [selectedDomain, setSelectedDomain] = useState("");
   const [currentHref, setCurrentHref] = useState("");
   const [snackbar, setSnackbar] = useState({
+    id: 0,
     open: false,
     message: "",
     severity: "success",
@@ -90,8 +91,11 @@ export default function PopupCont({
   const [showAllServices, setShowAllServices] = useState(false);
   const [showAllStyles, setShowAllStyles] = useState(false);
   const [translationBusy, setTranslationBusy] = useState(false);
+  const [translationTogglePending, setTranslationTogglePending] =
+    useState(false);
   const busyTimerRef = useRef(null);
   const translationTogglePendingRef = useRef(false);
+  const snackbarSequenceRef = useRef(0);
   const { allTextStyles } = useAllTextStyles();
   const primaryPopupTextStyles = useMemo(
     () => resolvePopupTextStyles(allTextStyles, rule?.textStyle, false),
@@ -109,7 +113,12 @@ export default function PopupCont({
     : `${i18n("popup_all_styles")} (${hiddenStyleCount})`;
 
   const showMessage = useCallback((message, severity = "success") => {
-    setSnackbar({ open: true, message, severity });
+    setSnackbar({
+      id: ++snackbarSequenceRef.current,
+      open: true,
+      message,
+      severity,
+    });
   }, []);
 
   useEffect(
@@ -174,6 +183,7 @@ export default function PopupCont({
     async (enabled) => {
       if (translationTogglePendingRef.current) return;
       translationTogglePendingRef.current = true;
+      setTranslationTogglePending(true);
       const previousTransOpen = rule?.transOpen;
       if (busyTimerRef.current) {
         window.clearTimeout(busyTimerRef.current);
@@ -183,7 +193,7 @@ export default function PopupCont({
         ...previous,
         transOpen: enabled ? "true" : "false",
       }));
-      setTranslationBusy(enabled);
+      setTranslationBusy(true);
       try {
         let response;
         if (processActions) {
@@ -250,6 +260,7 @@ export default function PopupCont({
         showMessage(i18n("rule_toggle_failed"), "error");
       } finally {
         translationTogglePendingRef.current = false;
+        setTranslationTogglePending(false);
       }
     },
     [i18n, processActions, rule?.transOpen, setRule, showMessage]
@@ -404,7 +415,12 @@ export default function PopupCont({
         className={`kt-popup-hero ${
           translationEnabled ? "" : "kt-popup-hero--off"
         } ${translationBusy ? "kt-popup-hero--busy" : ""}`}
-        onClick={() => void handleTransToggle(!translationEnabled)}
+        aria-busy={translationTogglePending || translationBusy}
+        onClick={() => {
+          if (!translationTogglePending) {
+            void handleTransToggle(!translationEnabled);
+          }
+        }}
       >
         <span className="kt-popup-hero__icon" aria-hidden="true">
           {translationBusy ? (
@@ -428,9 +444,13 @@ export default function PopupCont({
         <Switch
           className="kt-popup-main-switch"
           checked={translationEnabled}
+          disabled={translationTogglePending}
           onChange={(_event, checked) => void handleTransToggle(checked)}
           onClick={(event) => event.stopPropagation()}
-          inputProps={{ "aria-label": i18n("popup_translate_page") }}
+          inputProps={{
+            "aria-label": i18n("popup_translate_page"),
+            "aria-busy": translationTogglePending || translationBusy,
+          }}
         />
         {translationBusy && <span className="kt-popup-hero__progress" />}
       </div>
@@ -487,6 +507,7 @@ export default function PopupCont({
               <ApiProviderIcon
                 apiType={service.type}
                 className="kt-service-logo"
+                lightSurface
               />
               <span className="kt-popup-service__name">{service.name}</span>
             </button>
@@ -698,18 +719,20 @@ export default function PopupCont({
       )}
 
       <Snackbar
+        key={snackbar.id}
         open={snackbar.open}
         autoHideDuration={2200}
         anchorOrigin={{ vertical: "bottom", horizontal: "center" }}
-        onClose={() =>
-          setSnackbar({ open: false, message: "", severity: "success" })
-        }
+        onClose={(_, reason) => {
+          if (reason === "clickaway") return;
+          setSnackbar((current) => ({ ...current, open: false }));
+        }}
       >
         <Alert
           severity={snackbar.severity}
           variant="filled"
           onClose={() =>
-            setSnackbar({ open: false, message: "", severity: "success" })
+            setSnackbar((current) => ({ ...current, open: false }))
           }
         >
           {snackbar.message}

@@ -77,6 +77,9 @@ describe("CompactLanguageSelect", () => {
     expect(container.getAttribute("aria-hidden")).toBeNull();
     expect(container.querySelector('[role="listbox"]')).not.toBeNull();
     expect(
+      getComputedStyle(container.querySelector(".MuiPopover-root")).zIndex
+    ).toBe("2147483647");
+    expect(
       Array.from(container.querySelectorAll('[role="option"]')).map(
         (option) => option.textContent
       )

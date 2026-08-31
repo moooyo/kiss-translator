@@ -13,6 +13,7 @@ import MenuItem from "@mui/material/MenuItem";
 import MenuList from "@mui/material/MenuList";
 import Paper from "@mui/material/Paper";
 import Popper from "@mui/material/Popper";
+import SpeedDialIcon from "@mui/material/SpeedDialIcon";
 import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import ThemeProvider from "../../hooks/M3Theme";
 import Draggable from "./Draggable";
@@ -65,6 +66,7 @@ export function ContentFabContent({
 }) {
   const i18n = useI18n();
   const fabWidth = 56; // Material 3 regular FAB size.
+  const opensMenu = fabClickAction !== 1;
   const windowSize = useWindowSize();
   const [moved, setMoved] = useState(false); // 标记是否发生了拖动
   const [showFab, setShowFab] = useState(true);
@@ -91,13 +93,18 @@ export function ContentFabContent({
     setMoved(true);
   }, []);
 
+  const closeMenu = useCallback((restoreFocus = false) => {
+    setOpen(false);
+    if (restoreFocus) anchorRef.current?.focus();
+  }, []);
+
   // 执行一个动作并收起菜单
   const runAction = useCallback(
     (action) => {
       processActions({ action });
-      setOpen(false);
+      closeMenu(true);
     },
-    [processActions]
+    [closeMenu, processActions]
   );
 
   // 在浏览器新标签页中打开扩展 Options 设置页
@@ -111,32 +118,31 @@ export function ContentFabContent({
         "noopener,noreferrer"
       );
     }
-    setOpen(false);
-  }, []);
+    closeMenu(true);
+  }, [closeMenu]);
 
   // 处理点击事件。如果拖拽移动过，则忽略该次点击，防止误触
   const handleClick = useCallback(() => {
     if (moved) {
       return;
     }
-    // fabClickAction === 1 时保持“单击直接切换全文翻译”的旧行为，菜单不参与；
-    // 但菜单已经展开时，这一下必须先把它关掉，否则菜单会一直挂在那里。
-    if (fabClickAction === 1 && !open) {
+    // fabClickAction === 1 keeps the legacy direct translation action.
+    if (!opensMenu) {
       runAction(MSG_TRANS_TOGGLE);
       return;
     }
     setOpen((current) => !current);
-  }, [moved, fabClickAction, open, runAction]);
+  }, [moved, opensMenu, runAction]);
 
   // Esc 关闭菜单并把焦点还给悬浮球，避免焦点掉进已卸载的菜单项里
-  const handleMenuKeyDown = useCallback((event) => {
-    if (event.key !== "Escape") {
-      return;
-    }
-    event.preventDefault();
-    setOpen(false);
-    anchorRef.current?.focus();
-  }, []);
+  const handleMenuKeyDown = useCallback(
+    (event) => {
+      if (event.key !== "Escape" && event.key !== "Tab") return;
+      event.preventDefault();
+      closeMenu(true);
+    },
+    [closeMenu]
+  );
 
   // 计算悬浮球的位置参数，如果是初次加载则放置在视口垂直居中、贴在边缘的位置
   const fabProps = useMemo(
@@ -184,26 +190,36 @@ export function ContentFabContent({
       key="fab"
       snapEdge // Keep the idle FAB partially hidden at the viewport edge.
       fitContent // The fixed menu must not be constrained by the 56px FAB wrapper.
-      expanded={open} // Keep the anchor fully revealed while the menu is open.
+      expanded={opensMenu && open} // Keep the anchor fully revealed while the menu is open.
       {...fabProps}
       show={showFab}
       onStart={handleStart}
       onMove={handleMove}
       handler={
         <Fab
+          id="kt-content-fab-button"
           ref={anchorRef}
           className="kt-content-fab"
-          aria-expanded={open}
-          aria-haspopup="menu"
+          aria-expanded={opensMenu ? open : undefined}
+          aria-haspopup={opensMenu ? "menu" : undefined}
+          aria-controls={opensMenu && open ? "kt-content-fab-menu" : undefined}
           aria-label={i18n("translate")}
           onClick={handleClick}
         >
-          {open ? <CloseRoundedIcon /> : <TranslateIcon />}
+          {opensMenu ? (
+            <SpeedDialIcon
+              icon={<TranslateIcon />}
+              openIcon={<CloseRoundedIcon />}
+              open={open}
+            />
+          ) : (
+            <TranslateIcon />
+          )}
         </Fab>
       }
     >
       <Popper
-        open={open && Boolean(anchorRef.current)}
+        open={opensMenu && open && Boolean(anchorRef.current)}
         anchorEl={anchorRef.current}
         placement="top-end"
         // 内容页是 shadow DOM，portal 到 document.body 会逃出 shadow root，
@@ -223,11 +239,15 @@ export function ContentFabContent({
           }}
         >
           <Paper className="kt-content-fab-menu" elevation={6}>
-            <MenuList autoFocusItem onKeyDown={handleMenuKeyDown}>
-              {items.map(({ label, icon: Icon, action }, index) => (
+            <MenuList
+              id="kt-content-fab-menu"
+              aria-labelledby="kt-content-fab-button"
+              autoFocusItem
+              onKeyDown={handleMenuKeyDown}
+            >
+              {items.map(({ label, icon: Icon, action }) => (
                 <MenuItem
                   className="kt-content-fab-menu__item"
-                  style={{ animationDelay: `${index * 0.045}s` }}
                   onClick={action}
                   key={label}
                 >

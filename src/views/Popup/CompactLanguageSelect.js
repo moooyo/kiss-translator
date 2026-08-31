@@ -49,6 +49,7 @@ export default function CompactLanguageSelect({
       MenuProps={{
         container: () => selectRef.current?.closest(".kt-m3-root"),
         disableScrollLock: true,
+        sx: { zIndex: 2147483647 },
         PaperProps: {
           className: "kt-popup-language-menu",
           elevation: 0,

@@ -1,6 +1,10 @@
 import { apiMicrosoftDict } from "../apis";
 import { saveFavoriteWordIfMissing } from "./favoriteWords";
-import { addWordHoverStyles, WordTooltipController } from "./wordHover";
+import {
+  addWordHoverStyles,
+  WordTooltipController,
+  wrapWordsWithSpans,
+} from "./wordHover";
 
 jest.mock("../apis", () => ({ apiMicrosoftDict: jest.fn() }));
 jest.mock("../libs/log", () => ({ logger: { info: jest.fn() } }));
@@ -38,6 +42,49 @@ describe("WordTooltipController", () => {
     document.getElementById("kiss-word-hover-styles").remove();
   });
 
+  test("makes wrapped subtitle words keyboard operable", async () => {
+    apiMicrosoftDict.mockResolvedValue({
+      trs: [{ pos: "n.", def: "a definition" }],
+    });
+    const root = document.createElement("div");
+    root.innerHTML = wrapWordsWithSpans("behind");
+    document.body.appendChild(root);
+    const controller = new WordTooltipController({});
+    controller.attachSpanListeners(root, () => 1200);
+    const word = root.querySelector(".kiss-subtitle-word");
+
+    word.focus();
+    word.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Enter",
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    for (let index = 0; index < 6; index += 1) {
+      await Promise.resolve();
+    }
+
+    const tooltip = controller.tooltipEl;
+    expect(word.getAttribute("role")).toBe("button");
+    expect(word.tabIndex).toBe(0);
+    expect(tooltip.getAttribute("role")).toBe("dialog");
+    expect(tooltip.getAttribute("aria-label")).toBe("behind");
+    expect(tooltip.getAttribute("aria-busy")).toBe("false");
+    expect(document.activeElement).toBe(tooltip);
+
+    tooltip.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "Escape",
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    expect(controller.tooltipEl).toBeNull();
+    expect(document.activeElement).toBe(word);
+    controller.destroy();
+  });
+
   // 关闭按钮曾经写成内联 onclick，而所有 innerHTML 都要过
   // trustedTypesHelper.createHTML → 无配置的 DOMPurify.sanitize，
   // on* 属性会被一律剥掉。于是四个发行渠道里的 × 全都点不动。
@@ -51,7 +98,9 @@ describe("WordTooltipController", () => {
     } else {
       apiMicrosoftDict.mockResolvedValue(result);
     }
-    const controller = new WordTooltipController({});
+    const controller = new WordTooltipController({
+      i18n: (key) => (key === "close" ? "Close tooltip" : ""),
+    });
 
     await controller.showWordTooltip("first");
     const tooltip = controller.tooltipEl;
@@ -59,6 +108,8 @@ describe("WordTooltipController", () => {
 
     expect(closeButton).not.toBeNull();
     expect(closeButton.hasAttribute("onclick")).toBe(false);
+    expect(closeButton.getAttribute("aria-label")).toBe("Close tooltip");
+    expect(closeButton.title).toBe("Close tooltip");
 
     closeButton.click();
 

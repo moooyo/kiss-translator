@@ -1,4 +1,7 @@
 export function getMuiSwitchStyleOverrides(color) {
+  const positionTransition =
+    "transform .35s cubic-bezier(.3, 1.4, .4, 1), color .2s ease";
+
   return {
     root: {
       width: 52,
@@ -19,10 +22,14 @@ export function getMuiSwitchStyleOverrides(color) {
       padding: 0,
       color: color.outline,
       transform: "none",
-      transition: "transform .35s cubic-bezier(.3, 1.4, .4, 1), color .2s ease",
-      "&:hover": {
+      transition: positionTransition,
+      "&:not(.Mui-disabled):hover": {
         backgroundColor: `color-mix(in srgb, ${color.onSurface} 8%, transparent)`,
         "@media (hover: none)": { backgroundColor: "transparent" },
+      },
+      "&.Mui-focusVisible": {
+        outline: `3px solid ${color.primary}`,
+        outlineOffset: 0,
       },
       "&.Mui-checked": {
         padding: 0,
@@ -33,20 +40,45 @@ export function getMuiSwitchStyleOverrides(color) {
           backgroundColor: color.primary,
           opacity: 1,
         },
-        "&.Mui-disabled + .MuiSwitch-track": { opacity: 0.12 },
         "& .MuiSwitch-thumb": { width: 24, height: 24 },
-        "&:hover": {
+        "& .MuiSwitch-input": { left: -20 },
+        "&:not(.Mui-disabled):hover": {
           backgroundColor: `color-mix(in srgb, ${color.primary} 8%, transparent)`,
           "@media (hover: none)": { backgroundColor: "transparent" },
         },
       },
+      "&.Mui-disabled": {
+        color: color.onSurface,
+        "& .MuiSwitch-thumb": { opacity: 0.38 },
+        "& + .MuiSwitch-track": {
+          borderColor: color.onSurface,
+          backgroundColor: color.onSurface,
+          opacity: 0.12,
+        },
+      },
+      "&.Mui-checked.Mui-disabled": {
+        color: color.surface,
+        "& .MuiSwitch-thumb": { opacity: 1 },
+        "& + .MuiSwitch-track": {
+          borderColor: color.onSurface,
+          backgroundColor: color.onSurface,
+          opacity: 0.12,
+        },
+      },
+    },
+    input: {
+      left: 0,
+      width: 52,
+      height: 32,
+      borderRadius: 999,
+      transition: "left .35s cubic-bezier(.3, 1.4, .4, 1)",
     },
     thumb: {
       width: 16,
       height: 16,
       boxShadow: "none",
       transition:
-        "width .2s cubic-bezier(.2, 0, 0, 1), height .2s cubic-bezier(.2, 0, 0, 1)",
+        "width .2s cubic-bezier(.2, 0, 0, 1), height .2s cubic-bezier(.2, 0, 0, 1), opacity .2s ease",
     },
     track: {
       border: `2px solid ${color.outline}`,

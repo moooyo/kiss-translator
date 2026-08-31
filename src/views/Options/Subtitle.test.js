@@ -82,6 +82,36 @@ describe("Subtitle style editor layout", () => {
 
     view.unmount();
   });
+
+  test("names every slider and color input without relying on adjacent text", () => {
+    const view = renderSubtitle();
+    const sliderNames = Array.from(
+      view.container.querySelectorAll('.MuiSlider-root input[type="range"]')
+    ).map((input) => input.getAttribute("aria-label"));
+    expect(sliderNames).toEqual([
+      "origin_styles font_size",
+      "translation_styles font_size",
+      "opacity",
+      "line_height",
+      "padding vertical",
+      "padding horizontal",
+    ]);
+
+    const colorInputs = Array.from(
+      view.container.querySelectorAll('input[type="color"]')
+    );
+    expect(
+      colorInputs.map((input) => input.getAttribute("aria-label"))
+    ).toEqual([
+      "origin_styles font_color",
+      "translation_styles font_color",
+      "background_color",
+    ]);
+    expect(
+      colorInputs.every((input) => getComputedStyle(input).width === "48px")
+    ).toBe(true);
+    view.unmount();
+  });
 });
 
 describe("Subtitle style persistence", () => {

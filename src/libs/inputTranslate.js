@@ -5,6 +5,7 @@ import {
   DEFAULT_API_SETTING,
   OPT_INPUT_DOT_DISABLE,
   OPT_INPUT_DOT_MOBILE,
+  newI18n,
 } from "../config";
 import { resolveApiPromptSettings } from "../config/prompt";
 import { isMobile } from "./mobile";
@@ -105,11 +106,23 @@ function setNativeValue(element, value) {
  * //    导致 `checkSuccess()` 提前校验失败并误触发降级替换策略，造成文本被重复插入或覆盖失败。
  * @param {HTMLElement} node - 输入目标 DOM 节点
  * @param {string} newText - 翻译回填文本
+ * @param {Function} isCurrent Returns whether the replacement may continue.
+ * @param {string} sourceText Input content captured before the request.
  * @returns {Promise<boolean>} 是否成功替换
  */
-async function smartReplaceText(node, newText) {
+async function smartReplaceText(
+  node,
+  newText,
+  isCurrent = () => true,
+  sourceText = getNodeText(node)
+) {
+  const sourceIsUnchanged = () =>
+    isCurrent() && node.isConnected && getNodeText(node) === sourceText;
+
+  if (!sourceIsUnchanged()) return false;
   node.focus();
   await sleep(10);
+  if (!sourceIsUnchanged()) return false;
 
   // 判断是否为富文本编辑器 (X.com, Discord, Slack 等通常是 contenteditable 的 div/span)
   const isRichEditor =
@@ -135,6 +148,7 @@ async function smartReplaceText(node, newText) {
   };
   performSelectAll();
   await sleep(50);
+  if (!sourceIsUnchanged()) return false;
 
   // ------------------------------------------------
   // 步骤 2: 针对富文本编辑器的优先策略 (Clipboard Paste)
@@ -151,12 +165,15 @@ async function smartReplaceText(node, newText) {
         composed: true,
         view: window,
       });
+      if (!sourceIsUnchanged()) return false;
       node.dispatchEvent(pasteEvt);
 
       // 给 React 一点时间去处理 Paste 事件
       await sleep(100);
+      if (!isCurrent()) return false;
 
       if (checkSuccess(node, newText)) return true;
+      if (getNodeText(node) !== sourceText) return false;
     } catch (e) {
       logger.debug("Strategy Paste failed", e);
     }
@@ -166,10 +183,13 @@ async function smartReplaceText(node, newText) {
   // 步骤 3: 原有的 execCommand 策略 (降级 / 普通输入框)
   // ------------------------------------------------
   try {
+    if (!sourceIsUnchanged()) return false;
     const success = document.execCommand("insertText", false, newText);
     if (success) {
       await sleep(20);
+      if (!isCurrent()) return false;
       if (checkSuccess(node, newText)) return true;
+      if (getNodeText(node) !== sourceText) return false;
     }
   } catch (e) {
     logger.debug("Strategy 1 (insertText) failed", e);
@@ -178,6 +198,7 @@ async function smartReplaceText(node, newText) {
   // === 策略 2: 标准 Input 处理 (React/Vue 兼容) ===
   if (node.nodeName === "INPUT" || node.nodeName === "TEXTAREA") {
     try {
+      if (!sourceIsUnchanged()) return false;
       setNativeValue(node, newText);
       return true;
     } catch (e) {
@@ -198,7 +219,32 @@ function checkSuccess(node, targetText) {
 // UI 辅助函数
 // ==========================================
 
-function addLoading(node, loadingId) {
+const loadingContexts = new Map();
+const busyInputStates = new WeakMap();
+
+function markInputBusy(node) {
+  const state = busyInputStates.get(node) || {
+    count: 0,
+    previousValue: node.getAttribute("aria-busy"),
+  };
+  state.count += 1;
+  busyInputStates.set(node, state);
+  node.setAttribute("aria-busy", "true");
+}
+
+function restoreInputBusy(node) {
+  const state = busyInputStates.get(node);
+  if (!state) return;
+
+  state.count -= 1;
+  if (state.count > 0) return;
+
+  if (state.previousValue === null) node.removeAttribute("aria-busy");
+  else node.setAttribute("aria-busy", state.previousValue);
+  busyInputStates.delete(node);
+}
+
+function addLoading(node, loadingId, label, onDetached) {
   const rect = node.getBoundingClientRect();
   // 如果元素不可见或太小，简单容错
   if (rect.width === 0 || rect.height === 0) {
@@ -207,7 +253,12 @@ function addLoading(node, loadingId) {
 
   const div = document.createElement("div");
   div.id = loadingId;
+  div.setAttribute("role", "status");
+  div.setAttribute("aria-live", "polite");
+  div.setAttribute("aria-atomic", "true");
+  div.setAttribute("aria-label", label);
   div.appendChild(createLoadingSVG());
+  markInputBusy(node);
 
   div.style.cssText = `
         position: fixed;
@@ -222,11 +273,32 @@ function addLoading(node, loadingId) {
         z-index: 2147483647;
         pointer-events: none;
         background: transparent;
-    `;
+  `;
   document.body.appendChild(div);
+
+  const context = { node, observer: null };
+  loadingContexts.set(loadingId, context);
+  if (typeof MutationObserver === "function") {
+    context.observer = new MutationObserver(() => {
+      if (node.isConnected) return;
+      removeLoading(loadingId);
+      onDetached?.();
+    });
+    context.observer.observe(document, { childList: true, subtree: true });
+  }
+
+  if (!node.isConnected) {
+    removeLoading(loadingId);
+    onDetached?.();
+  }
 }
 
 function removeLoading(loadingId) {
+  const context = loadingContexts.get(loadingId);
+  context?.observer?.disconnect();
+  if (context?.node) restoreInputBusy(context.node);
+  loadingContexts.delete(loadingId);
+
   const div = document.getElementById(loadingId);
   if (div) div.remove();
 }
@@ -240,6 +312,11 @@ export class InputTranslator {
   #unregisterShortcut = null;
   #isEnabled = false;
   #triggerShortcut;
+  #loadingIds = new Set();
+  #requestGeneration = 0;
+  #requestSequence = 0;
+  #activeRequestIds = new WeakMap();
+  #activeLoadingIds = new WeakMap();
 
   // 状态管理
   #activeInput = null; // 当前获得焦点的输入框
@@ -258,6 +335,7 @@ export class InputTranslator {
     prompts = [],
     subtitleSetting = {},
     translateVariants = true,
+    uiLang = "en",
   } = {}) {
     this.#config = {
       inputRule,
@@ -265,6 +343,7 @@ export class InputTranslator {
       subtitleSetting,
       transApis,
       translateVariants,
+      uiLang,
     };
 
     const { triggerShortcut: initialTriggerShortcut } = this.#config.inputRule;
@@ -317,6 +396,11 @@ export class InputTranslator {
   }
 
   disable() {
+    this.#requestGeneration += 1;
+    this.#loadingIds.forEach((loadingId) => removeLoading(loadingId));
+    this.#loadingIds.clear();
+    this.#activeRequestIds = new WeakMap();
+    this.#activeLoadingIds = new WeakMap();
     if (!this.#isEnabled) return;
 
     // 1. 移除快捷键
@@ -442,7 +526,13 @@ export class InputTranslator {
 
   // 将创建逻辑抽离，保持代码整洁
   createFloatButtonDOM() {
-    this.#floatBtn = document.createElement("div");
+    this.#floatBtn = document.createElement("button");
+    this.#floatBtn.type = "button";
+    const i18n = newI18n(this.#config.uiLang || "en");
+    this.#floatBtn.setAttribute(
+      "aria-label",
+      i18n("input_translate") || "Translate input"
+    );
     // ... 样式代码保持不变 ...
     const isTouch = isMobile || navigator.maxTouchPoints > 0;
     const size = isTouch ? "36px" : "30px";
@@ -451,7 +541,9 @@ export class InputTranslator {
         position: fixed;
         width: ${size}; height: ${size};
         background: #209CEE;
+        border: 0; padding: 0;
         border-radius: 8px;
+        appearance: none;
         z-index: 2147483647;
         cursor: pointer;
         display: flex; align-items: center; justify-content: center;
@@ -459,7 +551,7 @@ export class InputTranslator {
         transform: scale(.92);
         box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         transition: opacity 160ms ease, transform 160ms ease, visibility 0s linear 160ms;
-        font-size: 13px; color: white;
+        font: inherit; font-size: 13px; color: white;
         user-select: none; -webkit-user-select: none;
       `;
     this.#floatBtn.dataset.visible = "false";
@@ -577,7 +669,8 @@ export class InputTranslator {
     let { fromLang, toLang } = this.#config.inputRule;
 
     // 3. 获取文本
-    let initText = getNodeText(node);
+    const sourceSnapshot = getNodeText(node);
+    let initText = sourceSnapshot;
 
     // 4. 处理触发字符逻辑
     // 修改：仅当非按钮触发（即键盘快捷键触发）时，才移除末尾的触发符
@@ -629,10 +722,42 @@ export class InputTranslator {
       this.#config.subtitleSetting
     );
 
+    const previousLoadingId = this.#activeLoadingIds.get(node);
+    if (previousLoadingId) {
+      removeLoading(previousLoadingId);
+      this.#loadingIds.delete(previousLoadingId);
+    }
+
     const loadingId = "kiss-loading-" + genEventName();
+    const requestGeneration = this.#requestGeneration;
+    const requestId = ++this.#requestSequence;
+    this.#activeRequestIds.set(node, requestId);
+    const isCurrentRequest = () =>
+      requestGeneration === this.#requestGeneration &&
+      this.#activeRequestIds.get(node) === requestId &&
+      node.isConnected;
 
     try {
-      addLoading(node, loadingId);
+      const i18n = newI18n(this.#config.uiLang || "en");
+      this.#loadingIds.add(loadingId);
+      this.#activeLoadingIds.set(node, loadingId);
+      addLoading(
+        node,
+        loadingId,
+        i18n("popup_translating") || "Translating input",
+        () => {
+          if (this.#activeRequestIds.get(node) !== requestId) return;
+          this.#activeRequestIds.delete(node);
+          this.#activeLoadingIds.delete(node);
+          this.#loadingIds.delete(loadingId);
+          if (this.#activeInput === node) {
+            this.#activeInput = null;
+            this.#resizeObserver?.disconnect();
+            this.#resizeObserver = null;
+            this.removeFloatButton();
+          }
+        }
+      );
       this.hideFloatButton(); // 翻译期间隐藏按钮
 
       // 调用翻译 API
@@ -644,29 +769,44 @@ export class InputTranslator {
         textFormat: "text",
         translateVariants: this.#config.translateVariants,
       });
+      if (!isCurrentRequest()) return;
 
       const newText = trText?.trim() || "";
       if (!newText || isSame) return;
 
       // 6. 执行替换 (使用新的智能替换函数)
-      const success = await smartReplaceText(node, newText);
+      const success = await smartReplaceText(
+        node,
+        newText,
+        isCurrentRequest,
+        sourceSnapshot
+      );
       if (!success) {
         logger.warn("Text replacement failed after all strategies.");
       }
     } catch (err) {
       logger.error("Translate input error:", err);
     } finally {
-      removeLoading(loadingId);
+      const requestIsCurrent = isCurrentRequest();
+      const ownsLoading =
+        this.#activeRequestIds.get(node) === requestId &&
+        this.#activeLoadingIds.get(node) === loadingId;
+      if (ownsLoading) {
+        removeLoading(loadingId);
+        this.#activeLoadingIds.delete(node);
+        this.#activeRequestIds.delete(node);
+      }
+      this.#loadingIds.delete(loadingId);
       // 恢复显示按钮
-      if (this.#activeInput === node) {
+      if (requestIsCurrent && this.#activeInput === node) {
         this.showFloatButton(node);
       }
     }
   }
 
-  updateConfig({ inputRule, transApis, prompts, subtitleSetting }) {
+  updateConfig({ inputRule, transApis, prompts, subtitleSetting, uiLang }) {
     const wasEnabled = this.#isEnabled;
-    if (wasEnabled) this.disable();
+    this.disable();
 
     if (inputRule) this.#config.inputRule = inputRule;
     if (prompts) this.#config.prompts = prompts;
@@ -676,6 +816,7 @@ export class InputTranslator {
     if (transApis) {
       this.#config.transApis = transApis;
     }
+    if (uiLang) this.#config.uiLang = uiLang;
 
     const { triggerShortcut } = this.#config.inputRule;
     this.#triggerShortcut =

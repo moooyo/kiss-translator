@@ -161,6 +161,12 @@ describe("TranCont", () => {
       container.querySelector(".kt-playground-translator__result")
     ).not.toBeNull();
     expect(textarea.readOnly).toBe(true);
+    expect(textarea.classList).toContain("kt-resizable-textarea");
+    expect(textarea.closest(".kt-resizable-text-field")).not.toBeNull();
+    expect(
+      getComputedStyle(textarea.closest(".MuiInputBase-root")).overflow
+    ).toBe("visible");
+    expect(getComputedStyle(textarea).resize).toBe("vertical");
     expect(textarea.placeholder).toBe("playground_translation_empty_result");
     expect(container.querySelector("button[data-copy-text]")).toBeNull();
     expect(apiTranslate).not.toHaveBeenCalled();
@@ -184,6 +190,34 @@ describe("TranCont", () => {
     act(() => root.unmount());
   });
 
+  test("keeps the Popup copy action hidden until translation text exists", async () => {
+    const deferred = createDeferred();
+    apiTranslate.mockReturnValueOnce(deferred.promise);
+    const { container, root } = renderTranCont({ popupStyle: true });
+    await flushEffects();
+
+    const body = container.querySelector(".kt-popup-translation-result__body");
+    expect(body.getAttribute("aria-busy")).toBe("true");
+    expect(container.querySelector("[data-copy-text]")).toBeNull();
+
+    await act(async () => {
+      apiTranslate.mock.calls[0][0].onStreamChunk({
+        text: "partial translation",
+        isComplete: false,
+      });
+    });
+    expect(container.querySelector("[data-copy-text]").dataset.copyText).toBe(
+      "partial translation"
+    );
+
+    await act(async () => {
+      deferred.resolve({ trText: "final translation" });
+      await deferred.promise;
+    });
+    expect(body.getAttribute("aria-busy")).toBe("false");
+    act(() => root.unmount());
+  });
+
   test("renders streaming chunks before the final translation", async () => {
     const deferred = createDeferred();
     apiTranslate.mockReturnValueOnce(deferred.promise);
@@ -193,6 +227,12 @@ describe("TranCont", () => {
 
     const textarea = container.querySelector("textarea");
     expect(textarea.value).toBe("");
+    expect(textarea.getAttribute("aria-busy")).toBe("true");
+    expect(
+      container.querySelector(
+        '[role="progressbar"][aria-label="popup_translating"]'
+      )
+    ).not.toBeNull();
 
     await act(async () => {
       // 模拟底层 SSE 增量返回，输出框应立即展示已经到达的部分译文。
@@ -208,6 +248,7 @@ describe("TranCont", () => {
       await deferred.promise;
     });
     expect(textarea.value).toBe("最终译文");
+    expect(textarea.getAttribute("aria-busy")).toBe("false");
 
     act(() => {
       root.unmount();

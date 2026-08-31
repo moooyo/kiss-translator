@@ -51,10 +51,16 @@ export default class DomManager {
       return;
     }
 
+    if (props && this.#hostElement) {
+      this.updateProps(props);
+    } else if (props) {
+      this._props = { ...this._props, ...props };
+    }
+
     if (!this.#hostElement) {
       this.#isProcessing = true;
       try {
-        this.#mount(props || this._props);
+        this.#mount(this._props);
       } catch (error) {
         logger.warn(`Failed to mount component with id "${this._id}":`, error);
         this.#isProcessing = false;
@@ -114,14 +120,11 @@ export default class DomManager {
   }
 
   /**
-   * 更新组件 props（仅在组件已挂载时有效）
-   * // REVIEW: 内部属性未更新隐患。在 updateProps() 执行中，虽然成功调用了渲染器更新 DOM 上的组件，
-   * // 但并没有将新的 newProps 同步更新到实例的 `this._props` 中。
-   * // 导致后续如果通过 `toggle()` 或不传参数的 `show()` 再次显示组件时，
-   * // 仍会读取到挂载初期在构造器中传入的旧 props 引用，产生数据不同步的 BUG。
-   * @param {Object} newProps - 新的 props
+   * Updates stored props and rerenders an already mounted component.
+   * @param {Object} newProps Props to merge into the current values.
    */
   updateProps(newProps) {
+    this._props = { ...this._props, ...newProps };
     if (this.#reactRoot && this.#hostElement) {
       const ComponentToRender = this._ReactComponent;
       const cache = createCache({
@@ -131,7 +134,7 @@ export default class DomManager {
       this.#reactRoot.render(
         <React.StrictMode>
           <CacheProvider value={cache}>
-            <ComponentToRender {...newProps} />
+            <ComponentToRender {...this.#enhanceProps(this._props)} />
           </CacheProvider>
         </React.StrictMode>
       );
@@ -157,19 +160,24 @@ export default class DomManager {
       prepend: true,
     });
 
-    const enhancedProps = {
-      ...props,
-      onClose: this.hide.bind(this),
-    };
-
     const ComponentToRender = this._ReactComponent;
     this.#reactRoot = ReactDOM.createRoot(host);
     this.#reactRoot.render(
       <React.StrictMode>
         <CacheProvider value={cache}>
-          <ComponentToRender {...enhancedProps} />
+          <ComponentToRender {...this.#enhanceProps(props)} />
         </CacheProvider>
       </React.StrictMode>
     );
+  }
+
+  #enhanceProps(props) {
+    return {
+      ...props,
+      onClose: (...args) => {
+        this.hide();
+        props?.onClose?.(...args);
+      },
+    };
   }
 }

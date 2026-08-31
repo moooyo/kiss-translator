@@ -143,6 +143,7 @@ export function SettingsSegmented({
             disabled={Boolean(normalized.disabled)}
             role="radio"
             aria-checked={selected}
+            aria-pressed={undefined}
             aria-label={
               typeof normalized.label === "string"
                 ? normalized.label

@@ -141,7 +141,11 @@ async function renderApis(api = createApi(), update = jest.fn()) {
   configureApiMocks();
 
   await act(async () => {
-    root.render(<Apis />);
+    root.render(
+      <div className="kt-m3-root">
+        <Apis />
+      </div>
+    );
   });
   await flushEffects();
 
@@ -152,7 +156,11 @@ async function renderApis(api = createApi(), update = jest.fn()) {
       apis = nextApis;
       configureApiMocks();
       await act(async () => {
-        root.render(<Apis />);
+        root.render(
+          <div className="kt-m3-root">
+            <Apis />
+          </div>
+        );
       });
       await flushEffects();
     },
@@ -310,6 +318,19 @@ describe("Apis ordering and master-detail layout", () => {
       "charlie"
     );
 
+    view.apiListValue.reorderApis.mockClear();
+    await act(async () => {
+      Simulate.keyDown(charlieCard, { key: "ArrowUp", altKey: true });
+      await Promise.resolve();
+    });
+    expect(view.apiListValue.reorderApis).toHaveBeenCalledWith(
+      "charlie",
+      "beta"
+    );
+    expect(charlieCard.getAttribute("aria-keyshortcuts")).toContain(
+      "Alt+ArrowUp"
+    );
+
     await view.rerender([
       { ...beta, sortOrder: 0 },
       { ...charlie, sortOrder: 1 },
@@ -404,8 +425,10 @@ describe("Apis ordering and master-detail layout", () => {
     const bulkButton = Array.from(
       view.container.querySelectorAll("button")
     ).find((button) => button.textContent === "bulk_actions");
+    expect(bulkButton.getAttribute("aria-pressed")).toBe("false");
 
     await act(async () => Simulate.click(bulkButton));
+    expect(bulkButton.getAttribute("aria-pressed")).toBe("true");
 
     const bulkCards = Array.from(
       view.container.querySelectorAll('.kt-api-list__card[role="checkbox"]')
@@ -422,6 +445,23 @@ describe("Apis ordering and master-detail layout", () => {
     expect(getInput(view.container, "apiName").value).toBe("Alpha");
     expect(mockConfirm).not.toHaveBeenCalled();
 
+    view.unmount();
+  });
+
+  test("keeps the add menu inside the Material theme root", async () => {
+    const view = await renderApis(createApi());
+    const addButton = Array.from(
+      view.container.querySelectorAll("button")
+    ).find((button) => button.textContent.trim() === "add");
+
+    await act(async () => Simulate.click(addButton));
+
+    const menu = view.container.querySelector("#add-api-menu");
+    expect(menu).not.toBeNull();
+    expect(menu.closest(".kt-m3-root")).toBe(
+      view.container.querySelector(".kt-m3-root")
+    );
+    expect(menu.querySelector(".kt-api-provider-icon")).not.toBeNull();
     view.unmount();
   });
 });

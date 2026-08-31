@@ -790,6 +790,15 @@ const SUBTITLE_PLAYGROUND_I18N = {
     "Bölümleme sonucu",
     "Kết quả phân đoạn"
   ),
+  subtitle_playground_result_format: subtitlePlaygroundText(
+    "结果格式",
+    "Result format",
+    "結果格式",
+    "結果形式",
+    "결과 형식",
+    "Sonuç biçimi",
+    "Định dạng kết quả"
+  ),
   subtitle_playground_download: subtitlePlaygroundText(
     "下载",
     "Download",
@@ -4362,6 +4371,15 @@ export const I18N = {
     tr: `Görünüm modu`,
     vi: `Chế độ giao diện`,
   },
+  settings_appearance_mode_transition: {
+    zh: `外观模式：当前 {0}，下一项 {1}`,
+    en: `Appearance mode: current {0}; next {1}`,
+    zh_TW: `外觀模式：目前 {0}，下一個 {1}`,
+    ja: `外観モード: 現在は {0}、次は {1}`,
+    ko: `화면 모드: 현재 {0}, 다음 {1}`,
+    tr: `Görünüm modu: şu anda {0}, sıradaki {1}`,
+    vi: `Chế độ giao diện: hiện tại {0}, tiếp theo {1}`,
+  },
   settings_theme_light: {
     zh: `浅色`,
     en: `Light`,
@@ -6332,6 +6350,24 @@ export const I18N = {
     ko: `복사`,
     tr: `Kopyala`,
     vi: "Sao chép",
+  },
+  copy_success: {
+    zh: `已复制`,
+    en: `Copied`,
+    zh_TW: `已複製`,
+    ja: `コピーしました`,
+    ko: `복사됨`,
+    tr: `Kopyalandı`,
+    vi: `Đã sao chép`,
+  },
+  retry: {
+    zh: `重试`,
+    en: `Retry`,
+    zh_TW: `重試`,
+    ja: `再試行`,
+    ko: `다시 시도`,
+    tr: `Yeniden dene`,
+    vi: `Thử lại`,
   },
   paste: {
     zh: `黏贴`,

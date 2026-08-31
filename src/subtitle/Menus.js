@@ -1,15 +1,22 @@
-import { useCallback, useMemo, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { API_SPE_TYPES } from "../config";
 
 /**
- * Label 组件 - 单行文本溢出省略包装标签
+ * Single-line label with overflow truncation.
  *
  * @param {object} props
- * @param {React.ReactNode} props.children - 标签子节点文本内容
+ * @param {React.ReactNode} props.children Label content.
  */
 function Label({ children }) {
   return (
-    <div
+    <span
       style={{
         overflow: "hidden",
         textOverflow: "ellipsis",
@@ -17,82 +24,146 @@ function Label({ children }) {
       }}
     >
       {children}
-    </div>
+    </span>
   );
 }
 
 /**
- * MenuItem 组件 - 菜单单项卡片包装器
- * 支持鼠标悬浮 (hover) 时的背景色渐变高亮与不透明度过渡过渡效果
+ * Accessible menu-row button with hover feedback.
  *
  * @param {object} props
- * @param {React.ReactNode} props.children - 子元素内容
- * @param {Function} props.onClick - 点击事件回调
- * @param {boolean} [props.disabled=false] - 是否禁用点击
+ * @param {React.ReactNode} props.children Row content.
+ * @param {Function} props.onClick Activation callback.
+ * @param {Function} props.onKeyDown Optional keyboard callback.
+ * @param {React.RefObject<HTMLButtonElement>} props.buttonRef Button ref.
+ * @param {boolean} [props.disabled=false] Whether the row is disabled.
+ * @param {string} [props.role="button"] ARIA role for the button.
  */
-function MenuItem({ children, onClick, disabled = false }) {
+function MenuItem({
+  children,
+  onClick,
+  onKeyDown,
+  buttonRef,
+  disabled = false,
+  role = "button",
+  ...buttonProps
+}) {
   const [hover, setHover] = useState(false);
   const highlighted = hover && !disabled;
 
+  const handleClick = useCallback(
+    (event) => {
+      if (disabled) {
+        event.preventDefault();
+        return;
+      }
+      onClick?.(event);
+    },
+    [disabled, onClick]
+  );
+
+  const handleKeyDown = useCallback(
+    (event) => {
+      if (disabled) {
+        event.preventDefault();
+        return;
+      }
+
+      if (event.repeat && (event.key === "Enter" || event.key === " ")) {
+        event.preventDefault();
+        return;
+      }
+
+      onKeyDown?.(event);
+      if (event.defaultPrevented) return;
+
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        onClick?.(event);
+      }
+    },
+    [disabled, onClick, onKeyDown]
+  );
+
   return (
-    <div
+    <button
+      {...buttonProps}
+      ref={buttonRef}
+      type="button"
+      role={role}
+      disabled={disabled}
+      aria-disabled={disabled}
       style={{
+        width: "100%",
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         padding: "0px 8px",
+        margin: 0,
+        border: 0,
         opacity: disabled ? 0.5 : highlighted ? 1 : 0.8,
         background: `rgba(255, 255, 255, ${highlighted ? 0.1 : 0})`,
+        color: "inherit",
         cursor: disabled ? "default" : "pointer",
+        font: "inherit",
+        lineHeight: "inherit",
+        textAlign: "left",
+        appearance: "none",
         transition: "background 0.2s, opacity 0.2s",
         borderRadius: 5,
       }}
       onMouseEnter={() => !disabled && setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onClick={disabled ? undefined : onClick}
-      aria-disabled={disabled || undefined}
+      onClick={handleClick}
+      onKeyDown={handleKeyDown}
     >
       {children}
-    </div>
+    </button>
   );
 }
 
 /**
- * Switch 组件 - 开关 (Toggle Switch) 菜单组件
+ * Toggle switch used by the in-player settings menu.
  *
  * @param {object} props
- * @param {string} props.label - 开关文本标题
- * @param {string} props.name - 配置表单中的字段 Key 名
- * @param {boolean} props.value - 当前开关状态值 (true 为开启，false 为关闭)
- * @param {Function} props.onChange - 开关改变时的回调通知
- * @param {boolean} props.disabled - 是否禁用该开关
+ * @param {string} props.label Visible and accessible label.
+ * @param {string} props.name Settings field name.
+ * @param {boolean} props.value Current checked state.
+ * @param {Function} props.onChange State-change callback.
+ * @param {boolean} props.disabled Whether the switch is disabled.
  */
 function Switch({ label, name, value, onChange, disabled }) {
-  // REVIEW: 这里的 handleClick 依赖了 value。当每次开关被点击切换时，value 会随之改变，
-  // 导致该 useCallback 重新生成并返回新的函数引用，使得 useCallback 并没有起到缓存函数引用的效果。
   const handleClick = useCallback(() => {
     if (disabled) return;
 
-    // 点击时状态取反派发
     onChange({ name, value: !value });
   }, [disabled, onChange, name, value]);
 
   return (
-    <MenuItem onClick={handleClick} disabled={disabled}>
+    <MenuItem
+      onClick={handleClick}
+      disabled={disabled}
+      role="switch"
+      aria-checked={Boolean(value)}
+      aria-label={label}
+    >
       <Label>{label}</Label>
-      {/* 开关轨道 (Track) */}
-      <div
+      {/* Track */}
+      <span
+        aria-hidden="true"
         style={{
           width: 40,
           height: 24,
+          display: "block",
+          flex: "0 0 auto",
           borderRadius: 12,
           background: value ? "rgba(32,156,238,.8)" : "rgba(255,255,255,.3)",
           position: "relative",
           transition: "background 180ms ease",
         }}
       >
-        {/* 开关滑块 (Thumb) */}
-        <div
+        {/* Thumb */}
+        <span
           style={{
             width: 20,
             height: 20,
@@ -104,17 +175,17 @@ function Switch({ label, name, value, onChange, disabled }) {
             transform: `translateX(${value ? 16 : 0}px)`,
             transition: "transform 180ms ease",
           }}
-        ></div>
-      </div>
+        />
+      </span>
     </MenuItem>
   );
 }
 
 /**
- * Select 组件 - 下拉选择菜单组件 (Select Component)
+ * Custom select control used by the in-player settings menu.
  *
  * @param {object} props
- * @param {string} props.label - 下拉标题文本
+ * @param {string} props.label Visible and accessible label.
  * @param {string} props.name - 表单字段 Key 名
  * @param {*} props.value - 当前选中的值
  * @param {Array<object>} props.options - 下拉选项数组，每一项为 { value, label }
@@ -123,12 +194,48 @@ function Switch({ label, name, value, onChange, disabled }) {
  */
 function Select({ label, name, value, options, onChange, disabled }) {
   const [isOpen, setIsOpen] = useState(false); // 控制下拉菜单面板的展开/收起状态
+  const [activeIndex, setActiveIndex] = useState(0);
+  const containerRef = useRef(null);
+  const triggerRef = useRef(null);
+  const optionRefs = useRef([]);
+  const listboxId = useId();
 
   // 查找当前被选中的选项，若没匹配到则回退至第一个可选项以做安全兜底
   const selectedOption = useMemo(
     () => options.find((opt) => opt.value === value) || options[0],
     [options, value]
   );
+  const selectedIndex = useMemo(
+    () =>
+      Math.max(
+        0,
+        options.findIndex((option) => option.value === value)
+      ),
+    [options, value]
+  );
+
+  useEffect(() => {
+    optionRefs.current.length = options.length;
+    if (isOpen) {
+      setActiveIndex(selectedIndex);
+      optionRefs.current[selectedIndex]?.focus();
+    }
+  }, [isOpen, options.length, selectedIndex]);
+
+  useEffect(() => {
+    if (disabled && isOpen) setIsOpen(false);
+  }, [disabled, isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const handlePointerDown = (event) => {
+      if (!containerRef.current?.contains(event.target)) setIsOpen(false);
+    };
+    document.addEventListener("pointerdown", handlePointerDown, true);
+    return () =>
+      document.removeEventListener("pointerdown", handlePointerDown, true);
+  }, [isOpen]);
 
   // 切换下拉菜单展开收起
   const handleToggle = useCallback(() => {
@@ -136,20 +243,115 @@ function Select({ label, name, value, options, onChange, disabled }) {
     setIsOpen((prev) => !prev);
   }, [disabled]);
 
+  const closeAndFocusTrigger = useCallback(() => {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }, []);
+
   // 选中下拉具体选项时，派发 onChange 事件，随后关闭下拉选择面板
   const handleSelect = useCallback(
     (optionValue) => {
+      if (disabled) return;
       onChange({ name, value: optionValue });
-      setIsOpen(false);
+      closeAndFocusTrigger();
     },
-    [onChange, name]
+    [closeAndFocusTrigger, disabled, onChange, name]
+  );
+
+  const focusOption = useCallback(
+    (index) => {
+      if (options.length === 0) return;
+      const nextIndex = (index + options.length) % options.length;
+      setActiveIndex(nextIndex);
+      optionRefs.current[nextIndex]?.focus();
+    },
+    [options.length]
+  );
+
+  const handleTriggerKeyDown = useCallback(
+    (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        handleToggle();
+        return;
+      }
+
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (!isOpen) {
+          setIsOpen(true);
+        } else {
+          focusOption(selectedIndex);
+        }
+        return;
+      }
+
+      if (event.key === "Escape" && isOpen) {
+        event.preventDefault();
+        closeAndFocusTrigger();
+      }
+    },
+    [closeAndFocusTrigger, focusOption, handleToggle, isOpen, selectedIndex]
+  );
+
+  const handleOptionKeyDown = useCallback(
+    (event, index, optionValue) => {
+      switch (event.key) {
+        case "Enter":
+        case " ":
+          event.preventDefault();
+          if (!event.repeat) handleSelect(optionValue);
+          break;
+        case "Escape":
+          event.preventDefault();
+          closeAndFocusTrigger();
+          break;
+        case "ArrowDown":
+          event.preventDefault();
+          focusOption(index + 1);
+          break;
+        case "ArrowUp":
+          event.preventDefault();
+          focusOption(index - 1);
+          break;
+        case "Home":
+          event.preventDefault();
+          focusOption(0);
+          break;
+        case "End":
+          event.preventDefault();
+          focusOption(options.length - 1);
+          break;
+        default:
+      }
+    },
+    [closeAndFocusTrigger, focusOption, handleSelect, options.length]
   );
 
   return (
-    <div style={{ position: "relative" }}>
-      <MenuItem onClick={handleToggle} disabled={disabled}>
+    <div
+      ref={containerRef}
+      style={{ position: "relative" }}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) {
+          setIsOpen(false);
+        }
+      }}
+    >
+      <MenuItem
+        buttonRef={triggerRef}
+        onClick={handleToggle}
+        onKeyDown={handleTriggerKeyDown}
+        disabled={disabled}
+        role="button"
+        aria-label={`${label}: ${selectedOption?.label || ""}`}
+        aria-haspopup="listbox"
+        aria-expanded={isOpen}
+        aria-controls={listboxId}
+        tabIndex={isOpen ? -1 : 0}
+      >
         <Label>{label}</Label>
-        <div
+        <span
           style={{
             fontSize: 12,
             opacity: 0.8,
@@ -160,11 +362,14 @@ function Select({ label, name, value, options, onChange, disabled }) {
           }}
         >
           {selectedOption?.label || ""}
-        </div>
+        </span>
       </MenuItem>
       {/* 下拉浮出面板 */}
       {isOpen && (
         <div
+          id={listboxId}
+          role="listbox"
+          aria-label={label}
           style={{
             position: "absolute",
             right: 0,
@@ -178,13 +383,34 @@ function Select({ label, name, value, options, onChange, disabled }) {
             marginTop: 4,
           }}
         >
-          {options.map((option) => (
-            <div
+          {options.map((option, index) => (
+            <button
               key={option.value}
+              ref={(node) => {
+                optionRefs.current[index] = node;
+              }}
+              type="button"
+              role="option"
+              disabled={disabled}
+              aria-disabled={disabled}
+              aria-selected={option.value === value}
+              tabIndex={index === activeIndex ? 0 : -1}
               onClick={() => handleSelect(option.value)}
+              onKeyDown={(event) =>
+                handleOptionKeyDown(event, index, option.value)
+              }
               style={{
+                width: "100%",
+                display: "block",
                 padding: "8px 12px",
+                margin: 0,
+                border: 0,
                 cursor: "pointer",
+                color: "inherit",
+                font: "inherit",
+                lineHeight: "inherit",
+                textAlign: "left",
+                appearance: "none",
                 background:
                   option.value === value
                     ? "rgba(32,156,238,.3)"
@@ -206,7 +432,7 @@ function Select({ label, name, value, options, onChange, disabled }) {
               }}
             >
               {option.label}
-            </div>
+            </button>
           ))}
         </div>
       )}
@@ -230,7 +456,12 @@ function Button({ label, onClick, disabled }) {
   }, [disabled, onClick]);
 
   return (
-    <MenuItem onClick={handleClick} disabled={disabled}>
+    <MenuItem
+      onClick={handleClick}
+      disabled={disabled}
+      role="button"
+      aria-label={label}
+    >
       <Label>{label}</Label>
     </MenuItem>
   );
@@ -255,7 +486,9 @@ export function Menus({
   updateSetting,
   downloadSubtitle,
   transApis,
+  onClose = () => {},
 }) {
+  const dialogRef = useRef(null);
   // 当快捷菜单的任何子选项发生更改时，统一向上层派发更新事件
   const handleChange = useCallback(
     ({ name, value }) => {
@@ -310,6 +543,12 @@ export function Menus({
     return i18n("processing_subtitles");
   }, [progressed, i18n]);
 
+  useEffect(() => {
+    dialogRef.current
+      ?.querySelector("button:not(:disabled), [tabindex='0']")
+      ?.focus();
+  }, []);
+
   // 从表单配置对象中解构出字幕交互相关的控制值
   const {
     segSlug, // 选中的智能断句大模型 apiSlug
@@ -323,6 +562,17 @@ export function Menus({
 
   return (
     <div
+      ref={dialogRef}
+      role="dialog"
+      aria-label={
+        i18n("enable_subtitle_translate") || "Subtitle translation controls"
+      }
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        onClose();
+      }}
       style={{
         position: "absolute",
         left: 0,
@@ -394,6 +644,7 @@ export function Menus({
       <Button
         label={`${status} [${progressed}%] `}
         onClick={downloadSubtitle}
+        disabled={progressed === 0}
       />
     </div>
   );

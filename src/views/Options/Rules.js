@@ -19,7 +19,7 @@ import {
   OPT_SPLIT_PARAGRAPH_ALL,
   OPT_HIGHLIGHT_WORDS_ALL,
 } from "../../config";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useI18n } from "../../hooks/I18n";
 import Typography from "@mui/material/Typography";
 import Accordion from "@mui/material/Accordion";
@@ -38,11 +38,11 @@ import Radio from "@mui/material/Radio";
 import RadioGroup from "@mui/material/RadioGroup";
 import DeleteIcon from "@mui/icons-material/Delete";
 import IconButton from "@mui/material/IconButton";
+import LoadingButton from "@mui/lab/LoadingButton";
 import ShareIcon from "@mui/icons-material/Share";
 import SyncIcon from "@mui/icons-material/Sync";
 import { useSubRules } from "../../hooks/SubRules";
-import { syncSubRules } from "../../libs/subRules";
-import { loadOrFetchSubRules } from "../../libs/subRules";
+import { loadOrFetchSubRules, syncSubRules } from "../../libs/subRules";
 import { useAlert } from "../../hooks/Alert";
 import { syncShareRules } from "../../libs/sync";
 import { debounce } from "../../libs/utils";
@@ -68,6 +68,53 @@ import { useApiList } from "../../hooks/Api";
 import ShowMoreButton from "./ShowMoreButton";
 import { useConfirm } from "../../hooks/Confirm";
 import { useAllTextStyles } from "../../hooks/CustomStyles";
+
+let disabledSubRuleWriteQueue = Promise.resolve();
+
+function queueDisabledSubRuleTask(task) {
+  const queuedTask = disabledSubRuleWriteQueue
+    .catch(() => undefined)
+    .then(task);
+  disabledSubRuleWriteQueue = queuedTask;
+  return queuedTask;
+}
+
+export function queueDisabledSubRuleUpdate(
+  sourceUrl,
+  pattern,
+  disabled,
+  {
+    readDisabled = getDisabledSubRules,
+    writeDisabled = setDisabledSubRules,
+  } = {}
+) {
+  return queueDisabledSubRuleTask(async () => {
+    const list = await readDisabled(sourceUrl);
+    const patterns = new Set(Array.isArray(list) ? list : []);
+    if (disabled) patterns.add(pattern);
+    else patterns.delete(pattern);
+    const next = [...patterns];
+    await writeDisabled(sourceUrl, next);
+    return next;
+  });
+}
+
+export function queueDisabledSubRuleRead(
+  sourceUrl,
+  readDisabled = getDisabledSubRules
+) {
+  const pendingWrites = disabledSubRuleWriteQueue;
+  return pendingWrites
+    .catch(() => undefined)
+    .then(() => readDisabled(sourceUrl));
+}
+
+export function queueDisabledSubRuleRemoval(
+  sourceUrl,
+  removeDisabled = removeDisabledSubRules
+) {
+  return queueDisabledSubRuleTask(() => removeDisabled(sourceUrl));
+}
 
 // 计算规则的初始表单值
 const calculateInitialValues = (rule) => {
@@ -974,32 +1021,51 @@ function RuleAccordion({ rule, rules, sourceUrl, isExpanded = false }) {
   const isRuleEnabled = isPersonalRule ? rule.enabled !== false : true;
 
   // 用户是否手动禁用了该订阅规则
-  const [disabledByUser, setDisabledByUser] = useState(false);
+  const [disabledByUser, setDisabledByUser] = useState(
+    isSubRule ? null : false
+  );
+  const [subRulePending, setSubRulePending] = useState(isSubRule);
+  const subRuleRequestRef = useRef(0);
   const alert = useAlert();
 
   // 若为订阅规则（rules 不存在且 sourceUrl 存在），则在初始化时从存储中读取该 pattern 的启用/禁用状态
   useEffect(() => {
-    if (!rules) {
-      if (!sourceUrl) return;
-      (async () => {
-        try {
-          const list = await getDisabledSubRules(sourceUrl);
-          // REVIEW: 此异步回调在组件卸载时若被执行可能会造成未挂载组件状态更新的报错，虽然在多标签切换等低频场景下影响较小
-          setDisabledByUser(Array.isArray(list) && list.includes(rule.pattern));
-        } catch (err) {
+    if (!isSubRule || !sourceUrl) {
+      setDisabledByUser(false);
+      setSubRulePending(false);
+      return undefined;
+    }
+
+    const requestId = ++subRuleRequestRef.current;
+    let active = true;
+    setDisabledByUser(null);
+    setSubRulePending(true);
+
+    void queueDisabledSubRuleRead(sourceUrl)
+      .then((list) => {
+        if (!active || requestId !== subRuleRequestRef.current) return;
+        setDisabledByUser(Array.isArray(list) && list.includes(rule.pattern));
+      })
+      .catch((err) => {
+        if (active && requestId === subRuleRequestRef.current) {
+          setDisabledByUser(false);
           kissLog("getDisabledSubRules", err);
         }
-      })();
-    }
-  }, [rule, rules, sourceUrl]);
+      })
+      .finally(() => {
+        if (active && requestId === subRuleRequestRef.current) {
+          setSubRulePending(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [isSubRule, rule.pattern, sourceUrl]);
 
   // 面板展开/折叠切换
   const handleChange = (e) => {
     setExpanded((pre) => !pre);
-  };
-
-  const stopSummaryToggle = (e) => {
-    e.stopPropagation();
   };
 
   const titleOpacity = isPersonalRule
@@ -1010,61 +1076,72 @@ function RuleAccordion({ rule, rules, sourceUrl, isExpanded = false }) {
       ? 1
       : 0.5;
 
+  const handleSubRuleToggle = async (event) => {
+    if (subRulePending) return;
+    const enabled = event.target.checked;
+    const toDisable = !enabled;
+    const previousDisabled = disabledByUser;
+    const requestId = ++subRuleRequestRef.current;
+    setDisabledByUser(toDisable);
+    setSubRulePending(true);
+    try {
+      await queueDisabledSubRuleUpdate(sourceUrl, rule.pattern, toDisable);
+      if (requestId !== subRuleRequestRef.current) return;
+      setDisabledByUser(toDisable);
+      alert.success(i18n(toDisable ? "rule_disabled" : "rule_enabled"));
+    } catch (err) {
+      if (requestId !== subRuleRequestRef.current) return;
+      setDisabledByUser(previousDisabled);
+      kissLog("toggle disabled sub rule", err);
+      alert.error(i18n("rule_toggle_failed"));
+    } finally {
+      if (requestId === subRuleRequestRef.current) {
+        setSubRulePending(false);
+      }
+    }
+  };
+
+  const ruleSwitch = isPersonalRule ? (
+    <Switch
+      size="small"
+      checked={isRuleEnabled}
+      inputProps={{
+        "aria-label": `Toggle personal rule ${rule.pattern}`,
+      }}
+      onChange={(event) => {
+        const enabled = event.target.checked;
+        rules.put(rule.pattern, { enabled });
+        alert.success(i18n(enabled ? "rule_enabled" : "rule_disabled"));
+      }}
+    />
+  ) : isSubRule ? (
+    <Switch
+      size="small"
+      checked={disabledByUser === false}
+      disabled={subRulePending}
+      inputProps={{
+        "aria-label": `Toggle subscription rule ${rule.pattern}`,
+        "aria-busy": subRulePending,
+      }}
+      onChange={handleSubRuleToggle}
+    />
+  ) : null;
+
   return (
-    <Accordion expanded={expanded} onChange={handleChange}>
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Stack
-          direction="row"
-          alignItems="center"
-          spacing={1}
-          sx={{ width: "100%" }}
+    <Box className="kt-rule-accordion" sx={{ position: "relative" }}>
+      {ruleSwitch && (
+        <Box
+          className="kt-rule-enable-control"
+          sx={{ position: "absolute", top: 13, left: 14, zIndex: 2 }}
         >
-          {/* 对于个人规则，提供一个 Switch 按钮，控制该条规则在匹配时的生效状态 */}
-          {isPersonalRule && (
-            <Switch
-              size="small"
-              checked={isRuleEnabled}
-              inputProps={{
-                "aria-label": `Toggle personal rule ${rule.pattern}`,
-              }}
-              onPointerDown={stopSummaryToggle}
-              onClick={stopSummaryToggle}
-              onChange={(e) => {
-                const enabled = e.target.checked;
-                rules.put(rule.pattern, { enabled });
-                alert.success(i18n(enabled ? "rule_enabled" : "rule_disabled"));
-              }}
-            />
-          )}
-
-          {/* 对于订阅规则，额外提供一个 Switch 按钮，控制该条规则在匹配时的生效状态 */}
-          {isSubRule && (
-            <Switch
-              size="small"
-              checked={!disabledByUser}
-              onPointerDown={stopSummaryToggle} // 阻止事件传播，避免点击 Switch 触发折叠面板展开/收起
-              onClick={stopSummaryToggle}
-              onChange={async (e) => {
-                const enabled = e.target.checked;
-                const toDisable = !enabled;
-                try {
-                  const list = await getDisabledSubRules(sourceUrl);
-                  const set = new Set(Array.isArray(list) ? list : []);
-                  if (toDisable) set.add(rule.pattern);
-                  else set.delete(rule.pattern);
-                  await setDisabledSubRules(sourceUrl, [...set]);
-                  setDisabledByUser(toDisable);
-                  alert.success(
-                    i18n(toDisable ? "rule_disabled" : "rule_enabled")
-                  );
-                } catch (err) {
-                  kissLog("toggle disabled sub rule", err);
-                  alert.error(i18n("rule_toggle_failed"));
-                }
-              }}
-            />
-          )}
-
+          {ruleSwitch}
+        </Box>
+      )}
+      <Accordion expanded={expanded} onChange={handleChange}>
+        <AccordionSummary
+          expandIcon={<ExpandMoreIcon />}
+          sx={ruleSwitch ? { pl: "76px" } : undefined}
+        >
           <Typography
             sx={{
               opacity: titleOpacity,
@@ -1076,12 +1153,12 @@ function RuleAccordion({ rule, rules, sourceUrl, isExpanded = false }) {
               ? `[${i18n("global_rule")}] ${rule.pattern}`
               : rule.pattern}
           </Typography>
-        </Stack>
-      </AccordionSummary>
-      <AccordionDetails>
-        {expanded && <RuleFields rule={rule} rules={rules} />}
-      </AccordionDetails>
-    </Accordion>
+        </AccordionSummary>
+        <AccordionDetails>
+          {expanded && <RuleFields rule={rule} rules={rules} />}
+        </AccordionDetails>
+      </Accordion>
+    </Box>
   );
 }
 
@@ -1089,9 +1166,14 @@ function RuleAccordion({ rule, rules, sourceUrl, isExpanded = false }) {
 function ShareButton({ rules, injectRules, selectedUrl }) {
   const alert = useAlert();
   const i18n = useI18n();
+  const [sharing, setSharing] = useState(false);
+  const sharingRef = useRef(false);
 
   // 处理分享点击逻辑
   const handleClick = async () => {
+    if (sharingRef.current) return;
+    sharingRef.current = true;
+    setSharing(true);
     try {
       // 获取同步配置
       const { syncType, syncUrl, syncKey } = await getSyncWithDefault();
@@ -1120,18 +1202,23 @@ function ShareButton({ rules, injectRules, selectedUrl }) {
     } catch (err) {
       alert.warning(i18n("error_got_some_wrong"));
       kissLog("share rules", err);
+    } finally {
+      sharingRef.current = false;
+      setSharing(false);
     }
   };
 
   return (
-    <Button
+    <LoadingButton
       size="small"
       variant="outlined"
       onClick={handleClick}
+      loading={sharing}
+      aria-busy={sharing}
       startIcon={<ShareIcon />}
     >
       {i18n("share")}
-    </Button>
+    </LoadingButton>
   );
 }
 
@@ -1302,7 +1389,7 @@ function SubRulesItem({
   syncAt,
   selectedUrl,
   delSub,
-  setSelectedRules,
+  setSelectedRulesForUrl,
   updateDataCache,
   deleteDataCache,
 }) {
@@ -1317,7 +1404,7 @@ function SubRulesItem({
       await deleteDataCache(url); // 删除本地同步的时间戳缓存
       // 移除针对该订阅源下单独定制的规则禁用状态
       try {
-        await removeDisabledSubRules(url);
+        await queueDisabledSubRuleRemoval(url);
       } catch (err) {
         kissLog("removeDisabledSubRules", err);
       }
@@ -1332,8 +1419,8 @@ function SubRulesItem({
       setLoading(true);
       const rules = await syncSubRules(url); // 发起网络请求获取最新的订阅规则
       // 如果当前正处于选中查看状态，则立刻更新 UI 中正在展示的规则列表
-      if (rules.length > 0 && url === selectedUrl) {
-        setSelectedRules(rules);
+      if (rules.length > 0) {
+        setSelectedRulesForUrl(url, rules);
       }
       await updateDataCache(url); // 更新最近同步时间戳
     } catch (err) {
@@ -1374,18 +1461,20 @@ function SubRulesItem({
         </span>
       )}
 
-      {/* 同步中展示菊花图，否则展示同步按钮 */}
-      {loading ? (
-        <CircularProgress size={16} />
-      ) : (
-        <IconButton
-          size="small"
-          onClick={handleSync}
-          aria-label={`Sync subscription ${url}`}
-        >
+      <IconButton
+        size="small"
+        onClick={handleSync}
+        disabled={loading}
+        aria-label={`Sync subscription ${url}`}
+        aria-disabled={loading}
+        aria-busy={loading}
+      >
+        {loading ? (
+          <CircularProgress size={20} />
+        ) : (
           <SyncIcon fontSize="small" />
-        </IconButton>
-      )}
+        )}
+      </IconButton>
 
       {/* 首个默认订阅源，以及当前正在选中的订阅源不允许删除 */}
       {index !== 0 && selectedUrl !== url && (
@@ -1411,10 +1500,20 @@ function SubRulesEdit({ subList, addSub, updateDataCache }) {
   // 控制是否展示 URL 输入栏
   const [showInput, setShowInput] = useState(false);
   const [loading, setLoading] = useState(false);
+  const requestIdRef = useRef(0);
+
+  useEffect(
+    () => () => {
+      requestIdRef.current += 1;
+    },
+    []
+  );
 
   // 取消并隐藏输入栏
   const handleCancel = (e) => {
     e.preventDefault();
+    requestIdRef.current += 1;
+    setLoading(false);
     setShowInput(false);
     setInputText("");
     setInputError("");
@@ -1436,22 +1535,27 @@ function SubRulesEdit({ subList, addSub, updateDataCache }) {
       return;
     }
 
+    const requestId = ++requestIdRef.current;
     try {
       setLoading(true);
       const rules = await syncSubRules(url);
+      if (requestId !== requestIdRef.current) return;
       // REVIEW: 若获取成功但返回的规则数刚好为 0（如合法的空订阅源），直接抛错并提示“获取 URL 失败 (error_fetch_url)”不够精确
       if (rules.length === 0) {
         throw new Error("empty rules");
       }
       await addSub(url); // 将新订阅源添加到列表
+      if (requestId !== requestIdRef.current) return;
       await updateDataCache(url); // 记录首次同步的时间戳
+      if (requestId !== requestIdRef.current) return;
       setShowInput(false);
       setInputText("");
     } catch (err) {
+      if (requestId !== requestIdRef.current) return;
       kissLog("fetch rules", err);
       setInputError(i18n("error_fetch_url")); // 网络请求或同步解析失败提示
     } finally {
-      setLoading(false);
+      if (requestId === requestIdRef.current) setLoading(false);
     }
   };
 
@@ -1535,6 +1639,9 @@ function SubRulesEdit({ subList, addSub, updateDataCache }) {
 
 // 订阅规则配置主面板组件
 function SubRules({ subRules }) {
+  const i18n = useI18n();
+  const rulesListRef = useRef(null);
+  const [rulesListHeight, setRulesListHeight] = useState(0);
   const {
     subList, // 订阅源列表
     selectSub, // 选择订阅源方法
@@ -1542,12 +1649,30 @@ function SubRules({ subRules }) {
     delSub, // 删除订阅源方法
     selectedUrl, // 当前选中的订阅 URL
     selectedRules, // 当前选中订阅源下的规则集列表
-    setSelectedRules, // 更新当前选中订阅源规则集列表的方法
+    setSelectedRulesForUrl, // 更新当前选中订阅源规则集列表的方法
     loading, // 是否正在同步/加载
   } = subRules;
 
   // 引入同步缓存 Hook，用于管理 WebDAV 或本地订阅源的最后同步时间戳
   const { dataCaches, updateDataCache, deleteDataCache } = useSyncCaches();
+
+  useLayoutEffect(() => {
+    const listElement = rulesListRef.current;
+    if (loading || !listElement) return undefined;
+
+    const measure = () => {
+      const nextHeight = Math.ceil(listElement.getBoundingClientRect().height);
+      setRulesListHeight((current) =>
+        current === nextHeight ? current : nextHeight
+      );
+    };
+    measure();
+
+    if (typeof ResizeObserver !== "function") return undefined;
+    const observer = new ResizeObserver(measure);
+    observer.observe(listElement);
+    return () => observer.disconnect();
+  }, [loading, selectedRules.length]);
 
   // 切换选中的订阅规则源
   const handleSelect = (e) => {
@@ -1565,7 +1690,11 @@ function SubRules({ subRules }) {
       />
 
       {/* 订阅源单选列表 */}
-      <RadioGroup value={selectedUrl} onChange={handleSelect}>
+      <RadioGroup
+        value={selectedUrl}
+        onChange={handleSelect}
+        aria-label={i18n("subscribe_rules")}
+      >
         {subList.map((item, index) => (
           <SubRulesItem
             key={item.url}
@@ -1574,7 +1703,7 @@ function SubRules({ subRules }) {
             index={index}
             selectedUrl={selectedUrl}
             delSub={delSub}
-            setSelectedRules={setSelectedRules}
+            setSelectedRulesForUrl={setSelectedRulesForUrl}
             updateDataCache={updateDataCache}
             deleteDataCache={deleteDataCache}
           />
@@ -1582,11 +1711,25 @@ function SubRules({ subRules }) {
       </RadioGroup>
 
       {/* 显示当前选中订阅源下的具体规则集折叠面板 */}
-      <Box>
+      <Box
+        ref={rulesListRef}
+        aria-busy={loading}
+        sx={{
+          minHeight: loading ? Math.max(80, rulesListHeight) : undefined,
+          position: "relative",
+        }}
+      >
         {loading ? (
-          <center>
+          <Box
+            sx={{
+              display: "grid",
+              position: "absolute",
+              inset: 0,
+              placeItems: "center",
+            }}
+          >
             <CircularProgress />
-          </center>
+          </Box>
         ) : (
           selectedRules.map((rule) => (
             <RuleAccordion
@@ -1652,22 +1795,53 @@ export default function Rules() {
         </Alert>
 
         {/* 规则分类选项卡导航 */}
-        <Tabs value={activeTab} onChange={handleTabChange}>
-          <Tab label={i18n("global_rule")} />
-          <Tab label={i18n("personal_rules")} />
-          <Tab label={i18n("subscribe_rules")} />
+        <Tabs
+          value={activeTab}
+          onChange={handleTabChange}
+          aria-label={i18n("rules_setting")}
+        >
+          <Tab
+            id="kt-rules-global-tab"
+            aria-controls="kt-rules-global-panel"
+            label={i18n("global_rule")}
+          />
+          <Tab
+            id="kt-rules-personal-tab"
+            aria-controls="kt-rules-personal-panel"
+            label={i18n("personal_rules")}
+          />
+          <Tab
+            id="kt-rules-subscribe-tab"
+            aria-controls="kt-rules-subscribe-panel"
+            label={i18n("subscribe_rules")}
+          />
           {/* <Tab label={i18n("overwrite_subscribe_rules")} /> */}
         </Tabs>
         {/* 全局默认规则视图 (Tab 0) */}
-        <div hidden={activeTab !== 0}>
+        <div
+          id="kt-rules-global-panel"
+          role="tabpanel"
+          aria-labelledby="kt-rules-global-tab"
+          hidden={activeTab !== 0}
+        >
           {activeTab === 0 && <GlobalRule rules={rules} />}
         </div>
         {/* 个人自定义规则视图 (Tab 1) */}
-        <div hidden={activeTab !== 1}>
+        <div
+          id="kt-rules-personal-panel"
+          role="tabpanel"
+          aria-labelledby="kt-rules-personal-tab"
+          hidden={activeTab !== 1}
+        >
           {activeTab === 1 && <UserRules subRules={subRules} rules={rules} />}
         </div>
         {/* 外部规则订阅视图 (Tab 2) */}
-        <div hidden={activeTab !== 2}>
+        <div
+          id="kt-rules-subscribe-panel"
+          role="tabpanel"
+          aria-labelledby="kt-rules-subscribe-tab"
+          hidden={activeTab !== 2}
+        >
           {activeTab === 2 && <SubRules subRules={subRules} />}
         </div>
         {/* <div hidden={activeTab !== 3}>{activeTab === 3 && <OwSubRule />}</div> */}

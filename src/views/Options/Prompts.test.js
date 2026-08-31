@@ -94,6 +94,17 @@ describe("Prompts", () => {
 
     expect(container.textContent).toContain("系统提示词");
     expect(container.textContent).toContain("用户提示词");
+    const resizableTextareas = container.querySelectorAll(
+      'textarea.kt-resizable-textarea:not([aria-hidden="true"])'
+    );
+    expect(resizableTextareas).toHaveLength(2);
+    resizableTextareas.forEach((textarea) => {
+      expect(textarea.closest(".kt-resizable-text-field")).not.toBeNull();
+      expect(
+        getComputedStyle(textarea.closest(".MuiInputBase-root")).overflow
+      ).toBe("visible");
+      expect(getComputedStyle(textarea).resize).toBe("vertical");
+    });
 
     unmount();
   });

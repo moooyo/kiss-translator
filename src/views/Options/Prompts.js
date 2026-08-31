@@ -283,6 +283,7 @@ function PromptFields({
 
       <Stack spacing={1}>
         <CodeField
+          className="kt-resizable-text-field"
           size="small"
           label={i18n("system_prompt", "系统提示词")}
           name="systemPrompt"
@@ -292,8 +293,12 @@ function PromptFields({
           minRows={3}
           maxRows={14}
           disabled={isPreset}
+          inputProps={{
+            className: "kt-resizable-textarea",
+            style: { resize: "vertical" },
+          }}
           sx={{
-            "& .MuiFilledInput-root": {
+            "& .MuiInputBase-root": {
               overflow: "visible",
             },
             '& textarea:not([aria-hidden="true"])': {
@@ -318,6 +323,7 @@ function PromptFields({
       {showUserPrompt && (
         <Stack spacing={1}>
           <CodeField
+            className="kt-resizable-text-field"
             size="small"
             label={i18n("user_prompt", "用户提示词")}
             name="userPrompt"
@@ -327,8 +333,12 @@ function PromptFields({
             minRows={3}
             maxRows={14}
             disabled={isPreset}
+            inputProps={{
+              className: "kt-resizable-textarea",
+              style: { resize: "vertical" },
+            }}
             sx={{
-              "& .MuiFilledInput-root": {
+              "& .MuiInputBase-root": {
                 overflow: "visible",
               },
               '& textarea:not([aria-hidden="true"])': {

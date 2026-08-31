@@ -6,6 +6,7 @@ import {
   resolveM3Colors,
   resolveM3ThemeMode,
 } from "./m3";
+import { getCssAtRuleBodies } from "./testUtils";
 
 describe("M3 brand colors", () => {
   test("matches the handoff tokens for alternate brands", () => {
@@ -53,6 +54,33 @@ describe("M3 global motion", () => {
   });
 });
 
+describe("M3 resizable textareas", () => {
+  test("keeps the native resize hit area usable without styling measurement nodes", () => {
+    expect(M3_GLOBAL_CSS).toMatch(
+      /textarea\.kt-resizable-textarea:not\(\[aria-hidden="true"\]\)::\-webkit-scrollbar\s*\{[^}]*width:\s*16px;[^}]*height:\s*16px;/
+    );
+    const resizerBodies = getCssAtRuleBodies(
+      M3_GLOBAL_CSS,
+      "@supports selector(textarea::-webkit-resizer)"
+    );
+    expect(resizerBodies).toHaveLength(1);
+    expect(
+      resizerBodies.some((body) =>
+        /textarea\.kt-resizable-textarea:not\(\[aria-hidden="true"\]\)::\-webkit-resizer\s*\{[^}]*background-color:\s*transparent;[^}]*background-image:\s*linear-gradient\([\s\S]*?var\(--kt-onv\)[\s\S]*?background-position:\s*right 6px bottom 6px;[^}]*background-size:\s*10px 10px;/.test(
+          body
+        )
+      )
+    ).toBe(true);
+    expect(M3_GLOBAL_CSS).not.toContain(".MuiFilledInput-root::after");
+    expect(M3_GLOBAL_CSS).not.toContain(
+      ".kt-popup-translation-textarea::after"
+    );
+    expect(M3_GLOBAL_CSS.match(/::\-webkit-resizer\s*\{/g) || []).toHaveLength(
+      1
+    );
+  });
+});
+
 describe("M3 keyboard focus", () => {
   test("keeps the primary focus ring solid after progressive enhancement", () => {
     const fallbackRule = M3_GLOBAL_CSS.match(
@@ -70,7 +98,28 @@ describe("M3 keyboard focus", () => {
 
   test("delegates MUI input focus rendering to the field container", () => {
     expect(M3_GLOBAL_CSS).toMatch(
-      /\.kt-m3-root \.MuiInputBase-input:focus,[\s\S]*?\.MuiInputBase-input:focus-visible\s*\{[^}]*outline:\s*none;/
+      /\.kt-m3-root \.MuiInputBase-input:focus\s*\{[^}]*outline:\s*none;/
     );
+    const focusVisibleBodies = getCssAtRuleBodies(
+      M3_GLOBAL_CSS,
+      "@supports selector(:focus-visible)"
+    );
+    expect(
+      focusVisibleBodies.some((body) =>
+        /\.kt-m3-root \.MuiInputBase-input:focus-visible\s*\{[^}]*outline:\s*none;/.test(
+          body
+        )
+      )
+    ).toBe(true);
+    expect(M3_GLOBAL_CSS).toMatch(
+      /\.kt-m3-root \.MuiButtonBase-root input:focus,[\s\S]*?\.MuiSlider-input:focus\s*\{[^}]*outline:\s*none;/
+    );
+    expect(
+      focusVisibleBodies.some((body) =>
+        /\.MuiButtonBase-root input:focus-visible,[\s\S]*?\.MuiSlider-input:focus-visible\s*\{[^}]*outline:\s*none;/.test(
+          body
+        )
+      )
+    ).toBe(true);
   });
 });

@@ -76,6 +76,8 @@ export default function ShortcutInput({
       className={compact ? "kt-shortcut-input kt-shortcut-input--compact" : ""}
       direction="row"
       alignItems="flex-start"
+      spacing={1}
+      useFlexGap
     >
       <TextField
         size="small"
@@ -85,6 +87,7 @@ export default function ShortcutInput({
         fullWidth
         inputRef={inputRef}
         disabled={!isEditing}
+        inputProps={{ "aria-label": label }}
         onBlur={handleBlur}
         helperText={
           compact
@@ -99,8 +102,8 @@ export default function ShortcutInput({
         <IconButton
           onClick={commitChanges}
           color="primary"
-          aria-label={i18n("save")}
-          title={i18n("save")}
+          aria-label={`${i18n("save")} ${label}`}
+          title={`${i18n("save")} ${label}`}
         >
           <CheckIcon />
         </IconButton>
@@ -108,8 +111,8 @@ export default function ShortcutInput({
         // 未编辑，显示铅笔 EditIcon 按钮
         <IconButton
           onClick={handleEditClick}
-          aria-label={i18n("edit")}
-          title={i18n("edit")}
+          aria-label={`${i18n("edit")} ${label}`}
+          title={`${i18n("edit")} ${label}`}
         >
           <EditIcon />
         </IconButton>

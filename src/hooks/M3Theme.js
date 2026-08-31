@@ -42,6 +42,10 @@ export default function M3Theme({
 
   const theme = useMemo(() => {
     const color = colors;
+    const focusRing = {
+      outline: `3px solid ${color.primary}`,
+      outlineOffset: 2,
+    };
     let htmlFontSize = 16;
     try {
       htmlFontSize = Number.parseInt(
@@ -87,6 +91,7 @@ export default function M3Theme({
             root: {
               backgroundImage: "none",
               borderColor: color.outlineVariant,
+              colorScheme: resolvedMode,
             },
           },
         },
@@ -98,8 +103,10 @@ export default function M3Theme({
               borderRadius: 999,
               paddingInline: 18,
               letterSpacing: ".01em",
-              transition: "background .3s, color .3s, transform .15s",
+              transition:
+                "background-color .3s, border-color .3s, color .3s, transform .15s",
               "&:active": { transform: "scale(.98)" },
+              "&.Mui-focusVisible": focusRing,
             },
             contained: { boxShadow: "none" },
           },
@@ -116,6 +123,7 @@ export default function M3Theme({
               }),
               transition: "background .3s, color .3s, transform .15s",
               "&:active": { transform: "scale(.94)" },
+              "&.Mui-focusVisible": focusRing,
             }),
           },
         },
@@ -131,19 +139,61 @@ export default function M3Theme({
               border: "1px solid transparent",
               borderRadius: 12,
               backgroundColor: color.surfaceContainer,
-              transition: "background .25s, border-color .25s",
-              "&:not(.Mui-disabled):hover": {
+              transition: "background-color .25s, border-color .25s",
+              "&:not(.Mui-disabled, .Mui-focused):hover": {
                 backgroundColor: color.surfaceHigh,
+                "@media (hover: none)": {
+                  backgroundColor: color.surfaceContainer,
+                },
               },
               "&.Mui-focused": {
                 borderColor: color.primary,
                 backgroundColor: color.surface,
               },
+              "&.Mui-error": {
+                borderColor: color.error,
+              },
+              "&.Mui-error.Mui-focused": {
+                borderColor: color.error,
+              },
+            },
+          },
+        },
+        MuiSelect: {
+          styleOverrides: {
+            select: {
+              "&:focus": {
+                borderRadius: "inherit",
+                backgroundColor: "transparent",
+              },
+            },
+            icon: {
+              transition: "transform .2s ease",
             },
           },
         },
         MuiSwitch: {
           styleOverrides: getMuiSwitchStyleOverrides(color),
+        },
+        MuiSlider: {
+          styleOverrides: {
+            thumb: {
+              "&.Mui-focusVisible": {
+                outline: `3px solid ${color.primary}`,
+                outlineOffset: 2,
+              },
+            },
+          },
+        },
+        MuiRadio: {
+          styleOverrides: {
+            root: {
+              "&.Mui-focusVisible": {
+                outline: `3px solid ${color.primary}`,
+                outlineOffset: 0,
+              },
+            },
+          },
         },
         MuiTabs: {
           styleOverrides: {
@@ -175,6 +225,83 @@ export default function M3Theme({
                 color: color.onSecondaryContainer,
                 fontWeight: 650,
               },
+              "&&.Mui-focusVisible": {
+                outline: "none",
+                boxShadow: `inset 0 0 0 3px ${color.primary}`,
+              },
+            },
+          },
+        },
+        MuiMenuItem: {
+          styleOverrides: {
+            root: {
+              borderRadius: 8,
+              color: color.onSurface,
+              transition:
+                "background-color .2s ease, color .2s ease, box-shadow .2s ease",
+              "&:hover": {
+                backgroundColor: color.surfaceContainer,
+                "@media (hover: none)": {
+                  backgroundColor: "transparent",
+                },
+              },
+              "&.Mui-selected": {
+                backgroundColor: color.secondaryContainer,
+                color: color.onSecondaryContainer,
+              },
+              "&.Mui-selected:hover": {
+                backgroundColor: color.secondaryContainer,
+              },
+              "&&.Mui-focusVisible": {
+                outline: "none",
+                backgroundColor: color.surfaceHigh,
+                boxShadow: `inset 0 0 0 3px ${color.primary}`,
+              },
+              "&&.Mui-selected.Mui-focusVisible": {
+                backgroundColor: color.secondaryContainer,
+                color: color.onSecondaryContainer,
+              },
+            },
+          },
+        },
+        MuiToggleButton: {
+          styleOverrides: {
+            root: {
+              borderRadius: 8,
+              color: color.onSurfaceVariant,
+              transition:
+                "background-color .2s ease, color .2s ease, box-shadow .2s ease",
+              "&:hover": {
+                backgroundColor: color.surfaceContainer,
+                "@media (hover: none)": { backgroundColor: "transparent" },
+              },
+              "&.Mui-selected": {
+                backgroundColor: color.secondaryContainer,
+                color: color.onSecondaryContainer,
+                fontWeight: 650,
+              },
+              "&.Mui-selected:hover": {
+                backgroundColor: color.secondaryContainer,
+              },
+              "&&.Mui-focusVisible": {
+                outline: "none",
+                boxShadow: `inset 0 0 0 3px ${color.primary}`,
+              },
+            },
+          },
+        },
+        MuiListItemButton: {
+          styleOverrides: {
+            root: {
+              "&&.Mui-focusVisible": {
+                outline: "none",
+                backgroundColor: color.surfaceHigh,
+                boxShadow: `inset 0 0 0 3px ${color.primary}`,
+              },
+              "&&.Mui-selected.Mui-focusVisible": {
+                backgroundColor: color.secondaryContainer,
+                color: color.onSecondaryContainer,
+              },
             },
           },
         },
@@ -196,6 +323,66 @@ export default function M3Theme({
               borderRadius: "12px !important",
               boxShadow: "none",
               "&::before": { display: "none" },
+            },
+          },
+        },
+        MuiAccordionSummary: {
+          styleOverrides: {
+            root: {
+              "&&.Mui-focusVisible": {
+                outline: "none",
+                backgroundColor: color.surfaceHigh,
+                boxShadow: `inset 0 0 0 3px ${color.primary}`,
+              },
+            },
+          },
+        },
+        MuiLoadingButton: {
+          styleOverrides: {
+            loadingIndicator: { color: color.primary },
+          },
+        },
+        MuiBackdrop: {
+          styleOverrides: {
+            root: {
+              "@media (prefers-reduced-motion: reduce)": {
+                transitionDuration: "0.01ms !important",
+              },
+            },
+          },
+        },
+        MuiDialog: {
+          styleOverrides: {
+            root: {
+              "@media (prefers-reduced-motion: reduce)": {
+                "& .MuiDialog-paper": {
+                  animationDuration: "0.01ms !important",
+                  transitionDuration: "0.01ms !important",
+                },
+              },
+            },
+            paper: { borderRadius: 28 },
+          },
+        },
+        MuiMenu: {
+          styleOverrides: {
+            paper: { borderRadius: 4 },
+          },
+        },
+        MuiTooltip: {
+          styleOverrides: {
+            tooltip: { borderRadius: 4 },
+          },
+        },
+        MuiPopover: {
+          styleOverrides: {
+            root: {
+              "@media (prefers-reduced-motion: reduce)": {
+                "& .MuiPaper-root": {
+                  animationDuration: "0.01ms !important",
+                  transitionDuration: "0.01ms !important",
+                },
+              },
             },
           },
         },

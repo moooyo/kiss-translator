@@ -617,6 +617,7 @@ export default function SubtitleSetting() {
             </Typography>
             <Slider
               size="small"
+              aria-label={`${label} ${i18n("font_size") || "Font size"}`}
               value={fontSize.preferred}
               min={0.5}
               max={5}
@@ -651,15 +652,27 @@ export default function SubtitleSetting() {
             <Box
               component="input"
               type="color"
+              aria-label={`${label} ${i18n("font_color") || "Font color"}`}
               value={colorToHex(cssObj["color"])}
               onChange={(e) => updateCss("color", e.target.value)}
               sx={{
-                width: 28,
-                height: 28,
-                border: "none",
+                width: 48,
+                height: 48,
+                border: "1px solid",
+                borderColor: "divider",
+                borderRadius: "8px",
                 cursor: "pointer",
                 p: 0,
                 bgcolor: "transparent",
+                "&::-webkit-color-swatch-wrapper": { p: "3px" },
+                "&::-webkit-color-swatch": {
+                  border: 0,
+                  borderRadius: "6px",
+                },
+                "&::-moz-color-swatch": {
+                  border: 0,
+                  borderRadius: "6px",
+                },
               }}
             />
             <TextField
@@ -667,6 +680,9 @@ export default function SubtitleSetting() {
               value={cssObj["color"] || ""}
               onChange={(e) => updateCss("color", e.target.value)}
               placeholder="#ffffff"
+              inputProps={{
+                "aria-label": `${label} ${i18n("font_color") || "Font color"}`,
+              }}
               sx={{ flex: 1 }}
             />
           </Box>
@@ -1099,6 +1115,9 @@ export default function SubtitleSetting() {
                       <Box
                         component="input"
                         type="color"
+                        aria-label={
+                          i18n("background_color") || "Background color"
+                        }
                         value={windowBgHex}
                         onChange={(e) => {
                           const rgb = hexToRgb(e.target.value);
@@ -1108,12 +1127,23 @@ export default function SubtitleSetting() {
                           );
                         }}
                         sx={{
-                          width: 28,
-                          height: 28,
-                          border: "none",
+                          width: 48,
+                          height: 48,
+                          border: "1px solid",
+                          borderColor: "divider",
+                          borderRadius: "8px",
                           cursor: "pointer",
                           p: 0,
                           bgcolor: "transparent",
+                          "&::-webkit-color-swatch-wrapper": { p: "3px" },
+                          "&::-webkit-color-swatch": {
+                            border: 0,
+                            borderRadius: "6px",
+                          },
+                          "&::-moz-color-swatch": {
+                            border: 0,
+                            borderRadius: "6px",
+                          },
                         }}
                       />
                       <Typography variant="body2" sx={{ minWidth: 48 }}>
@@ -1121,6 +1151,7 @@ export default function SubtitleSetting() {
                       </Typography>
                       <Slider
                         size="small"
+                        aria-label={i18n("opacity") || "Opacity"}
                         value={windowBgRgba.a}
                         min={0}
                         max={1}
@@ -1153,6 +1184,7 @@ export default function SubtitleSetting() {
                       </Typography>
                       <Slider
                         size="small"
+                        aria-label={i18n("line_height") || "Line height"}
                         value={windowLineHeight}
                         min={1}
                         max={2.5}
@@ -1172,7 +1204,14 @@ export default function SubtitleSetting() {
                   </Grid>
                   {/* 上下与左右内边距微调 Slider */}
                   <Grid item xs={12} sm={6}>
-                    <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
+                    <Box
+                      sx={{
+                        display: "flex",
+                        alignItems: "center",
+                        flexWrap: "wrap",
+                        gap: 2,
+                      }}
+                    >
                       <Typography
                         variant="body2"
                         color="text.secondary"
@@ -1185,6 +1224,7 @@ export default function SubtitleSetting() {
                       </Typography>
                       <Slider
                         size="small"
+                        aria-label={`${i18n("padding") || "Padding"} ${i18n("vertical") || "Vertical"}`}
                         value={windowPadding.vertical}
                         min={0}
                         max={2}
@@ -1195,13 +1235,14 @@ export default function SubtitleSetting() {
                             `${val}${windowPadding.unit} ${windowPadding.horizontal}${windowPadding.unit}`
                           );
                         }}
-                        sx={{ width: 80 }}
+                        sx={{ width: 80, flex: "1 1 80px" }}
                       />
                       <Typography variant="body2">
                         {i18n("horizontal") || "左右"}
                       </Typography>
                       <Slider
                         size="small"
+                        aria-label={`${i18n("padding") || "Padding"} ${i18n("horizontal") || "Horizontal"}`}
                         value={windowPadding.horizontal}
                         min={0}
                         max={3}
@@ -1212,7 +1253,7 @@ export default function SubtitleSetting() {
                             `${windowPadding.vertical}${windowPadding.unit} ${val}${windowPadding.unit}`
                           );
                         }}
-                        sx={{ width: 80 }}
+                        sx={{ width: 80, flex: "1 1 80px" }}
                       />
                     </Box>
                   </Grid>

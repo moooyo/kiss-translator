@@ -1,6 +1,6 @@
 import ThemeProvider from "../Popup/PopupTheme";
 import Draggable from "./Draggable";
-import { useEffect, useMemo, useCallback, useState } from "react";
+import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import { SettingProvider } from "../../hooks/Setting";
 import Header from "../Popup/Header";
 import Box from "@mui/material/Box";
@@ -24,7 +24,25 @@ export default function Action({ translator, processActions }) {
   const [showPopup, setShowPopup] = useState(true); // 是否显示弹窗面板
   const [rule, setRule] = useState(translator.rule); // 当前网页翻译规则状态缓存
   const [setting, setSetting] = useState(translator.setting); // 全局配置状态缓存
+  const panelRef = useRef(null);
   const windowSize = useWindowSize();
+
+  useEffect(() => {
+    if (!showPopup) return undefined;
+
+    let previousFocus = document.activeElement;
+    while (previousFocus?.shadowRoot?.activeElement) {
+      previousFocus = previousFocus.shadowRoot.activeElement;
+    }
+    const frameId = window.requestAnimationFrame(() => {
+      panelRef.current?.focus();
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frameId);
+      previousFocus?.focus?.();
+    };
+  }, [showPopup]);
 
   // 点击“设置”图标，在浏览器新标签页中打开扩展 Options 设置页
   const handleOpenSetting = useCallback(() => {
@@ -109,7 +127,18 @@ export default function Action({ translator, processActions }) {
             }
           >
             <Box
+              ref={panelRef}
               className="kt-popup-shell kt-popup-shell--content"
+              role="dialog"
+              aria-label={process.env.REACT_APP_NAME || "KISS Translator"}
+              tabIndex={-1}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setShowPopup(false);
+                }
+              }}
               style={{
                 maxHeight: Math.max(0, popProps.height - 57),
                 overflowY: "auto",

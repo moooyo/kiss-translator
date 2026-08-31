@@ -209,6 +209,9 @@ describe("SettingsSegmented", () => {
       "false",
     ]);
     expect(radios[1].disabled).toBe(true);
+    expect(radios.every((radio) => !radio.hasAttribute("aria-pressed"))).toBe(
+      true
+    );
 
     view.unmount();
   });

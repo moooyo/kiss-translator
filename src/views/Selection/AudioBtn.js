@@ -11,14 +11,20 @@ import queryString from "query-string";
  * @param {Object} props
  * @param {string} props.src - 音频源的 URL 地址
  */
-export function AudioBtn({ src }) {
+export function AudioBtn({ src, title = "Speak", pauseTitle = "Pause" }) {
   // 使用自定义的 useAudio 控制音频加载与播放状态
-  const { error, ready, playing, onPlay } = useAudio(src);
+  const { error, ready, playing, onPlay, onPause } = useAudio(src);
 
   // 如果加载音频出错或音频尚未准备就绪，显示禁用的发音图标
   if (error || !ready) {
     return (
-      <IconButton disabled size="small">
+      <IconButton
+        disabled
+        size="small"
+        title={title}
+        aria-label={title}
+        aria-busy={!error && !ready}
+      >
         <VolumeUpIcon fontSize="inherit" />
       </IconButton>
     );
@@ -27,7 +33,14 @@ export function AudioBtn({ src }) {
   // 如果当前音频正在播放，图标高亮为 primary 主题色
   if (playing) {
     return (
-      <IconButton color="primary" size="small">
+      <IconButton
+        color="primary"
+        size="small"
+        onClick={onPause}
+        title={pauseTitle}
+        aria-label={pauseTitle}
+        aria-pressed="true"
+      >
         <VolumeUpIcon fontSize="inherit" />
       </IconButton>
     );
@@ -35,7 +48,13 @@ export function AudioBtn({ src }) {
 
   // 默认正常就绪状态，点击时调用 onPlay 开始播放
   return (
-    <IconButton onClick={onPlay} size="small">
+    <IconButton
+      onClick={onPlay}
+      size="small"
+      title={title}
+      aria-label={title}
+      aria-pressed="false"
+    >
       <VolumeUpIcon fontSize="inherit" />
     </IconButton>
   );
@@ -79,12 +98,18 @@ export function BrowserTtsBtn({ text, lang = "en-US", title = "Speak" }) {
   return (
     <IconButton
       color={speaking ? "primary" : "default"}
-      // 对齐默认词典按钮：播放中高亮，并忽略重复点击。
-      onClick={speaking ? undefined : handleSpeak}
+      disabled={speaking}
+      onClick={handleSpeak}
       size="small"
       title={title}
       aria-label={title}
-      sx={{ ml: 0.5, verticalAlign: "middle" }}
+      aria-busy={speaking}
+      aria-pressed={speaking}
+      sx={{
+        ml: 0.5,
+        verticalAlign: "middle",
+        "&.Mui-disabled": speaking ? { color: "primary.main" } : undefined,
+      }}
     >
       <VolumeUpIcon fontSize="inherit" />
     </IconButton>

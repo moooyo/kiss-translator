@@ -223,7 +223,7 @@ export default function DraggableResizable({
     (contentHeight) => {
       if (!autoHeight) return getMaxTranBoxY(contentHeight);
 
-      const outerHeight = containerRef.current?.getBoundingClientRect().height;
+      const outerHeight = containerRef.current?.offsetHeight;
       return Math.max(
         0,
         window.innerHeight -

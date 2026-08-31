@@ -150,4 +150,34 @@ describe("SyncSetting method selection", () => {
     expect(mockUpdateSync).not.toHaveBeenCalled();
     view.unmount();
   });
+
+  test("keeps the encryption dialog named and width-safe", async () => {
+    const view = renderSyncSetting(OPT_SYNCTYPE_WORKER);
+    const openDialog = view.container.querySelector(
+      'button[aria-label="data_sync_encrypt_key"]'
+    );
+
+    await act(async () => openDialog.click());
+
+    const dialog = document.body.querySelector('[role="dialog"]');
+    expect(dialog.getAttribute("aria-labelledby")).toBe(
+      "sync-encryption-dialog-title"
+    );
+    expect(
+      document.getElementById("sync-encryption-dialog-title").textContent
+    ).toBe("set_sync_encrypt_key");
+    const fields = dialog.querySelector(
+      ".MuiDialogContent-root .MuiStack-root"
+    );
+    expect(getComputedStyle(fields).width).toBe("360px");
+    expect(getComputedStyle(fields).maxWidth).toBe("100%");
+    expect(dialog.className).toContain("MuiDialog-paperWidthSm");
+    expect(dialog.className).toContain("MuiDialog-paperFullWidth");
+    expect(
+      Array.from(dialog.querySelectorAll(".MuiInputLabel-root")).every(
+        (label) => label.getAttribute("data-shrink") === "true"
+      )
+    ).toBe(true);
+    view.unmount();
+  });
 });

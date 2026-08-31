@@ -144,6 +144,7 @@ describe("PopupCont capability parity", () => {
   });
 
   afterEach(() => {
+    jest.useRealTimers();
     document.body.innerHTML = "";
   });
 
@@ -210,6 +211,24 @@ describe("PopupCont capability parity", () => {
       view.container.querySelectorAll(".kt-popup-style-chip")
     ).find((button) => button.textContent.includes("Style 6"));
     expect(customStyleButton.querySelector("span").className).toBe("");
+    view.cleanup();
+  });
+
+  test("restarts Snackbar timing for consecutive messages", async () => {
+    const view = renderPopupCont();
+    await flushEffects();
+    const clearCache = view.container.querySelector(
+      'button[aria-label="clear_cache"]'
+    );
+
+    await act(async () => clearCache.click());
+    const firstSnackbar = document.body.querySelector(".MuiSnackbar-root");
+    expect(firstSnackbar.textContent).toContain("clear_success");
+
+    await act(async () => clearCache.click());
+    const secondSnackbar = document.body.querySelector(".MuiSnackbar-root");
+    expect(secondSnackbar).not.toBe(firstSnackbar);
+    expect(secondSnackbar.textContent).toContain("clear_success");
     view.cleanup();
   });
 
@@ -288,6 +307,7 @@ describe("PopupCont capability parity", () => {
   });
 
   test("merges only a confirmed translation state from an async action", async () => {
+    jest.useFakeTimers();
     let resolveAction;
     const processActions = jest.fn(
       () =>
@@ -312,6 +332,14 @@ describe("PopupCont capability parity", () => {
     );
     act(() => mainSwitch.click());
     expect(liveRule.transOpen).toBe("false");
+    expect(mainSwitch.disabled).toBe(true);
+    expect(mainSwitch.getAttribute("aria-busy")).toBe("true");
+    expect(
+      view.container.querySelector(".kt-popup-hero").getAttribute("aria-busy")
+    ).toBe("true");
+
+    act(() => view.container.querySelector(".kt-popup-hero").click());
+    expect(processActions).toHaveBeenCalledTimes(1);
 
     liveRule = { ...liveRule, apiSlug: "deepl", toLang: "fr" };
     await act(async () => {
@@ -324,6 +352,15 @@ describe("PopupCont capability parity", () => {
       });
       await Promise.resolve();
     });
+
+    expect(mainSwitch.disabled).toBe(false);
+    expect(
+      view.container.querySelector(".kt-popup-hero").getAttribute("aria-busy")
+    ).toBe("true");
+    act(() => jest.runOnlyPendingTimers());
+    expect(
+      view.container.querySelector(".kt-popup-hero").getAttribute("aria-busy")
+    ).toBe("false");
 
     expect(liveRule).toMatchObject({
       transOpen: "false",

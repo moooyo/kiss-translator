@@ -1039,13 +1039,21 @@ export class YouTubeCaptionProvider {
     );
 
     if (showList && !this.#subtitleListManager) {
-      this.#subtitleListManager = new YouTubeSubtitleList(videoEl, this.#i18n, {
+      const subtitleListManager = new YouTubeSubtitleList(videoEl, this.#i18n, {
         enableHoverLookup: isSubtitleModeEnabled(
           this.#setting.hoverLookupMode,
           this.#setting.enhanceMode
         ),
         autoFavWord: this.#setting.autoFavWord === true,
+        onClose: () => {
+          if (this.#subtitleListManager !== subtitleListManager) return;
+          this.#subtitleListManager = null;
+          if (this.#managerInstance) {
+            this.#managerInstance.onSubtitleUpdate = null;
+          }
+        },
       });
+      this.#subtitleListManager = subtitleListManager;
       this.#subtitleListManager.initialize(
         this.#subtitles,
         this.#rawSubtitleEvents,
@@ -1053,7 +1061,7 @@ export class YouTubeCaptionProvider {
       );
 
       this.#managerInstance.onSubtitleUpdate = (subtitleUpdate) => {
-        this.#subtitleListManager.updateSingleSubtitle(subtitleUpdate);
+        this.#subtitleListManager?.updateSingleSubtitle(subtitleUpdate);
       };
 
       this.#subtitleListManager.turnOnAutoSub();

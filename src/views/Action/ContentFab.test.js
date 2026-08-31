@@ -21,7 +21,10 @@ jest.mock("../../hooks/Setting", () => ({
 }));
 jest.mock("../../hooks/M3Theme", () => ({
   __esModule: true,
-  default: ({ children }) => children,
+  default: ({ children }) => {
+    const React = require("react");
+    return React.createElement("div", { className: "kt-m3-root" }, children);
+  },
 }));
 jest.mock("../../hooks/I18n", () => ({
   useI18n: () => (key) => key,
@@ -81,7 +84,7 @@ describe("ContentFab action menu", () => {
 
   const fab = () => container.querySelector(".kt-content-fab");
   const menuItems = () =>
-    Array.from(document.querySelectorAll(".kt-content-fab-menu__item"));
+    Array.from(container.querySelectorAll(".kt-content-fab-menu__item"));
   const clickFab = () => act(() => fab().click());
 
   test("uses Material 3 regular FAB geometry for edge snapping", () => {
@@ -101,10 +104,25 @@ describe("ContentFab action menu", () => {
     render();
     expect(menuItems()).toHaveLength(0);
     expect(fab().getAttribute("aria-expanded")).toBe("false");
+    const speedDialIcon = fab().querySelector(".MuiSpeedDialIcon-root");
+    expect(fab().querySelectorAll(".MuiSpeedDialIcon-root svg")).toHaveLength(
+      2
+    );
+    expect(
+      speedDialIcon.querySelector(".MuiSpeedDialIcon-iconOpen")
+    ).toBeNull();
+    expect(
+      speedDialIcon.querySelector(".MuiSpeedDialIcon-openIconOpen")
+    ).toBeNull();
 
     clickFab();
 
     expect(fab().getAttribute("aria-expanded")).toBe("true");
+    expect(fab().id).toBe("kt-content-fab-button");
+    expect(fab().getAttribute("aria-controls")).toBe("kt-content-fab-menu");
+    const menu = container.querySelector("#kt-content-fab-menu");
+    expect(menu.getAttribute("aria-labelledby")).toBe(fab().id);
+    expect(menu.closest(".kt-m3-root")).not.toBeNull();
     expect(menuItems().map((item) => item.textContent)).toEqual([
       "popup_translate_page",
       "text_style_alt",
@@ -112,6 +130,26 @@ describe("ContentFab action menu", () => {
       "open_menu",
       "open_setting",
     ]);
+    expect(fab().querySelectorAll(".MuiSpeedDialIcon-root svg")).toHaveLength(
+      2
+    );
+    expect(
+      speedDialIcon.querySelector(".MuiSpeedDialIcon-iconOpen")
+    ).not.toBeNull();
+    expect(
+      speedDialIcon.querySelector(".MuiSpeedDialIcon-openIconOpen")
+    ).not.toBeNull();
+    expect(menuItems().every((item) => item.style.animationDelay === "")).toBe(
+      true
+    );
+
+    clickFab();
+    expect(
+      speedDialIcon.querySelector(".MuiSpeedDialIcon-iconOpen")
+    ).toBeNull();
+    expect(
+      speedDialIcon.querySelector(".MuiSpeedDialIcon-openIconOpen")
+    ).toBeNull();
   });
 
   test.each([
@@ -127,7 +165,28 @@ describe("ContentFab action menu", () => {
 
     expect(processActions).toHaveBeenCalledWith({ action });
     expect(menuItems()).toHaveLength(0);
+    expect(document.activeElement).toBe(fab());
   });
+
+  test.each(["Escape", "Tab"])(
+    "%s closes the menu and restores focus to the FAB",
+    (key) => {
+      render();
+      clickFab();
+      menuItems()[0].focus();
+      const event = new KeyboardEvent("keydown", {
+        key,
+        bubbles: true,
+        cancelable: true,
+      });
+
+      act(() => menuItems()[0].dispatchEvent(event));
+
+      expect(event.defaultPrevented).toBe(true);
+      expect(menuItems()).toHaveLength(0);
+      expect(document.activeElement).toBe(fab());
+    }
+  );
 
   test("the settings item goes to the background, not through processActions", () => {
     render();
@@ -145,11 +204,16 @@ describe("ContentFab action menu", () => {
   test("fabClickAction=1 translates directly and never opens the menu", () => {
     render({ fabClickAction: 1 });
 
+    expect(fab().getAttribute("aria-expanded")).toBeNull();
+    expect(fab().getAttribute("aria-haspopup")).toBeNull();
+    expect(fab().getAttribute("aria-controls")).toBeNull();
+    expect(fab().querySelector(".MuiSpeedDialIcon-root")).toBeNull();
+    expect(fab().querySelectorAll("svg")).toHaveLength(1);
     clickFab();
 
     expect(processActions).toHaveBeenCalledWith({ action: MSG_TRANS_TOGGLE });
     expect(menuItems()).toHaveLength(0);
-    expect(fab().getAttribute("aria-expanded")).toBe("false");
+    expect(draggableProps.expanded).toBe(false);
   });
 
   test("a drag suppresses the click that ends it", () => {

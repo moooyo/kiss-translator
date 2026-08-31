@@ -1,5 +1,5 @@
 import Stack from "@mui/material/Stack";
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import Typography from "@mui/material/Typography";
 import Accordion from "@mui/material/Accordion";
 import AccordionSummary from "@mui/material/AccordionSummary";
@@ -90,6 +90,11 @@ function FavAccordion({
     tranboxSetting || DEFAULT_TRANBOX_SETTING;
   const i18n = useI18n();
   const [dictTab, setDictTab] = useState("default");
+  const dictionaryTabsId = useId();
+  const defaultDictionaryTabId = `${dictionaryTabsId}-default-tab`;
+  const defaultDictionaryPanelId = `${dictionaryTabsId}-default-panel`;
+  const aiDictionaryTabId = `${dictionaryTabsId}-ai-tab`;
+  const aiDictionaryPanelId = `${dictionaryTabsId}-ai-panel`;
   const isWord = useMemo(() => isValidWord(word), [word]);
   const isChineseChar = useMemo(() => isSingleChineseChar(word), [word]);
   const defaultDictAvailable =
@@ -153,38 +158,61 @@ function FavAccordion({
                       onChange={(_, value) => setDictTab(value)}
                       variant="scrollable"
                       allowScrollButtonsMobile
+                      aria-label={`${word} ${i18n("default_dict", "Dictionary")}`}
                       sx={{ minHeight: 36, mb: 1 }}
                     >
                       {defaultDictAvailable && (
                         <Tab
+                          id={defaultDictionaryTabId}
+                          aria-controls={defaultDictionaryPanelId}
                           value="default"
                           label={i18n("default_dict", "默认词典")}
                           sx={{ minHeight: 36, py: 0.5 }}
                         />
                       )}
                       <Tab
+                        id={aiDictionaryTabId}
+                        aria-controls={aiDictionaryPanelId}
                         value="ai"
                         label={i18n("ai_dict", "AI词典")}
                         sx={{ minHeight: 36, py: 0.5 }}
                       />
                     </Tabs>
-                    {defaultDictAvailable && dictTab === "default" && (
-                      <>
-                        {isWord && OPT_DICT_MAP.has(enDict) && (
-                          <DictCont text={word} enDict={enDict} />
-                        )}
-                        {isChineseChar && <Zdic text={word} />}
-                      </>
-                    )}
-                    {(!defaultDictAvailable || dictTab === "ai") && (
-                      <AiDictCont
-                        text={word}
-                        fromLang={fromLang}
-                        speechLang={fromLang}
-                        toLang={toLang}
-                        apiSetting={aiDictApiSetting}
-                      />
-                    )}
+                    <Box
+                      id={defaultDictionaryPanelId}
+                      role="tabpanel"
+                      aria-labelledby={
+                        defaultDictAvailable
+                          ? defaultDictionaryTabId
+                          : undefined
+                      }
+                      hidden={!defaultDictAvailable || dictTab !== "default"}
+                    >
+                      {defaultDictAvailable && dictTab === "default" && (
+                        <>
+                          {isWord && OPT_DICT_MAP.has(enDict) && (
+                            <DictCont text={word} enDict={enDict} />
+                          )}
+                          {isChineseChar && <Zdic text={word} />}
+                        </>
+                      )}
+                    </Box>
+                    <Box
+                      id={aiDictionaryPanelId}
+                      role="tabpanel"
+                      aria-labelledby={aiDictionaryTabId}
+                      hidden={defaultDictAvailable && dictTab !== "ai"}
+                    >
+                      {(!defaultDictAvailable || dictTab === "ai") && (
+                        <AiDictCont
+                          text={word}
+                          fromLang={fromLang}
+                          speechLang={fromLang}
+                          toLang={toLang}
+                          apiSetting={aiDictApiSetting}
+                        />
+                      )}
+                    </Box>
                   </>
                 ) : (
                   <>

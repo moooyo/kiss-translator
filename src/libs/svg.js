@@ -1,7 +1,7 @@
 /**
  * 各种 UI 动画和图标的 SVG 静态模板
  */
-export const loadingSvg = `<svg viewBox="-20 0 100 100" 
+export const loadingSvg = `<svg viewBox="-20 0 100 100" aria-hidden="true" focusable="false"
      style="display: inline-block; width: 1em; height: 1em; vertical-align: middle;">
   <circle fill="#209CEE" stroke="none" cx="6" cy="50" r="6">
     <animateTransform attributeName="transform" dur="1s" type="translate" values="0 15 ; 0 -15; 0 15" repeatCount="indefinite" begin="0.1"/>
@@ -32,6 +32,8 @@ function createSVGElement(tag, attributes) {
 export function createLoadingSVG() {
   const svg = createSVGElement("svg", {
     viewBox: "-20 0 100 100",
+    "aria-hidden": "true",
+    focusable: "false",
     style:
       "display: inline-block; width: 1em; height: 1em; vertical-align: middle;",
   });
@@ -73,13 +75,19 @@ export function createRetrySVG() {
   const svg = createSVGElement("svg", {
     viewBox: "0 0 24 24",
     style:
-      "display: inline-block; width: 1em; height: 1em; vertical-align: middle; cursor: pointer; opacity: 0.7;",
+      "display: inline-block; width: 1em; height: 1em; vertical-align: middle; cursor: pointer; opacity: 0.7; transition: opacity 160ms ease;",
   });
 
   svg.addEventListener("mouseenter", () => {
     svg.style.opacity = "1";
   });
   svg.addEventListener("mouseleave", () => {
+    svg.style.opacity = "0.7";
+  });
+  svg.addEventListener("focus", () => {
+    svg.style.opacity = "1";
+  });
+  svg.addEventListener("blur", () => {
     svg.style.opacity = "0.7";
   });
 

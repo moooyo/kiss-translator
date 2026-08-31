@@ -54,6 +54,20 @@ test("moves the existing translator into the text tab and exposes segmentation t
   const segmentationTab = [...container.querySelectorAll('[role="tab"]')].find(
     (tab) => tab.textContent === "字幕断句"
   );
+  const translationTab = container.querySelector(
+    "#kt-playground-translation-tab"
+  );
+  expect(
+    container.querySelector('[role="tablist"]').getAttribute("aria-label")
+  ).toBe("Playground");
+  expect(translationTab.getAttribute("aria-controls")).toBe(
+    "kt-playground-translation-panel"
+  );
+  expect(
+    container
+      .querySelector("#kt-playground-translation-panel")
+      .getAttribute("aria-labelledby")
+  ).toBe(translationTab.id);
   await act(async () => {
     segmentationTab.dispatchEvent(new MouseEvent("click", { bubbles: true }));
   });
@@ -62,6 +76,11 @@ test("moves the existing translator into the text tab and exposes segmentation t
   expect(
     container.querySelector('[data-testid="segmentation-tab"]')
   ).not.toBeNull();
+  expect(
+    container
+      .querySelector("#kt-playground-segmentation-panel")
+      .getAttribute("aria-labelledby")
+  ).toBe(segmentationTab.id);
   act(() => root.unmount());
 });
 

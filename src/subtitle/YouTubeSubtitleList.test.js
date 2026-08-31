@@ -113,11 +113,154 @@ describe("YouTubeSubtitleList", () => {
         "Download source data (JSON)",
       ])
     );
-    expect(buttons.find((button) => button.textContent === "×").title).toBe(
-      "Close panel"
-    );
+    const closeButton = buttons.find((button) => button.textContent === "×");
+    expect(closeButton.type).toBe("button");
+    expect(closeButton.title).toBe("Close panel");
+    expect(closeButton.getAttribute("aria-label")).toBe("Close panel");
 
     await flushPromises();
+    manager.destroy();
+  });
+
+  test("exposes accessible tab semantics and supports arrow key navigation", async () => {
+    const videoEl = createVideoElement();
+    const manager = new YouTubeSubtitleList(videoEl, (key) => {
+      if (key === "bilingual_subtitles") return "Bilingual subtitles";
+      if (key === "vocabulary_book") return "Vocabulary";
+      return "";
+    });
+
+    manager.initialize([subtitle], [], 100);
+
+    const tablist = document.querySelector('[role="tablist"]');
+    const subtitleTab = document.getElementById("kiss-youtube-subtitles-tab");
+    const vocabularyTab = document.getElementById(
+      "kiss-youtube-vocabulary-tab"
+    );
+    const subtitlePanel = document.getElementById("kiss-youtube-subtitle-list");
+    const vocabularyPanel = document.getElementById(
+      "kiss-youtube-vocabulary-list"
+    );
+    const focusStyle = document.querySelector(
+      "#kiss-youtube-subtitle-list-container style"
+    );
+
+    expect(tablist).not.toBeNull();
+    expect(Array.from(tablist.children)).toEqual([subtitleTab, vocabularyTab]);
+    expect(focusStyle.textContent).toContain(".kiss-youtube-tab:focus-visible");
+    expect(focusStyle.textContent).toContain(
+      "outline: 2px solid var(--kt-primary)"
+    );
+    expect(subtitleTab.getAttribute("role")).toBe("tab");
+    expect(vocabularyTab.getAttribute("role")).toBe("tab");
+    expect(subtitleTab.getAttribute("aria-controls")).toBe(subtitlePanel.id);
+    expect(vocabularyTab.getAttribute("aria-controls")).toBe(
+      vocabularyPanel.id
+    );
+    expect(subtitlePanel.getAttribute("role")).toBe("tabpanel");
+    expect(vocabularyPanel.getAttribute("role")).toBe("tabpanel");
+    expect(subtitlePanel.getAttribute("aria-labelledby")).toBe(subtitleTab.id);
+    expect(vocabularyPanel.getAttribute("aria-labelledby")).toBe(
+      vocabularyTab.id
+    );
+    expect(subtitlePanel.tabIndex).toBe(-1);
+    expect(vocabularyPanel.tabIndex).toBe(-1);
+    expect(manager.subtitleScrollContainer.tabIndex).toBe(0);
+    expect(manager.subtitleScrollContainer.getAttribute("aria-label")).toBe(
+      "Bilingual subtitles"
+    );
+    expect(vocabularyPanel.lastElementChild.tabIndex).toBe(0);
+    expect(vocabularyPanel.lastElementChild.getAttribute("aria-label")).toBe(
+      "Vocabulary"
+    );
+    expect(subtitleTab.style.fontWeight).toBe("600");
+    expect(vocabularyTab.style.fontWeight).toBe("600");
+    expect(subtitleTab.style.transition).toContain("color 160ms ease");
+    expect(subtitleTab.style.transition).toContain("border-color 160ms ease");
+    expect(subtitleTab.style.outline).toBe("");
+    expect(vocabularyTab.style.outline).toBe("");
+    expect(subtitleTab.getAttribute("aria-selected")).toBe("true");
+    expect(vocabularyTab.getAttribute("aria-selected")).toBe("false");
+    expect(subtitleTab.tabIndex).toBe(0);
+    expect(vocabularyTab.tabIndex).toBe(-1);
+    expect(subtitlePanel.hidden).toBe(false);
+    expect(vocabularyPanel.hidden).toBe(true);
+
+    subtitleTab.focus();
+    const arrowRight = new KeyboardEvent("keydown", {
+      key: "ArrowRight",
+      bubbles: true,
+      cancelable: true,
+    });
+    subtitleTab.dispatchEvent(arrowRight);
+
+    expect(arrowRight.defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(vocabularyTab);
+    expect(subtitleTab.getAttribute("aria-selected")).toBe("false");
+    expect(vocabularyTab.getAttribute("aria-selected")).toBe("true");
+    expect(subtitleTab.tabIndex).toBe(-1);
+    expect(vocabularyTab.tabIndex).toBe(0);
+    expect(subtitlePanel.hidden).toBe(true);
+    expect(vocabularyPanel.hidden).toBe(false);
+
+    vocabularyTab.dispatchEvent(
+      new KeyboardEvent("keydown", {
+        key: "ArrowLeft",
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    expect(document.activeElement).toBe(subtitleTab);
+    expect(subtitleTab.getAttribute("aria-selected")).toBe("true");
+
+    await flushPromises();
+    manager.destroy();
+  });
+
+  test("notifies its owner when the close control destroys the panel", () => {
+    const onClose = jest.fn();
+    const videoEl = createVideoElement();
+    const manager = new YouTubeSubtitleList(videoEl, () => "", { onClose });
+    manager.initialize([subtitle], [], 100);
+
+    const closeButton = Array.from(
+      manager.container.querySelectorAll("button")
+    ).find((button) => button.textContent === "×");
+    closeButton.click();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(manager.container).toBeNull();
+  });
+
+  test("uses interpolable colors for subtitle download button states", async () => {
+    const storage = require("../libs/storage.js");
+    storage.getSettingWithDefault.mockResolvedValueOnce({ darkMode: "dark" });
+    const videoEl = createVideoElement();
+    const manager = new YouTubeSubtitleList(videoEl);
+
+    manager.initialize([subtitle], [], 100);
+    await flushPromises();
+
+    const buttons = Array.from(
+      document.querySelectorAll("#kiss-youtube-subtitle-list button")
+    ).filter((button) => button.style.transition.includes("background-color"));
+    expect(buttons).toHaveLength(3);
+    buttons.forEach((button) => {
+      expect(button.style.transition).toContain("background-color 220ms ease");
+      button.dispatchEvent(new MouseEvent("mouseenter"));
+      const hoverColor = button.style.backgroundColor;
+      expect(hoverColor).not.toBe("");
+      button.dispatchEvent(new MouseEvent("mouseleave"));
+      expect(button.style.backgroundColor).not.toBe("");
+      expect(button.style.backgroundColor).not.toBe(hoverColor);
+    });
+    expect(manager.container.style.getPropertyValue("--kt-btn-bg")).not.toMatch(
+      /gradient/
+    );
+    expect(
+      manager.container.style.getPropertyValue("--kt-btn-hover-bg")
+    ).not.toMatch(/gradient/);
+
     manager.destroy();
   });
 
@@ -157,6 +300,13 @@ describe("YouTubeSubtitleList", () => {
         document.querySelectorAll(".kiss-youtube-original .kiss-subtitle-word")
       ).map((node) => node.textContent)
     ).toEqual(["hello", "world"]);
+    const words = Array.from(
+      document.querySelectorAll(".kiss-youtube-original .kiss-subtitle-word")
+    );
+    expect(words.every((node) => node.getAttribute("role") === "button")).toBe(
+      true
+    );
+    expect(words.every((node) => node.tabIndex === 0)).toBe(true);
 
     await flushPromises();
     manager.destroy();
@@ -357,7 +507,9 @@ describe("YouTubeSubtitleList", () => {
     document.querySelector(".kiss-youtube-original").click();
     expect(videoEl.currentTime).toBe(0);
 
-    document.querySelector(".kiss-youtube-item span").click();
+    const timeButton = document.querySelector(".kiss-youtube-item button");
+    expect(timeButton.type).toBe("button");
+    timeButton.click();
     expect(videoEl.currentTime).toBe(33);
 
     await Promise.resolve();

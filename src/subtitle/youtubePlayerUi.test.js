@@ -35,6 +35,7 @@ describe("YouTubePlayerUi", () => {
       hide: mockHide,
       show: mockShow,
       updateProps: mockUpdateProps,
+      isVisible: true,
     }));
     document.body.innerHTML = "";
     setting = { hideSubtitleButton: false, showLoadNotification: true };
@@ -69,6 +70,73 @@ describe("YouTubePlayerUi", () => {
     setting.hideSubtitleButton = false;
     ui.injectToggleButton(controls);
     expect(document.querySelector(".kiss-subtitle-button")).not.toBeNull();
+  });
+
+  test("keeps the subtitle menu button semantics in sync with visibility", () => {
+    document.body.innerHTML = '<div class="ytp-right-controls"></div>';
+    const controls = document.querySelector(".ytp-right-controls");
+    const ui = createUi();
+
+    ui.injectToggleButton(controls);
+    const button = document.querySelector(".kiss-subtitle-button");
+
+    expect(button.type).toBe("button");
+    expect(button.getAttribute("aria-label")).toBe("Kiss Translator");
+    expect(button.getAttribute("aria-controls")).toBe("kiss-subtitle-menus");
+    expect(button.getAttribute("aria-haspopup")).toBe("dialog");
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+
+    button.click();
+    expect(button.getAttribute("aria-expanded")).toBe("true");
+    expect(button.firstChild.dataset.selected).toBe("true");
+    expect(mockShow).toHaveBeenCalledTimes(1);
+
+    button.click();
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.firstChild.dataset.selected).toBe("false");
+    expect(mockHide).toHaveBeenCalledTimes(1);
+  });
+
+  test("collapses the menu and restores trigger focus on managed close", () => {
+    document.body.innerHTML = '<div class="ytp-right-controls"></div>';
+    const controls = document.querySelector(".ytp-right-controls");
+    const ui = createUi();
+
+    ui.injectToggleButton(controls);
+    const button = document.querySelector(".kiss-subtitle-button");
+    button.click();
+    button.blur();
+
+    const managedProps = DomManager.mock.calls[0][0].props;
+    managedProps.onClose();
+    jest.runOnlyPendingTimers();
+
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.firstChild.dataset.selected).toBe("false");
+    expect(mockHide).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(button);
+  });
+
+  test("keeps the menu button collapsed when mounting fails", () => {
+    DomManager.mockImplementationOnce(() => ({
+      destroy: mockDestroy,
+      hide: mockHide,
+      show: mockShow,
+      updateProps: mockUpdateProps,
+      isVisible: false,
+    }));
+    document.body.innerHTML = '<div class="ytp-right-controls"></div>';
+    const controls = document.querySelector(".ytp-right-controls");
+    const ui = createUi();
+
+    ui.injectToggleButton(controls);
+    const button = document.querySelector(".kiss-subtitle-button");
+    button.click();
+
+    expect(mockShow).toHaveBeenCalledTimes(1);
+    expect(button.getAttribute("aria-expanded")).toBe("false");
+    expect(button.firstChild.dataset.selected).toBe("false");
+    expect(mockUpdateProps).not.toHaveBeenCalled();
   });
 
   test("hides notification when loading notification setting is disabled", () => {

@@ -19,6 +19,7 @@ export default function FavBtn({ word, title }) {
   const { favWords, toggleFav } = useFavWords();
   const { context, setting } = useSetting();
   const [loading, setLoading] = useState(false);
+  const isFavorite = Boolean(favWords[word]);
   const autoCollect =
     context === "tranbox" && setting?.tranboxSetting?.autoFavWord;
 
@@ -53,9 +54,11 @@ export default function FavBtn({ word, title }) {
       size="small"
       onClick={handleClick}
       title={title}
+      aria-label={title}
+      aria-pressed={isFavorite}
     >
       {/* 如果单词已存在于生词本中，渲染实心红心，否则为空心红心 */}
-      {favWords[word] ? (
+      {isFavorite ? (
         <FavoriteIcon fontSize="inherit" />
       ) : (
         <FavoriteBorderIcon fontSize="inherit" />

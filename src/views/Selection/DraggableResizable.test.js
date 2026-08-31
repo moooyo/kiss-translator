@@ -21,16 +21,19 @@ const emptyRect = {
 describe("DraggableResizable auto height bounds", () => {
   let container;
   let root;
-  let outerHeight;
+  let layoutOuterHeight;
+  let transformedOuterHeight;
   let resizeCallback;
   let getBoundingClientRect;
+  let getOffsetHeight;
   let originalResizeObserver;
 
   beforeEach(() => {
     container = document.createElement("div");
     document.body.appendChild(container);
     root = createRoot(container);
-    outerHeight = 100;
+    layoutOuterHeight = 100;
+    transformedOuterHeight = 97;
     originalResizeObserver = window.ResizeObserver;
     window.ResizeObserver = class {
       constructor(callback) {
@@ -46,9 +49,18 @@ describe("DraggableResizable auto height bounds", () => {
       .spyOn(HTMLElement.prototype, "getBoundingClientRect")
       .mockImplementation(function () {
         if (this.classList?.contains("KT-draggable")) {
-          return { ...emptyRect, height: outerHeight, bottom: outerHeight };
+          return {
+            ...emptyRect,
+            height: transformedOuterHeight,
+            bottom: transformedOuterHeight,
+          };
         }
         return emptyRect;
+      });
+    getOffsetHeight = jest
+      .spyOn(HTMLElement.prototype, "offsetHeight", "get")
+      .mockImplementation(function () {
+        return this.classList?.contains("KT-draggable") ? layoutOuterHeight : 0;
       });
     Object.defineProperty(window, "innerHeight", {
       configurable: true,
@@ -61,6 +73,7 @@ describe("DraggableResizable auto height bounds", () => {
     act(() => root.unmount());
     container.remove();
     getBoundingClientRect.mockRestore();
+    getOffsetHeight.mockRestore();
     window.ResizeObserver = originalResizeObserver;
   });
 
@@ -105,10 +118,11 @@ describe("DraggableResizable auto height bounds", () => {
     expect(panel.setPosition).toHaveBeenLastCalledWith({ x: 0, y: 400 });
   });
 
-  test("clamps the position when auto-height content grows", () => {
+  test("clamps with layout height while the entrance transform scales visual bounds", () => {
     const panel = renderPanel({ position: { x: 0, y: 400 } });
     panel.setPosition.mockClear();
-    outerHeight = 300;
+    transformedOuterHeight = 291;
+    layoutOuterHeight = 300;
 
     act(() => resizeCallback());
 

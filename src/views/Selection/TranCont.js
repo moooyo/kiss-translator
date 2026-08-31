@@ -226,17 +226,19 @@ export default function TranCont({
 
   if (simpleStyle) {
     return (
-      <Box>
+      <Box aria-live="polite" aria-busy={loading}>
         {error ? (
           <Alert severity="error">{error}</Alert>
         ) : trText ? (
           <Stack direction="row" spacing={1} alignItems="flex-start">
-            {loading && (
-              <CircularProgress
-                size={12}
-                sx={{ flex: "0 0 auto", mt: "0.35em" }}
-              />
-            )}
+            <Box sx={{ width: 12, height: 12, flex: "0 0 auto", mt: "0.35em" }}>
+              {loading && (
+                <CircularProgress
+                  size={12}
+                  aria-label={i18n("popup_translating")}
+                />
+              )}
+            </Box>
             <Typography style={{ whiteSpace: "pre-line" }}>{trText}</Typography>
           </Stack>
         ) : loading ? (
@@ -253,7 +255,13 @@ export default function TranCont({
           <strong>{apiSetting.apiName || apiSetting.apiSlug}</strong>
           {elapsedMs !== null && <span>{elapsedMs}ms</span>}
           <div>
-            <CopyBtn text={trText} title={i18n("copy")} />
+            {trText && (
+              <CopyBtn
+                text={trText}
+                title={i18n("copy")}
+                copiedLabel={i18n("copy_success", "Copied")}
+              />
+            )}
             <BrowserTtsBtn
               text={trText}
               lang={toLang}
@@ -289,8 +297,8 @@ export default function TranCont({
       <TextField
         className={
           isPlayground
-            ? "kt-translation-text-field kt-translation-text-field--result"
-            : undefined
+            ? "kt-resizable-text-field kt-translation-text-field kt-translation-text-field--result"
+            : "kt-resizable-text-field"
         }
         size="small"
         label={`${i18n("translated_text")} - ${apiSetting.apiName}`}
@@ -299,6 +307,11 @@ export default function TranCont({
         multiline
         minRows={isPlayground ? 4 : undefined}
         maxRows={10}
+        inputProps={{
+          className: "kt-resizable-textarea",
+          style: { resize: "vertical" },
+          "aria-busy": loading,
+        }}
         placeholder={
           isPlayground && !text
             ? i18n(
@@ -308,7 +321,7 @@ export default function TranCont({
             : undefined
         }
         sx={{
-          "& .MuiFilledInput-root": {
+          "& .MuiInputBase-root": {
             overflow: "visible",
           },
           '& textarea:not([aria-hidden="true"])': {
@@ -319,7 +332,23 @@ export default function TranCont({
         helperText={error}
         InputProps={{
           readOnly: true,
-          startAdornment: loading ? <CircularProgress size={16} /> : null,
+          startAdornment: (
+            <Box
+              sx={{
+                width: 16,
+                height: 16,
+                display: "grid",
+                placeItems: "center",
+              }}
+            >
+              {loading && (
+                <CircularProgress
+                  size={16}
+                  aria-label={i18n("popup_translating")}
+                />
+              )}
+            </Box>
+          ),
           endAdornment: (
             <Stack
               className={
@@ -337,7 +366,13 @@ export default function TranCont({
               }
             >
               {/* 复制当前译文；流式渲染期间复制到的是已经到达的部分文本。 */}
-              {trText && <CopyBtn text={trText} title={i18n("copy")} />}
+              {trText && (
+                <CopyBtn
+                  text={trText}
+                  title={i18n("copy")}
+                  copiedLabel={i18n("copy_success", "Copied")}
+                />
+              )}
             </Stack>
           ),
         }}

@@ -16,7 +16,7 @@ import BrightnessAutoIcon from "@mui/icons-material/BrightnessAuto";
 import DragIndicatorRoundedIcon from "@mui/icons-material/DragIndicatorRounded";
 import MoreVertIcon from "@mui/icons-material/MoreVert";
 import { useI18n } from "../../hooks/I18n";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import TranForm from "./TranForm.js";
 import { MSG_OPEN_SEPARATE_WINDOW } from "../../config/msg.js";
 import { sendBgMsg } from "../../libs/msg.js";
@@ -50,6 +50,49 @@ function TranBoxHeader({
   const i18n = useI18n();
   const { darkMode, toggleDarkMode } = useDarkMode();
   const [showMore, setShowMore] = useState(false);
+  const menuId = useId();
+  const menuButtonId = `${menuId}-button`;
+  const menuRef = useRef(null);
+  const menuButtonRef = useRef(null);
+
+  useEffect(() => {
+    if (showMore) {
+      menuRef.current?.querySelector('[role^="menuitem"]')?.focus();
+    }
+  }, [showMore]);
+
+  const handleMenuKeyDown = (event) => {
+    const items = Array.from(
+      menuRef.current?.querySelectorAll('[role^="menuitem"]') || []
+    ).filter((item) => !item.disabled);
+    if (items.length === 0) return;
+
+    const currentIndex = items.indexOf(document.activeElement);
+    let nextIndex;
+
+    if (event.key === "ArrowDown") {
+      nextIndex = (currentIndex + 1 + items.length) % items.length;
+    } else if (event.key === "ArrowUp") {
+      nextIndex = (currentIndex - 1 + items.length) % items.length;
+    } else if (event.key === "Home") {
+      nextIndex = 0;
+    } else if (event.key === "End") {
+      nextIndex = items.length - 1;
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setShowMore(false);
+      menuButtonRef.current?.focus();
+      return;
+    } else if (event.key === "Tab") {
+      setShowMore(false);
+      return;
+    } else {
+      return;
+    }
+
+    event.preventDefault();
+    items[nextIndex]?.focus();
+  };
 
   // 请求在独立的无边框小窗口中打开翻译框
   const openSeparateWindow = useCallback(() => {
@@ -88,9 +131,12 @@ function TranBoxHeader({
 
         {/* 其余低频开关收进溢出菜单 */}
         <IconButton
+          id={menuButtonId}
+          ref={menuButtonRef}
           title={i18n("more")}
           aria-expanded={showMore}
           aria-haspopup="menu"
+          aria-controls={showMore ? menuId : undefined}
           onClick={() => setShowMore((pre) => !pre)}
         >
           <MoreVertIcon />
@@ -104,7 +150,14 @@ function TranBoxHeader({
 
       {showMore && (
         <ClickAwayListener onClickAway={() => setShowMore(false)}>
-          <div className="kt-tranbox-header__menu" role="menu">
+          <div
+            ref={menuRef}
+            id={menuId}
+            className="kt-tranbox-header__menu"
+            role="menu"
+            aria-labelledby={menuButtonId}
+            onKeyDown={handleMenuKeyDown}
+          >
             {/* 独立窗口打开 */}
             {isExt && (
               <button

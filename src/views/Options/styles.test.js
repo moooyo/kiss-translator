@@ -1,4 +1,5 @@
 import { OPTIONS_STYLES } from "./styles";
+import { getCssAtRuleBodies } from "../../styles/testUtils";
 
 describe("settings segmented controls", () => {
   test("keeps selected and focused states inside the segmented track", () => {
@@ -11,9 +12,18 @@ describe("settings segmented controls", () => {
     const fallbackFocusRule = OPTIONS_STYLES.match(
       /\.kt-settings-segmented > button:focus\s*\{([^}]*)\}/
     )?.[1];
-    const enhancedFocusRule = OPTIONS_STYLES.match(
-      /\.kt-settings-segmented > button:focus-visible\s*\{([^}]*)\}/
-    )?.[1];
+    const focusVisibleBodies = getCssAtRuleBodies(
+      OPTIONS_STYLES,
+      "@supports selector(:focus-visible)"
+    );
+    const enhancedFocusRule = focusVisibleBodies
+      .map(
+        (body) =>
+          body.match(
+            /\.kt-settings-segmented > button:focus-visible\s*\{([^}]*)\}/
+          )?.[1]
+      )
+      .find(Boolean);
     const labelRule = OPTIONS_STYLES.match(
       /\.kt-settings-segmented__label\s*\{([^}]*)\}/
     )?.[1];
@@ -41,6 +51,26 @@ describe("settings segmented controls", () => {
 });
 
 describe("settings layout boundaries", () => {
+  test("draws the search focus ring on the pill container", () => {
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-options-search:focus-within\s*\{[^}]*outline:\s*3px solid var\(--kt-pri\);[^}]*outline-offset:\s*2px;/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-m3-root \.kt-options-search input:focus\s*\{[^}]*outline:\s*none;/
+    );
+    const focusVisibleBodies = getCssAtRuleBodies(
+      OPTIONS_STYLES,
+      "@supports selector(:focus-visible)"
+    );
+    expect(
+      focusVisibleBodies.some((body) =>
+        /\.kt-m3-root \.kt-options-search input:focus-visible\s*\{[^}]*outline:\s*none;/.test(
+          body
+        )
+      )
+    ).toBe(true);
+  });
+
   test("keeps layout grids flat and scopes prose list spacing", () => {
     expect(OPTIONS_STYLES).not.toMatch(
       /\.kt-options-page \.MuiGrid-container\s*\{[^}]*border/
@@ -125,7 +155,7 @@ describe("settings layout boundaries", () => {
 
   test("keeps resizable Playground fields outside the rounded clip", () => {
     const textFieldRule = OPTIONS_STYLES.match(
-      /\.kt-options-page \.kt-translation-text-field \.MuiFilledInput-root\s*\{([^}]*)\}/
+      /\.kt-options-page \.kt-translation-text-field \.MuiInputBase-root\s*\{([^}]*)\}/
     )?.[1];
 
     expect(textFieldRule).toContain("overflow: visible");
@@ -133,8 +163,25 @@ describe("settings layout boundaries", () => {
     expect(OPTIONS_STYLES).toMatch(
       /\.kt-options-page \.kt-translation-text-field__actions\s*\{[^}]*right:\s*16px;[^}]*bottom:\s*16px;/
     );
+    const hoverBodies = getCssAtRuleBodies(
+      OPTIONS_STYLES,
+      "@media (hover: hover)"
+    );
+    expect(
+      hoverBodies.some((body) =>
+        /\.kt-translation-text-field__actions \.MuiIconButton-root:hover\s*\{[^}]*var\(--kt-onsecc\) 8%/.test(
+          body
+        )
+      )
+    ).toBe(true);
+    expect(
+      hoverBodies.some((body) => /\.kt-options-nav__link:hover/.test(body)) &&
+        hoverBodies.some((body) =>
+          /\.kt-options-sidebar__close:hover/.test(body)
+        )
+    ).toBe(true);
     expect(OPTIONS_STYLES).toMatch(
-      /\.kt-options-page \.kt-translation-text-field__actions \.MuiIconButton-root:hover,[\s\S]*?\.Mui-focusVisible\s*\{[^}]*var\(--kt-onsecc\) 8%/
+      /\.kt-translation-text-field__actions \.MuiIconButton-root\.Mui-focusVisible\s*\{[^}]*var\(--kt-onsecc\) 10%/
     );
   });
 
@@ -153,12 +200,30 @@ describe("settings layout boundaries", () => {
     );
   });
 
+  test("keeps wrapped rule accordions visually separated", () => {
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-options-page \.kt-rule-accordion:not\(:last-child\)\s*\{[^}]*margin-bottom:\s*8px;/
+    );
+  });
+
   test("keeps selected method cards from shifting their content", () => {
     const selectedRule = OPTIONS_STYLES.match(
       /\.kt-sync-method\[aria-checked="true"\]\s*\{([^}]*)\}/
     )?.[1];
 
     expect(selectedRule).toContain("border-color: var(--kt-pri)");
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-sync-method\[aria-checked="true"\] svg\s*\{[^}]*color:\s*currentColor;/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-settings-segmented > button\s*\{[^}]*transition:[^;}]*background-color[^;}]*color[^;}]*box-shadow/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-sync-method\s*\{[^}]*transition:[^;}]*background-color[^;}]*color/
+    );
+    expect(OPTIONS_STYLES).toMatch(
+      /\.kt-sync-method__description\s*\{[^}]*transition:[^;}]*color[^;}]*opacity/
+    );
     expect(selectedRule).toContain("box-shadow: inset 0 0 0 1px var(--kt-pri)");
     expect(selectedRule).not.toContain("border: 2px");
   });

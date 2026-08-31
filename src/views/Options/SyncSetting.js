@@ -505,19 +505,26 @@ export default function SyncSetting() {
           </Button>
         </Stack>
       </Stack>
-      <Dialog open={!!encryptKeyDialogMode} onClose={closeEncryptKeyDialog}>
-        <DialogTitle>
+      <Dialog
+        open={!!encryptKeyDialogMode}
+        onClose={savingEncryptKey ? undefined : closeEncryptKeyDialog}
+        fullWidth
+        maxWidth="sm"
+        aria-labelledby="sync-encryption-dialog-title"
+      >
+        <DialogTitle id="sync-encryption-dialog-title">
           {encryptKeyDialogMode === "change"
             ? i18n("change_sync_encrypt_key")
             : i18n("set_sync_encrypt_key")}
         </DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ pt: 1, minWidth: 360 }}>
+          <Stack spacing={2} sx={{ width: 360, maxWidth: "100%", pt: 1 }}>
             {encryptKeyDialogMode === "change" && (
               <TextField
                 size="small"
                 type={showOldEncryptKey ? "text" : "password"}
                 label={i18n("old_sync_encrypt_key")}
+                InputLabelProps={{ shrink: true }}
                 value={oldEncryptKey}
                 onChange={(e) => setOldEncryptKey(e.target.value)}
                 InputProps={{
@@ -547,6 +554,7 @@ export default function SyncSetting() {
               size="small"
               type={showNewEncryptKey ? "text" : "password"}
               label={i18n("new_sync_encrypt_key")}
+              InputLabelProps={{ shrink: true }}
               value={newEncryptKey}
               onChange={(e) => setNewEncryptKey(e.target.value)}
               InputProps={{
@@ -575,6 +583,7 @@ export default function SyncSetting() {
               size="small"
               type={showConfirmEncryptKey ? "text" : "password"}
               label={i18n("confirm_sync_encrypt_key")}
+              InputLabelProps={{ shrink: true }}
               value={confirmEncryptKey}
               onChange={(e) => setConfirmEncryptKey(e.target.value)}
               error={!!encryptKeyError}

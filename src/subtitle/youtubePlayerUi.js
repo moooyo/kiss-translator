@@ -76,7 +76,24 @@ export class YouTubePlayerUi {
    */
   updateMenuProps() {
     if (this.#menuManager && this.#isMenuShow) {
-      this.#menuManager.updateProps(this.#getMenuProps());
+      this.#menuManager.updateProps(this.#getManagedMenuProps());
+    }
+  }
+
+  #getManagedMenuProps() {
+    return {
+      ...this.#getMenuProps(),
+      onClose: () => this.#closeMenu(true),
+    };
+  }
+
+  #closeMenu(restoreFocus = false) {
+    this.#isMenuShow = false;
+    this.#toggleButton?.setAttribute("aria-expanded", "false");
+    this.#toggleButton?.replaceChildren(createLogoSVG());
+    this.#menuManager?.hide();
+    if (restoreFocus) {
+      window.requestAnimationFrame(() => this.#toggleButton?.focus());
     }
   }
 
@@ -103,8 +120,13 @@ export class YouTubePlayerUi {
     });
 
     const toggleButton = document.createElement("button");
+    toggleButton.type = "button";
     toggleButton.className = "ytp-button kiss-subtitle-button";
     toggleButton.title = APP_NAME;
+    toggleButton.setAttribute("aria-label", APP_NAME);
+    toggleButton.setAttribute("aria-controls", "kiss-subtitle-menus");
+    toggleButton.setAttribute("aria-haspopup", "dialog");
+    toggleButton.setAttribute("aria-expanded", "false");
 
     toggleButton.appendChild(createLogoSVG());
     kissControls.appendChild(toggleButton);
@@ -115,21 +137,22 @@ export class YouTubePlayerUi {
       className: "notranslate",
       reactComponent: Menus,
       rootElement: kissControls,
-      props: this.#getMenuProps(),
+      props: this.#getManagedMenuProps(),
     });
 
     toggleButton.onclick = () => {
       if (!this.#isMenuShow) {
+        this.#menuManager.show();
+        if (this.#menuManager.isVisible === false) return;
+
         this.#isMenuShow = true;
+        toggleButton.setAttribute("aria-expanded", "true");
         this.#toggleButton?.replaceChildren(
           createLogoSVG({ isSelected: true })
         );
-        this.#menuManager.show();
         this.updateMenuProps();
       } else {
-        this.#isMenuShow = false;
-        this.#toggleButton?.replaceChildren(createLogoSVG());
-        this.#menuManager.hide();
+        this.#closeMenu();
       }
     };
     this.#toggleButton = toggleButton;

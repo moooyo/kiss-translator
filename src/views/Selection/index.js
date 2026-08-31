@@ -6,6 +6,7 @@ import useTranboxShortcuts from "../../hooks/useTranboxShortcuts";
 import ThemeProvider from "../../hooks/M3Theme";
 import { SettingProvider } from "../../hooks/Setting";
 import { SELECTION_STYLES } from "./styles";
+import { newI18n } from "../../config";
 
 /**
  * 划词翻译交互整体入口组件
@@ -27,6 +28,7 @@ export default function Selection({
   translateVariants = true,
   extStyles,
 }) {
+  const i18n = newI18n(uiLang || "zh");
   // 1. 初始化并管理划词翻译框（TranBox）的各种展示和交互状态（如宽高、位置、极简模式、点击外部关闭等）
   const {
     boxSize,
@@ -111,6 +113,7 @@ export default function Selection({
           <TranBtn
             position={position}
             btnEvent={btnEvent}
+            label={i18n("translate") || "Translate selection"}
             onTrigger={(e) => {
               e.stopPropagation();
               handleOpenTranbox();

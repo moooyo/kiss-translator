@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useMemo } from "react";
 import Stack from "@mui/material/Stack";
 import FavBtn from "./FavBtn";
 import Typography from "@mui/material/Typography";
@@ -74,6 +74,11 @@ export default function DictCont({ text, enDict }) {
   // 获取词典匹配处理器
   const dict = dictHandlers[enDict];
 
+  useLayoutEffect(() => {
+    setCopyText(text);
+    setRealWord(text);
+  }, [enDict, text]);
+
   return (
     <Stack spacing={1}>
       {text && (
@@ -84,7 +89,11 @@ export default function DictCont({ text, enDict }) {
           </Typography>
           <Stack direction="row" justifyContent="space-between">
             {/* 复制按钮 */}
-            <CopyBtn text={copyText} title={i18n("copy")} />
+            <CopyBtn
+              text={copyText}
+              title={i18n("copy")}
+              copiedLabel={i18n("copy_success", "Copied")}
+            />
             {/* 收藏生词按钮 */}
             <FavBtn word={realWord} title={i18n("collect")} />
           </Stack>

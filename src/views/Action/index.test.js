@@ -71,9 +71,12 @@ describe("content action Popup integration", () => {
     mockWindowSize = { w: 240, h: 300 };
   });
 
-  test("passes the narrow viewport width to the draggable panel", () => {
+  test("passes the narrow viewport width to the draggable panel", async () => {
     const container = document.createElement("div");
     document.body.appendChild(container);
+    const previousFocus = document.createElement("button");
+    document.body.appendChild(previousFocus);
+    previousFocus.focus();
     const root = createRoot(container);
 
     act(() => {
@@ -104,9 +107,28 @@ describe("content action Popup integration", () => {
     expect(container.querySelector("style").textContent).toContain(
       ".kt-popup-shell"
     );
+    const panel = container.querySelector('[role="dialog"]');
+    expect(panel.getAttribute("aria-label")).toBe(
+      process.env.REACT_APP_NAME || "KISS Translator"
+    );
+    expect(panel.tabIndex).toBe(-1);
+
+    await act(async () => {
+      panel.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "Escape",
+          bubbles: true,
+          cancelable: true,
+        })
+      );
+      await Promise.resolve();
+    });
+    expect(container.querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(previousFocus);
 
     act(() => root.unmount());
     container.remove();
+    previousFocus.remove();
   });
 
   test("caps the draggable panel at 360 pixels on wide viewports", () => {

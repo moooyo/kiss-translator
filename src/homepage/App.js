@@ -118,6 +118,7 @@ function Header({
       <Stack
         direction="row"
         spacing={1}
+        useFlexGap
         alignItems="center"
         justifyContent={{ xs: "space-between", md: "flex-end" }}
         sx={{ flexWrap: "wrap", rowGap: 1 }}
@@ -175,6 +176,9 @@ function Header({
               height: 40,
               "&:hover": {
                 bgcolor: tokens.panelSoft,
+                "@media (hover: none)": {
+                  bgcolor: tokens.panel,
+                },
               },
             }}
           >
@@ -207,6 +211,7 @@ function Hero({ content, tokens }) {
             border: `1px solid ${tokens.borderStrong}`,
             bgcolor: tokens.panelSoft,
             color: "primary.main",
+            "& .MuiChip-icon": { color: "inherit" },
             fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
             fontWeight: 800,
           }}
@@ -273,7 +278,12 @@ function Hero({ content, tokens }) {
             {content.openOptions}
           </Button>
         </Stack>
-        <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          useFlexGap
+          sx={{ flexWrap: "wrap", rowGap: 1 }}
+        >
           {content.status.map((item) => (
             <Chip
               key={item}
@@ -414,6 +424,10 @@ function InstallMatrix({ content, tokens }) {
               "&:hover": {
                 borderColor: tokens.borderStrong,
                 transform: "translateY(-2px)",
+                "@media (hover: none)": {
+                  borderColor: tokens.border,
+                  transform: "none",
+                },
               },
             }}
           >
@@ -631,6 +645,10 @@ function Ecosystem({ content, tokens }) {
               "&:hover": {
                 borderColor: tokens.borderStrong,
                 transform: "translateY(-2px)",
+                "@media (hover: none)": {
+                  borderColor: tokens.border,
+                  transform: "none",
+                },
               },
             }}
           >
@@ -659,7 +677,12 @@ function Ecosystem({ content, tokens }) {
           </Card>
         ))}
       </Box>
-      <Stack direction="row" spacing={1} sx={{ flexWrap: "wrap", rowGap: 1 }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        useFlexGap
+        sx={{ flexWrap: "wrap", rowGap: 1 }}
+      >
         {[
           "WebDAV",
           "Hooks",

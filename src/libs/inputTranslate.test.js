@@ -13,6 +13,7 @@ jest.mock("../config", () => ({
   DEFAULT_API_SETTING: {},
   OPT_INPUT_DOT_DISABLE: "-",
   OPT_INPUT_DOT_MOBILE: "mobile",
+  newI18n: jest.fn(),
 }));
 
 jest.mock("../config/prompt", () => ({
@@ -44,10 +45,12 @@ jest.mock("./log", () => ({
 }));
 
 const { InputTranslator } = require("./inputTranslate");
+const { newI18n } = require("../config");
 const { stepShortcutRegister } = require("./shortcut");
 const { resolveApiPromptSettings } = require("../config/prompt");
 const { apiTranslate } = require("../apis");
 const { createLoadingSVG } = require("./svg");
+const { genEventName, removeEndchar } = require("./utils");
 
 function makeRect({ top = 100, right = 200, width = 100, height = 30 } = {}) {
   return {
@@ -102,6 +105,15 @@ describe("InputTranslator input button", () => {
 
   beforeEach(() => {
     document.body.innerHTML = "";
+    newI18n.mockImplementation(
+      () => (key) =>
+        ({
+          input_translate: "Translate input",
+          popup_translating: "Translating input",
+        })[key] || ""
+    );
+    genEventName.mockReturnValue("event");
+    removeEndchar.mockImplementation((text) => text);
     mockUnregisterShortcut.mockClear();
     stepShortcutRegister.mockReturnValue(mockUnregisterShortcut);
     translator = new InputTranslator({
@@ -213,6 +225,10 @@ describe("InputTranslator input button", () => {
     focusTarget(translator, target);
     const button = getFloatButton(target);
 
+    expect(button.tagName).toBe("BUTTON");
+    expect(button.type).toBe("button");
+    expect(button.getAttribute("aria-label")).toBe("Translate input");
+    expect(button.style.border).toBe("0px");
     expect(button.style.borderRadius).toBe("8px");
     expect(button.style.transition).toContain("opacity 160ms");
     expect(button.dataset.visible).toBe("true");
@@ -224,6 +240,18 @@ describe("InputTranslator input button", () => {
     expect(button.style.opacity).toBe("0");
     expect(button.style.visibility).toBe("hidden");
     expect(button.style.pointerEvents).toBe("none");
+  });
+
+  test("activates the input translation from a keyboard click", () => {
+    const target = document.createElement("input");
+    const handleTranslate = jest
+      .spyOn(translator, "handleTranslate")
+      .mockResolvedValue(undefined);
+    focusTarget(translator, target);
+
+    getFloatButton(target).click();
+
+    expect(handleTranslate).toHaveBeenCalledWith({ isBtnTrigger: true });
   });
 
   test.each([
@@ -255,7 +283,7 @@ describe("InputTranslator input button", () => {
     translator = new InputTranslator({
       inputRule: {
         transOpen: true,
-        triggerShortcut: ["AltLeft", "KeyI"],
+        triggerShortcut: ["."],
         triggerCount: 1,
         triggerTime: 200,
         showDot: "always",
@@ -274,10 +302,11 @@ describe("InputTranslator input button", () => {
       isSame: false,
     });
     const target = document.createElement("textarea");
-    target.value = "First & simple\n\nSecond";
+    target.value = "First & simple\n\nSecond.";
     focusTarget(translator, target);
+    removeEndchar.mockReturnValueOnce("First & simple\n\nSecond");
 
-    await translator.handleTranslate({ isBtnTrigger: true });
+    await translator.handleTranslate();
 
     expect(apiTranslate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -286,5 +315,226 @@ describe("InputTranslator input button", () => {
       })
     );
     expect(target.value).toBe("First isn't & simple\n\nSecond");
+  });
+
+  test("exposes and clears the input translation loading state", async () => {
+    translator.disable();
+    const apiSetting = {
+      apiSlug: "google-cloud",
+      apiType: "GoogleCloud",
+    };
+    translator = new InputTranslator({
+      inputRule: {
+        transOpen: true,
+        triggerShortcut: ["AltLeft", "KeyI"],
+        triggerCount: 1,
+        triggerTime: 200,
+        showDot: "always",
+        apiSlug: "google-cloud",
+        fromLang: "auto",
+        toLang: "en",
+      },
+      transApis: [apiSetting],
+    });
+    resolveApiPromptSettings.mockReturnValue(apiSetting);
+    const loadingIcon = document.createElementNS(
+      "http://www.w3.org/2000/svg",
+      "svg"
+    );
+    loadingIcon.setAttribute("aria-hidden", "true");
+    createLoadingSVG.mockReturnValue(loadingIcon);
+
+    let resolveTranslation;
+    apiTranslate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTranslation = resolve;
+      })
+    );
+    const target = document.createElement("textarea");
+    target.value = "Hello";
+    focusTarget(translator, target);
+
+    const request = translator.handleTranslate({ isBtnTrigger: true });
+    await Promise.resolve();
+
+    const status = document.getElementById("kiss-loading-event");
+    expect(target.getAttribute("aria-busy")).toBe("true");
+    expect(status.getAttribute("role")).toBe("status");
+    expect(status.getAttribute("aria-live")).toBe("polite");
+    expect(status.getAttribute("aria-atomic")).toBe("true");
+    expect(status.getAttribute("aria-label")).toBe("Translating input");
+    expect(status.querySelector("svg").getAttribute("aria-hidden")).toBe(
+      "true"
+    );
+
+    resolveTranslation({ trText: "", isSame: true });
+    await request;
+
+    expect(document.getElementById("kiss-loading-event")).toBeNull();
+    expect(target.hasAttribute("aria-busy")).toBe(false);
+  });
+
+  test("does not overwrite newer input state when requests resolve late", async () => {
+    translator.disable();
+    const apiSetting = {
+      apiSlug: "google-cloud",
+      apiType: "GoogleCloud",
+    };
+    translator = new InputTranslator({
+      inputRule: {
+        transOpen: true,
+        triggerShortcut: ["AltLeft", "KeyI"],
+        triggerCount: 1,
+        triggerTime: 200,
+        showDot: "always",
+        apiSlug: "google-cloud",
+        fromLang: "auto",
+        toLang: "en",
+      },
+      transApis: [apiSetting],
+    });
+    resolveApiPromptSettings.mockReturnValue(apiSetting);
+    createLoadingSVG.mockImplementation(() =>
+      document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    );
+    genEventName
+      .mockReturnValueOnce("older-request")
+      .mockReturnValueOnce("newer-request");
+
+    let resolveOlder;
+    let resolveNewer;
+    apiTranslate
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOlder = resolve;
+        })
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveNewer = resolve;
+        })
+      );
+
+    const target = document.createElement("textarea");
+    target.value = "Older source";
+    focusTarget(translator, target);
+    const olderRequest = translator.handleTranslate({ isBtnTrigger: true });
+    await Promise.resolve();
+
+    target.value = "Newer source";
+    const newerRequest = translator.handleTranslate({ isBtnTrigger: true });
+    await Promise.resolve();
+
+    expect(document.getElementById("kiss-loading-older-request")).toBeNull();
+    expect(
+      document.getElementById("kiss-loading-newer-request")
+    ).not.toBeNull();
+
+    resolveNewer({ trText: "Newest result", isSame: false });
+    await newerRequest;
+    expect(target.value).toBe("Newest result");
+    expect(target.hasAttribute("aria-busy")).toBe(false);
+
+    resolveOlder({ trText: "Stale result", isSame: false });
+    await olderRequest;
+    expect(target.value).toBe("Newest result");
+    expect(target.hasAttribute("aria-busy")).toBe(false);
+
+    let resolveManualEditRequest;
+    genEventName.mockReturnValueOnce("manual-edit-request");
+    apiTranslate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveManualEditRequest = resolve;
+      })
+    );
+    target.value = "Source before manual edit";
+    const manualEditRequest = translator.handleTranslate({
+      isBtnTrigger: true,
+    });
+    await Promise.resolve();
+
+    target.value = "User draft while waiting";
+    resolveManualEditRequest({ trText: "Late result", isSame: false });
+    await manualEditRequest;
+
+    expect(target.value).toBe("User draft while waiting");
+    expect(target.hasAttribute("aria-busy")).toBe(false);
+
+    let resolveDetachedRequest;
+    genEventName.mockReturnValueOnce("detached-request");
+    apiTranslate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveDetachedRequest = resolve;
+      })
+    );
+    target.value = "Detached source";
+    const detachedRequest = translator.handleTranslate({
+      isBtnTrigger: true,
+    });
+    await Promise.resolve();
+    expect(
+      document.getElementById("kiss-loading-detached-request")
+    ).not.toBeNull();
+
+    target.remove();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(document.getElementById("kiss-loading-detached-request")).toBeNull();
+    expect(target.hasAttribute("aria-busy")).toBe(false);
+    expect(getFloatButton(target)).toBeUndefined();
+
+    resolveDetachedRequest({ trText: "Detached result", isSame: false });
+    await detachedRequest;
+    expect(target.value).toBe("Detached source");
+    expect(getFloatButton(target)).toBeUndefined();
+  });
+
+  test("clears a pending loading context when disabled", async () => {
+    translator.disable();
+    const apiSetting = {
+      apiSlug: "google-cloud",
+      apiType: "GoogleCloud",
+    };
+    translator = new InputTranslator({
+      inputRule: {
+        transOpen: true,
+        triggerShortcut: ["AltLeft", "KeyI"],
+        triggerCount: 1,
+        triggerTime: 200,
+        showDot: "always",
+        apiSlug: "google-cloud",
+        fromLang: "auto",
+        toLang: "en",
+      },
+      transApis: [apiSetting],
+    });
+    resolveApiPromptSettings.mockReturnValue(apiSetting);
+    createLoadingSVG.mockReturnValue(
+      document.createElementNS("http://www.w3.org/2000/svg", "svg")
+    );
+
+    let resolveTranslation;
+    apiTranslate.mockReturnValueOnce(
+      new Promise((resolve) => {
+        resolveTranslation = resolve;
+      })
+    );
+    const target = document.createElement("textarea");
+    target.value = "Hello";
+    target.setAttribute("aria-busy", "false");
+    focusTarget(translator, target);
+
+    const request = translator.handleTranslate({ isBtnTrigger: true });
+    await Promise.resolve();
+    expect(target.getAttribute("aria-busy")).toBe("true");
+    expect(document.getElementById("kiss-loading-event")).not.toBeNull();
+
+    translator.disable();
+    expect(target.getAttribute("aria-busy")).toBe("false");
+    expect(document.getElementById("kiss-loading-event")).toBeNull();
+
+    resolveTranslation({ trText: "Translated", isSame: false });
+    await request;
+    expect(target.value).toBe("Hello");
+    expect(getFloatButton(target)).toBeUndefined();
   });
 });

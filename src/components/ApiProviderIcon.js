@@ -71,6 +71,26 @@ const API_ICON_FILES = {
   [OPT_TRANS_ORCAROUTER]: "OrcaRouter.svg",
 };
 
+const LIGHT_SURFACE_FOREGROUND = "#1F1F1F";
+const API_ICON_SCALES = {
+  [OPT_TRANS_SILICONFLOW]: 1.25,
+};
+
+export function resolveApiIconPresentation(
+  apiType,
+  { mode = "light", lightSurface = false } = {}
+) {
+  const shouldInvert = lightSurface
+    ? apiType === OPT_TRANS_EPHONEAI
+    : mode === "dark" && API_SPE_TYPES.darkIcon.has(apiType);
+
+  return {
+    color: lightSurface ? LIGHT_SURFACE_FOREGROUND : undefined,
+    filter: shouldInvert ? "invert(100%)" : "none",
+    scale: API_ICON_SCALES[apiType] || 1,
+  };
+}
+
 export function getApiIconSrc(
   apiType,
   {
@@ -93,10 +113,12 @@ export default function ApiProviderIcon({
   size = 22,
   imageSize = 14,
   disabled = false,
+  lightSurface = false,
   className = "",
   sx = {},
 }) {
   const src = getApiIconSrc(apiType);
+  const presentation = resolveApiIconPresentation(apiType, { lightSurface });
 
   return (
     <Box
@@ -109,6 +131,7 @@ export default function ApiProviderIcon({
         display: "inline-grid",
         flex: "0 0 auto",
         placeItems: "center",
+        color: presentation.color,
         opacity: disabled ? 0.5 : 1,
         ...sx,
       }}
@@ -118,20 +141,31 @@ export default function ApiProviderIcon({
           component="img"
           src={src}
           alt={label}
-          sx={(theme) => ({
-            width: imageSize,
-            height: imageSize,
-            display: "block",
-            objectFit: "contain",
-            filter:
-              theme.palette.mode === "dark" &&
-              API_SPE_TYPES.darkIcon.has(apiType)
-                ? "invert(100%)"
-                : "none",
-          })}
+          sx={(theme) => {
+            const imagePresentation = resolveApiIconPresentation(apiType, {
+              mode: theme.palette.mode,
+              lightSurface,
+            });
+
+            return {
+              width: imageSize,
+              height: imageSize,
+              display: "block",
+              objectFit: "contain",
+              filter: imagePresentation.filter,
+              transform: `scale(${imagePresentation.scale})`,
+              transformOrigin: "center",
+            };
+          }}
         />
       ) : (
-        <ApiRoundedIcon sx={{ width: imageSize, height: imageSize }} />
+        <ApiRoundedIcon
+          sx={{
+            width: imageSize,
+            height: imageSize,
+            color: presentation.color || "inherit",
+          }}
+        />
       )}
     </Box>
   );

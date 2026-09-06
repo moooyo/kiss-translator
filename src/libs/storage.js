@@ -337,7 +337,7 @@ async function clearFieldRevisions(key) {
  * 字段一起抹掉。只写自己真正改动的字段可以让「A 改 X 的同时 B 改 Y」可交换。
  *
  * @param {string} key 键名
- * @param {Object} patch createSettingPatch 产出的补丁
+ * @param {Object|Function} patch A patch or synchronous factory receiving the latest stored value.
  * @param {Object} [options]
  * @param {Function} [options.onWillWrite] 在实际落盘**之前**同步收到合并结果
  *   与本次写入的版本戳表。订阅回声是在 setObj 内部发出的，等 patchObj 的 promise
@@ -347,9 +347,10 @@ async function clearFieldRevisions(key) {
 async function patchObj(key, patch, { onWillWrite } = {}) {
   const run = async () => {
     const cur = (await getObj(key)) ?? {};
-    const next = mergeSettingPatch(cur, patch);
+    const actualPatch = typeof patch === "function" ? patch(cur) : patch;
+    const next = mergeSettingPatch(cur, actualPatch);
 
-    const paths = collectPatchPaths(patch);
+    const paths = collectPatchPaths(actualPatch);
     const revisions = bumpRevisions(
       await getFieldRevisions(key),
       paths,

@@ -34,7 +34,9 @@ export class BilingualSubtitleManager {
   #pointerOverCaption = false; // 指针是否还停在字幕窗口上
   #hoverTarget = null;
   #playerControlBarObserver = null; // 监听播放器底部控制条显隐突变的 MutationObserver
+  #playerResizeObserver = null; // 记住位置时监听播放器尺寸变化
   #syncPaperBottomAfterDrag = null; // 拖拽结束后按当前控制条状态修正字幕位置
+  #syncPaperPosition = null; // 按当前播放器尺寸和控制条状态重算字幕位置
 
   /**
    * @param {object} options
@@ -121,7 +123,10 @@ export class BilingualSubtitleManager {
     // 释放 MutationObserver 监听器
     this.#playerControlBarObserver?.disconnect();
     this.#playerControlBarObserver = null;
+    this.#playerResizeObserver?.disconnect();
+    this.#playerResizeObserver = null;
     this.#syncPaperBottomAfterDrag = null;
+    this.#syncPaperPosition = null;
     this.#formattedSubtitles = [];
     this.#wordTooltipController?.destroy();
     this.#wordTooltipController = null;
@@ -179,8 +184,26 @@ export class BilingualSubtitleManager {
     const controlBar = player.querySelector(".ytp-left-controls");
     if (!controlBar) return;
     const controlBarHeight = parseFloat(getComputedStyle(controlBar).height);
+    const rememberPosition = this.#setting.rememberPosition === true;
+    const configuredRatio = Number(this.#setting.positionRatio);
+    let positionRatio =
+      rememberPosition &&
+      Number.isFinite(configuredRatio) &&
+      configuredRatio >= 0 &&
+      configuredRatio <= 1
+        ? configuredRatio
+        : 0.05;
 
-    let baseBottomWhenControlsHidden = player.clientHeight * 0.05;
+    const clampBaseBottom = (bottom) => {
+      const playerHeight = player.clientHeight;
+      const captionHeight = this.#paperEl?.offsetHeight || 0;
+      const maxBottom = Math.max(0, playerHeight - captionHeight);
+      return Math.min(Math.max(0, bottom), maxBottom);
+    };
+
+    let baseBottomWhenControlsHidden = clampBaseBottom(
+      player.clientHeight * positionRatio
+    );
     let lastControlBarHiddenState = null;
 
     const syncPaperElBottom = ({ force = false } = {}) => {
@@ -188,27 +211,50 @@ export class BilingualSubtitleManager {
       if (!force && isHidden === lastControlBarHiddenState) return;
       lastControlBarHiddenState = isHidden;
 
+      if (rememberPosition) {
+        baseBottomWhenControlsHidden = clampBaseBottom(
+          player.clientHeight * positionRatio
+        );
+      } else {
+        baseBottomWhenControlsHidden = clampBaseBottom(
+          baseBottomWhenControlsHidden
+        );
+      }
+
       const shouldFloatAboveControlBar =
         baseBottomWhenControlsHidden < controlBarHeight * 2;
-      const bottom =
+      const bottom = clampBaseBottom(
         !isHidden && shouldFloatAboveControlBar
           ? baseBottomWhenControlsHidden + controlBarHeight
-          : baseBottomWhenControlsHidden;
+          : baseBottomWhenControlsHidden
+      );
 
       this.#paperEl.style.bottom = `${bottom}px`;
     };
 
-    this.#syncPaperBottomAfterDrag = () => {
-      baseBottomWhenControlsHidden =
-        parseFloat(this.#paperEl.style.bottom) || 0;
+    this.#syncPaperBottomAfterDrag = (draggedBottom) => {
+      baseBottomWhenControlsHidden = clampBaseBottom(draggedBottom);
+      if (rememberPosition && player.clientHeight > 0) {
+        positionRatio = baseBottomWhenControlsHidden / player.clientHeight;
+        this.#setting.positionRatio = positionRatio;
+        this.#setting.onSubtitlePositionChange?.(positionRatio);
+      }
       syncPaperElBottom({ force: true });
     };
+    this.#syncPaperPosition = () => syncPaperElBottom({ force: true });
 
     syncPaperElBottom({ force: true });
 
     const observer = new MutationObserver(() => syncPaperElBottom());
     observer.observe(player, { attributes: true, attributeFilter: ["class"] });
     this.#playerControlBarObserver = observer;
+
+    if (rememberPosition && typeof ResizeObserver === "function") {
+      this.#playerResizeObserver = new ResizeObserver(() => {
+        syncPaperElBottom({ force: true });
+      });
+      this.#playerResizeObserver.observe(player);
+    }
   }
 
   /**
@@ -268,8 +314,11 @@ export class BilingualSubtitleManager {
     const isHoverLookupEnabled = this.#isHoverLookupEnabled();
 
     // 4. 为字幕框启用拖拽交互
-    this.#enableDragging(this.#paperEl, container, this.#captionWindowEl, () =>
-      this.#syncPaperBottomAfterDrag?.()
+    this.#enableDragging(
+      this.#paperEl,
+      container,
+      this.#captionWindowEl,
+      (draggedBottom) => this.#syncPaperBottomAfterDrag?.(draggedBottom)
     );
 
     // 5. 如果开启了悬浮查词，则在鼠标 hover 字幕窗口时暂停视频，方便用户稳妥查词；移开鼠标时自动恢复播放
@@ -398,7 +447,7 @@ export class BilingualSubtitleManager {
         dragEndCallback &&
         typeof dragEndCallback === "function"
       )
-        dragEndCallback();
+        dragEndCallback(parseFloat(dragElement.style.bottom) || 0);
       const finalBottomPx = dragElement.style.bottom;
       setTimeout(() => {
         dragElement.style.bottom = finalBottomPx;
@@ -611,6 +660,7 @@ export class BilingualSubtitleManager {
       }
 
       this.#paperEl.style.display = "block";
+      this.#syncPaperPosition?.();
     } else {
       this.#paperEl.style.display = "none";
     }

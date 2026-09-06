@@ -226,6 +226,21 @@ describe("Draggable FAB edge locking", () => {
     expect(draggable.style.transform).toBe(expected);
   });
 
+  test("preserves fractional proportional position across uneven viewport resizes", () => {
+    let fab = renderFab({ edge: "top", left: 300, top: -20 });
+
+    setViewport(1001, 400);
+    fab = rerenderFab(fab, { windowSize: { w: 1001, h: 400 } });
+    expect(draggable.style.transform).toBe("translate(500.5px, -20px)");
+
+    setViewport(600, 400);
+    rerenderFab(fab, { windowSize: { w: 600, h: 400 } });
+    act(() => jest.runOnlyPendingTimers());
+
+    expect(draggable.style.transform).toBe("translate(300px, -20px)");
+    expect(putFab).toHaveBeenLastCalledWith({ x: 300, y: -20, edge: "top" });
+  });
+
   test("hovering expands the FAB without changing its saved edge", () => {
     renderFab();
     expect(draggable.style.opacity).toBe("1");
@@ -322,9 +337,7 @@ describe("Draggable FAB edge locking", () => {
     expect(putFab).toHaveBeenLastCalledWith({ x: 580, y: 200, edge: "right" });
   });
 
-  // pointercancel 之后浏览器不会再补发 pointerup，而清空 origin 的唯一出口
-  // 就在 pointerup 里。少了 cancel 分支，被系统手势打断的一次拖拽会让 origin
-  // 永久残留，之后指针只要掠过悬浮球就继续拖动——没有按下任何键。
+  // Cancellation must clear the drag because no later pointerup is guaranteed.
   test("a cancelled pointer ends the drag instead of leaving it stuck", () => {
     renderFab();
     const handler = draggable.firstElementChild.firstElementChild;
@@ -378,5 +391,86 @@ describe("Draggable FAB edge locking", () => {
     rerenderFab(fab, { expanded: true });
     expect(draggable.style.opacity).toBe("1");
     expect(draggable.style.transform).toBe("translate(560px, 200px)");
+  });
+
+  test("clamps a saved position from a wider viewport while keeping the cross-axis visible", () => {
+    // The top edge remains half-hidden; the cross-axis fits the narrower viewport.
+    // The mocked storage verifies only the persisted payload.
+    setViewport(800, 600);
+    renderFab({
+      left: 1400,
+      top: -20,
+      edge: "top",
+      windowSize: { w: 800, h: 600 },
+    });
+    act(() => jest.runOnlyPendingTimers());
+
+    expect(draggable.style.transform).toBe("translate(760px, -20px)");
+    expect(putFab).toHaveBeenLastCalledWith({ x: 760, y: -20, edge: "top" });
+  });
+
+  test.each([
+    ["left", -20, "translate(-20px, 0px)"],
+    ["right", 580, "translate(780px, 560px)"],
+    ["top", -20, "translate(0px, -20px)"],
+    ["bottom", 780, "translate(760px, 580px)"],
+  ])(
+    "keeps only the snapped %s edge half-hidden at viewport corners",
+    (edge, ortho, expected) => {
+      setViewport(800, 600);
+      renderFab({
+        left: edge === "top" || edge === "bottom" ? ortho : 1400,
+        top: edge === "left" || edge === "right" ? ortho : 500,
+        edge,
+        windowSize: { w: 800, h: 600 },
+      });
+      act(() => jest.runOnlyPendingTimers());
+
+      expect(draggable.style.transform).toBe(expected);
+    }
+  );
+
+  test("zero viewport yields finite in-range corners without NaN or negative upper bound", () => {
+    setViewport(0, 0);
+    renderFab({
+      left: 0,
+      top: 0,
+      edge: "top",
+      windowSize: { w: 0, h: 0 },
+    });
+    act(() => jest.runOnlyPendingTimers());
+
+    expect(draggable.style.transform).toBe("translate(0px, -20px)");
+    expect(draggable.style.transform).not.toMatch(/NaN|Infinity/);
+    expect(putFab).toHaveBeenLastCalledWith({ x: 0, y: -20, edge: "top" });
+  });
+
+  test("non-finite coordinates fall back safely instead of producing illegal transforms", () => {
+    renderFab({
+      left: Infinity,
+      top: Number.NaN,
+      edge: "left",
+      windowSize: { w: 800, h: 600 },
+    });
+    act(() => jest.runOnlyPendingTimers());
+
+    expect(draggable.style.transform).toBe("translate(-20px, 0px)");
+    expect(draggable.style.transform).not.toMatch(/NaN|Infinity/);
+    expect(putFab).toHaveBeenLastCalledWith({ x: -20, y: 0, edge: "left" });
+  });
+
+  test("default edge (undefined) follows top semantics when clamping the orthogonal axis", () => {
+    // The default branch uses the top edge and clamps the horizontal position.
+    const result = getEdgePosition({
+      x: 1400,
+      y: -20,
+      width: 40,
+      height: 40,
+      windowWidth: 800,
+      windowHeight: 600,
+      revealed: false,
+      edge: undefined,
+    });
+    expect(result).toEqual({ x: 760, y: -20 });
   });
 });

@@ -29,7 +29,15 @@ jest.mock("react-markdown", () => {
 jest.mock("./TranCont", () => {
   const React = require("react");
 
-  return ({ apiSlug, text, toLang, translateVariants, popupStyle }) =>
+  return ({
+    apiSlug,
+    text,
+    toLang,
+    translateVariants,
+    detectedLang,
+    sourceDetectionPending,
+    popupStyle,
+  }) =>
     React.createElement("div", {
       "data-testid": "tran-cont",
       "data-api-slug": apiSlug,
@@ -37,6 +45,8 @@ jest.mock("./TranCont", () => {
       "data-to-lang": toLang,
       "data-translate-variants": String(translateVariants),
       "data-popup-style": String(Boolean(popupStyle)),
+      "data-detected-lang": detectedLang,
+      "data-source-detection-pending": String(sourceDetectionPending),
     });
 });
 
@@ -74,9 +84,9 @@ async function flushEffects() {
 function createDeferred() {
   let resolve;
   let reject;
-  const promise = new Promise((res, rej) => {
-    resolve = res;
-    reject = rej;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
   });
   return { promise, resolve, reject };
 }
@@ -676,24 +686,28 @@ describe("TranForm translation service selection", () => {
     act(() => root.unmount());
   });
 
-  test("switches to the secondary target when Chinese variants are disabled", async () => {
-    tryDetectLang.mockResolvedValue("zh-TW");
-    const { container, root } = renderTranForm({
-      text: "繁體中文",
-      apiSlugs: ["openai"],
-      fromLang: "auto",
-      toLang: "zh-CN",
-      toLang2: "en",
-      translateVariants: false,
-    });
-    await flushEffects();
+  test.each([false, true])(
+    "switches to the secondary target when Chinese variants are disabled and popupStyle is %s",
+    async (popupStyle) => {
+      tryDetectLang.mockResolvedValue("zh-TW");
+      const { container, root } = renderTranForm({
+        text: "繁體中文",
+        apiSlugs: ["openai"],
+        fromLang: "auto",
+        toLang: "zh-CN",
+        toLang2: "en",
+        translateVariants: false,
+        popupStyle,
+      });
+      await flushEffects();
 
-    const translation = container.querySelector('[data-testid="tran-cont"]');
-    expect(translation.dataset.toLang).toBe("en");
-    expect(translation.dataset.translateVariants).toBe("false");
+      const translation = container.querySelector('[data-testid="tran-cont"]');
+      expect(translation.dataset.toLang).toBe("en");
+      expect(translation.dataset.translateVariants).toBe("false");
 
-    act(() => root.unmount());
-  });
+      act(() => root.unmount());
+    }
+  );
 
   test("keeps the primary target when Chinese variants are enabled", async () => {
     tryDetectLang.mockResolvedValue("zh-TW");
@@ -809,6 +823,65 @@ describe("TranForm translation service selection", () => {
 
     act(() => root.unmount());
   });
+
+  test.each([false, true])(
+    "passes only the current complete-input detection result when popupStyle is %s",
+    async (popupStyle) => {
+      const firstDetection = createDeferred();
+      const secondDetection = createDeferred();
+      tryDetectLang.mockImplementation((value) =>
+        value === "first" ? firstDetection.promise : secondDetection.promise
+      );
+      const transApis = [
+        { apiSlug: "openai", apiName: "OpenAI", apiType: "OpenAI" },
+      ];
+      const baseProps = {
+        setText: jest.fn(),
+        apiSlugs: ["openai"],
+        fromLang: "auto",
+        toLang: "zh-CN",
+        toLang2: "-",
+        transApis,
+        simpleStyle: false,
+        langDetector: "Baidu",
+        enDict: "-",
+        enSug: "-",
+        aiDictApiSlug: "-",
+        popupStyle,
+      };
+      const { container, root } = renderTranForm({
+        ...baseProps,
+        text: "first",
+      });
+      await flushEffects();
+
+      act(() => {
+        root.render(<TranForm {...baseProps} text="second" />);
+      });
+      await flushEffects();
+      let translation = container.querySelector('[data-testid="tran-cont"]');
+      expect(translation.dataset.detectedLang).toBe("");
+      expect(translation.dataset.sourceDetectionPending).toBe("true");
+
+      await act(async () => {
+        firstDetection.resolve("fr");
+        await firstDetection.promise;
+      });
+      translation = container.querySelector('[data-testid="tran-cont"]');
+      expect(translation.dataset.detectedLang).toBe("");
+      expect(translation.dataset.sourceDetectionPending).toBe("true");
+
+      await act(async () => {
+        secondDetection.resolve("de");
+        await secondDetection.promise;
+      });
+      translation = container.querySelector('[data-testid="tran-cont"]');
+      expect(translation.dataset.detectedLang).toBe("de");
+      expect(translation.dataset.sourceDetectionPending).toBe("false");
+
+      act(() => root.unmount());
+    }
+  );
 
   test("keeps user-selected services when text changes", async () => {
     const setText = jest.fn();

@@ -3,14 +3,41 @@ import { APP_LCNAME } from "../config/app.js";
 import { isMatch } from "../libs/utils.js";
 import { DEFAULT_API_SETTING } from "../config/api.js";
 import { DEFAULT_SUBTITLE_SETTING } from "../config/setting.js";
+import { KV_SETTING_KEY, STOKEY_SETTING } from "../config/storage.js";
 import { logger } from "../libs/log.js";
 import { injectJs, INJECTOR } from "../injectors/index.js";
+import { debounceSyncMeta, storage } from "../libs/storage.js";
 
 // 各视频平台对应的字幕初始化拦截器配置
 // 目前仅配置了 YouTube 的匹配规则 (pattern) 及其对应的初始化引导器 (YouTubeInitializer)
 const providers = [
   { pattern: "https://www.youtube.com", start: YouTubeInitializer },
 ];
+
+let subtitlePositionWriteQueue = Promise.resolve();
+
+/**
+ * Save the subtitle position through the shared settings patch queue.
+ *
+ * @param {number} positionRatio Caption bottom relative to the player height.
+ * @returns {Promise<void>}
+ */
+export function persistSubtitlePosition(positionRatio) {
+  const write = subtitlePositionWriteQueue.then(async () => {
+    await storage.patchObj(STOKEY_SETTING, (currentSetting) => ({
+      subtitleSetting: {
+        ...(!currentSetting.subtitleSetting ? DEFAULT_SUBTITLE_SETTING : {}),
+        positionRatio,
+      },
+    }));
+    debounceSyncMeta(KV_SETTING_KEY);
+  });
+
+  subtitlePositionWriteQueue = write.catch(() => {});
+  return write.catch((err) => {
+    logger.warn("save subtitle position failed", err);
+  });
+}
 
 /**
  * 运行双语字幕翻译服务的主入口。
@@ -56,6 +83,7 @@ export function runSubtitle({ href, setting }) {
         prompts: setting.prompts,
         uiLang: setting.uiLang,
         translateVariants: setting.translateVariants ?? true,
+        onSubtitlePositionChange: persistSubtitlePosition,
       });
     }
   } catch (err) {

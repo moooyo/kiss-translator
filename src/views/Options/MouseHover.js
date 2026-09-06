@@ -10,9 +10,15 @@ import { useCallback } from "react";
 import {
   DEFAULT_MOUSEHOVER_KEY,
   DEFAULT_MOUSE_HOVER_BUBBLE_STYLE,
+  DEFAULT_MOUSE_HOVER_HOLD_DELAY,
   GLOBAL_KEY,
   OPT_MOUSE_HOVER_DISPLAY_BILINGUAL,
   OPT_MOUSE_HOVER_DISPLAY_BUBBLE,
+  OPT_MOUSE_HOVER_TRANS_DISPLAY_BLOCK,
+  OPT_MOUSE_HOVER_TRANS_DISPLAY_INLINE,
+  OPT_MOUSE_HOVER_TRANS_AREA,
+  OPT_MOUSE_HOVER_TRANS_PARAGRAPH,
+  OPT_MOUSE_HOVER_TRANS_REGION,
 } from "../../config";
 import {
   SettingsAdvanced,
@@ -48,6 +54,60 @@ export default function MouseHoverSetting() {
     [updateMouseHoverSetting]
   );
 
+  // Enable holding the left mouse button for the primary trigger.
+  const handleHoldKeyChange = useCallback(
+    (checked) => {
+      updateMouseHoverSetting({ mouseHoverKeyHold: checked });
+    },
+    [updateMouseHoverSetting]
+  );
+
+  // Enable holding the left mouse button for the alternative trigger.
+  const handleAltHoldKeyChange = useCallback(
+    (checked) => {
+      updateMouseHoverSetting({ mouseHoverKey2Hold: checked });
+    },
+    [updateMouseHoverSetting]
+  );
+
+  // Match the runtime fallback for invalid or non-positive hold delays.
+  const handleHoldDelayChange = useCallback(
+    (e) => {
+      const value = Number(e.target.value);
+      updateMouseHoverSetting({
+        mouseHoverHoldDelay:
+          Number.isFinite(value) && value > 0
+            ? value
+            : DEFAULT_MOUSE_HOVER_HOLD_DELAY,
+      });
+    },
+    [updateMouseHoverSetting]
+  );
+
+  // Update the translation scope used by either hold trigger.
+  const handleTransModeChange = useCallback(
+    (e) => {
+      updateMouseHoverSetting({ mouseHoverTransMode: e.target.value });
+    },
+    [updateMouseHoverSetting]
+  );
+
+  // Update the translation layout used by either hold trigger.
+  const handleTransDisplayChange = useCallback(
+    (e) => {
+      updateMouseHoverSetting({ mouseHoverTransDisplay: e.target.value });
+    },
+    [updateMouseHoverSetting]
+  );
+
+  // Suppress navigation after translating a link or button with a hold trigger.
+  const handlePreventClickChange = useCallback(
+    (checked) => {
+      updateMouseHoverSetting({ mouseHoverPreventClick: checked });
+    },
+    [updateMouseHoverSetting]
+  );
+
   // Update blacklist patterns used by mouse hover translation.
   const handleBlacklistChange = useCallback(
     (e) => {
@@ -76,6 +136,12 @@ export default function MouseHoverSetting() {
     useMouseHover = true,
     mouseHoverKey = DEFAULT_MOUSEHOVER_KEY,
     mouseHoverKey2 = [],
+    mouseHoverKeyHold = false,
+    mouseHoverKey2Hold = false,
+    mouseHoverHoldDelay = DEFAULT_MOUSE_HOVER_HOLD_DELAY,
+    mouseHoverTransMode = OPT_MOUSE_HOVER_TRANS_AREA,
+    mouseHoverTransDisplay = OPT_MOUSE_HOVER_TRANS_DISPLAY_BLOCK,
+    mouseHoverPreventClick = false,
     blacklist = "",
     displayMode = OPT_MOUSE_HOVER_DISPLAY_BILINGUAL,
     apiSlug = GLOBAL_KEY,
@@ -107,6 +173,16 @@ export default function MouseHoverSetting() {
               value={mouseHoverKey}
               onChange={handleShortcutInput}
               label={i18n("trigger_trans_shortcut")}
+            />
+          </SettingsRow>
+          <SettingsRow
+            label={i18n("mousehover_hold_key")}
+            description={i18n("mousehover_hold_key_helper")}
+          >
+            <SettingsSwitch
+              checked={mouseHoverKeyHold}
+              label={i18n("mousehover_hold_key")}
+              onChange={handleHoldKeyChange}
             />
           </SettingsRow>
           <SettingsRow label={i18n("mousehover_display_mode")}>
@@ -158,14 +234,120 @@ export default function MouseHoverSetting() {
         </SettingsCard>
       </SettingsSection>
 
+      {(mouseHoverKeyHold || mouseHoverKey2Hold) && (
+        <SettingsSection>
+          <SettingsCard>
+            <SettingsRow
+              label={i18n("mousehover_hold_delay")}
+              description={i18n("mousehover_hold_delay_helper")}
+            >
+              <TextField
+                hiddenLabel
+                size="small"
+                variant="filled"
+                type="number"
+                inputProps={{
+                  min: 1,
+                  step: 50,
+                  "aria-label": i18n("mousehover_hold_delay"),
+                }}
+                name="mouseHoverHoldDelay"
+                value={mouseHoverHoldDelay}
+                onChange={handleHoldDelayChange}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={i18n("mousehover_hold_scope")}
+              description={i18n("mousehover_hold_scope_helper")}
+            >
+              <TextField
+                select
+                hiddenLabel
+                size="small"
+                variant="filled"
+                className="kt-settings-select"
+                name="mouseHoverTransMode"
+                value={mouseHoverTransMode}
+                inputProps={{ "aria-label": i18n("mousehover_hold_scope") }}
+                onChange={handleTransModeChange}
+              >
+                <MenuItem value={OPT_MOUSE_HOVER_TRANS_PARAGRAPH}>
+                  {i18n("mousehover_hold_scope_paragraph")}
+                </MenuItem>
+                <MenuItem value={OPT_MOUSE_HOVER_TRANS_REGION}>
+                  {i18n("mousehover_hold_scope_region")}
+                </MenuItem>
+                <MenuItem value={OPT_MOUSE_HOVER_TRANS_AREA}>
+                  {i18n("mousehover_hold_scope_area")}
+                </MenuItem>
+              </TextField>
+            </SettingsRow>
+            <SettingsRow
+              label={i18n("mousehover_hold_display")}
+              description={i18n("mousehover_hold_display_helper")}
+            >
+              <TextField
+                select
+                hiddenLabel
+                size="small"
+                variant="filled"
+                className="kt-settings-select"
+                name="mouseHoverTransDisplay"
+                value={mouseHoverTransDisplay}
+                inputProps={{ "aria-label": i18n("mousehover_hold_display") }}
+                onChange={handleTransDisplayChange}
+              >
+                <MenuItem value={OPT_MOUSE_HOVER_TRANS_DISPLAY_BLOCK}>
+                  {i18n("mousehover_hold_display_block")}
+                </MenuItem>
+                <MenuItem value={OPT_MOUSE_HOVER_TRANS_DISPLAY_INLINE}>
+                  {i18n("mousehover_hold_display_inline")}
+                </MenuItem>
+              </TextField>
+            </SettingsRow>
+            <SettingsRow
+              label={i18n("mousehover_hold_prevent_click")}
+              description={
+                mouseHoverPreventClick
+                  ? i18n("mousehover_hold_prevent_click_helper")
+                  : undefined
+              }
+            >
+              <SettingsSwitch
+                checked={mouseHoverPreventClick}
+                label={i18n("mousehover_hold_prevent_click")}
+                onChange={handlePreventClickChange}
+              />
+            </SettingsRow>
+          </SettingsCard>
+        </SettingsSection>
+      )}
+
       <SettingsAdvanced label={i18n("settings_detailed_controls")}>
         <Stack spacing={2} sx={{ py: 1 }}>
-          <ShortcutInput
-            value={mouseHoverKey2}
-            onChange={handleAltShortcutInput}
-            label={`${i18n("trigger_trans_shortcut")} 2`}
-            helperText={i18n("mousehover_key_help")}
-          />
+          <SettingsCard>
+            <SettingsRow
+              label={`${i18n("trigger_trans_shortcut")} 2`}
+              description={i18n("mousehover_key_help")}
+            >
+              <ShortcutInput
+                compact
+                value={mouseHoverKey2}
+                onChange={handleAltShortcutInput}
+                label={`${i18n("trigger_trans_shortcut")} 2`}
+              />
+            </SettingsRow>
+            <SettingsRow
+              label={`${i18n("mousehover_hold_key")} 2`}
+              description={i18n("mousehover_hold_key_helper")}
+            >
+              <SettingsSwitch
+                checked={mouseHoverKey2Hold}
+                label={`${i18n("mousehover_hold_key")} 2`}
+                onChange={handleAltHoldKeyChange}
+              />
+            </SettingsRow>
+          </SettingsCard>
           {displayMode === OPT_MOUSE_HOVER_DISPLAY_BUBBLE && (
             <TextField
               size="small"

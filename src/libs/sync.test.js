@@ -78,6 +78,7 @@ import {
   setSetting,
 } from "./storage";
 import { decryptSyncValue, encryptSyncValue } from "./syncCrypto";
+import { createClient, getPatcher } from "webdav";
 
 const SYNC_DESCRIPTION = "kiss translator sync files";
 const SYNC_KEY = "github-token";
@@ -101,6 +102,96 @@ const encryptedGistFileContent = (value, updateAt) =>
     value: `cipher:${Buffer.from(JSON.stringify(value)).toString("base64")}`,
     updateAt,
   });
+
+describe("WebDAV sync", () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    getPatcher.mockReturnValue({ patch: jest.fn() });
+    encryptSyncValue.mockImplementation((value) =>
+      Promise.resolve(`cipher:${Buffer.from(value).toString("base64")}`)
+    );
+    decryptSyncValue.mockImplementation((value) =>
+      Promise.resolve({
+        value: Buffer.from(value.slice("cipher:".length), "base64").toString(),
+        encrypted: true,
+      })
+    );
+  });
+
+  test("applies different remote data with an equal initial timestamp", async () => {
+    getSyncWithDefault.mockResolvedValue({
+      syncType: "WebDAV",
+      syncUrl: "https://dav.example.com",
+      syncUser: "user",
+      syncKey: "password",
+      syncEncryptKey: SYNC_ENCRYPT_KEY,
+      syncMeta: {},
+    });
+    const client = {
+      exists: jest.fn().mockResolvedValue(true),
+      getFileContents: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          key: SETTING_KEY,
+          value: `cipher:${Buffer.from(
+            JSON.stringify({ remote: true })
+          ).toString("base64")}`,
+          updateAt: 0,
+        })
+      ),
+      putFileContents: jest.fn(),
+    };
+    createClient.mockReturnValue(client);
+
+    const result = await syncData(SETTING_KEY, { local: true });
+
+    expect(client.putFileContents).not.toHaveBeenCalled();
+    expect(result).toEqual({ value: { remote: true }, isNew: true });
+  });
+
+  test("does not mark equal-timestamp legacy remote data as new after a prior sync", async () => {
+    const remoteLegacySetting = {
+      version: 1,
+      transApis: [{ systemPrompt: "legacy inline prompt" }],
+    };
+    const localMigratedSetting = {
+      version: 3,
+      prompts: [{ slug: "migrated-prompt" }],
+      transApis: [{ batchPromptSlug: "migrated-prompt" }],
+    };
+    getSyncWithDefault.mockResolvedValue({
+      syncType: "WebDAV",
+      syncUrl: "https://dav.example.com",
+      syncUser: "user",
+      syncKey: "password",
+      syncEncryptKey: SYNC_ENCRYPT_KEY,
+      syncMeta: {
+        [SETTING_KEY]: {
+          updateAt: 100,
+          syncAt: 1,
+        },
+      },
+    });
+    const client = {
+      exists: jest.fn().mockResolvedValue(true),
+      getFileContents: jest.fn().mockResolvedValue(
+        JSON.stringify({
+          key: SETTING_KEY,
+          value: `cipher:${Buffer.from(
+            JSON.stringify(remoteLegacySetting)
+          ).toString("base64")}`,
+          updateAt: 100,
+        })
+      ),
+      putFileContents: jest.fn(),
+    };
+    createClient.mockReturnValue(client);
+
+    const result = await syncData(SETTING_KEY, localMigratedSetting);
+
+    expect(client.putFileContents).not.toHaveBeenCalled();
+    expect(result.isNew).toBe(false);
+  });
+});
 
 describe("GitHub Gist sync", () => {
   beforeEach(() => {

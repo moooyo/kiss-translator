@@ -105,9 +105,12 @@ export default function TranForm({
   const [dictTab, setDictTab] = useState("default");
   const [showPopupServices, setShowPopupServices] = useState(false);
   const hasUserChangedDictTabRef = useRef(false);
-  // 异步自动检测到的源文本语言代码 (例如 "en", "zh")
-  const [deLang, setDeLang] = useState("");
-  const [deLoading, setDeLoading] = useState(false);
+  // Bind detection results to their input and detector to ignore stale requests.
+  const [detection, setDetection] = useState({
+    key: "",
+    lang: "",
+    loading: false,
+  });
   const inputRef = useRef(null);
   const selectMenuProps = useMemo(
     () => ({
@@ -117,6 +120,15 @@ export default function TranForm({
     }),
     []
   );
+
+  const detectionKey = useMemo(
+    () => `${langDetector}\u0000${text}`,
+    [langDetector, text]
+  );
+  const hasCurrentDetection = detection.key === detectionKey;
+  const deLang = hasCurrentDetection ? detection.lang : "";
+  const deLoading =
+    Boolean(text.trim()) && (!hasCurrentDetection || detection.loading);
 
   // 允许自动聚焦时，将输入框聚焦并把光标定位在文本尾部。
   // autoFocusInput 可在异步初始化完成后由 false 切换为 true。
@@ -159,33 +171,36 @@ export default function TranForm({
   // 文本改变或配置切换时，发起异步语种检测
   useEffect(() => {
     let active = true;
-    setDeLang("");
-
     if (!text.trim()) {
-      setDeLoading(false);
+      setDetection({ key: detectionKey, lang: "", loading: false });
       return () => {
         active = false;
       };
     }
 
-    setDeLoading(true);
+    setDetection({ key: detectionKey, lang: "", loading: true });
     void (async () => {
       try {
-        const deLang = await tryDetectLang(text, langDetector);
-        if (active && deLang) {
-          setDeLang(deLang);
+        const detectedLang = await tryDetectLang(text, langDetector);
+        if (active) {
+          setDetection({
+            key: detectionKey,
+            lang: detectedLang || "",
+            loading: false,
+          });
         }
       } catch (err) {
-        if (active) kissLog("tranbox: detect lang", err);
-      } finally {
-        if (active) setDeLoading(false);
+        if (active) {
+          kissLog("tranbox: detect lang", err);
+          setDetection({ key: detectionKey, lang: "", loading: false });
+        }
       }
     })();
 
     return () => {
       active = false;
     };
-  }, [text, langDetector, setDeLang, setDeLoading]);
+  }, [text, langDetector, detectionKey]);
 
   // 从剪贴板粘贴文本到翻译框
   const handlePaste = async () => {
@@ -317,6 +332,8 @@ export default function TranForm({
       transApis={transApis}
       isPlayground={isPlaygound}
       translateVariants={translateVariants}
+      detectedLang={deLang}
+      sourceDetectionPending={fromLang === "auto" && deLoading}
     />
   ));
   const togglePopupService = (slug) => {
@@ -496,6 +513,9 @@ export default function TranForm({
               toLang={realToLang}
               apiSlug={slug}
               transApis={transApis}
+              translateVariants={translateVariants}
+              detectedLang={deLang}
+              sourceDetectionPending={fromLang === "auto" && deLoading}
               popupStyle
             />
           ))}

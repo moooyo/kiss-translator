@@ -30,6 +30,10 @@ jest.mock("../libs/pool", () => ({
   })),
 }));
 
+jest.mock("../libs/storage", () => ({
+  getSetting: jest.fn(),
+}));
+
 jest.mock("../libs/request", () => ({
   normalizeHttpTimeout: (timeout) => {
     const normalizedTimeout = timeout || 30;
@@ -73,7 +77,8 @@ jest.mock("./trans", () => ({
 
 import { apiDict, apiSubtitle, apiTranslate } from "./index";
 import { handleDict, handleSubtitle, handleTranslate } from "./trans";
-import { fnPolyfill } from "../libs/fetch";
+import { fetchData, fnPolyfill } from "../libs/fetch";
+import { getSetting } from "../libs/storage";
 import { withTimeout } from "../libs/utils";
 import { getBatchQueue } from "../libs/batchQueue";
 import { getFetchPool } from "../libs/pool";
@@ -81,6 +86,7 @@ import { getHttpCachePolyfill, putHttpCachePolyfill } from "../libs/cache";
 import {
   DEFAULT_API_LIST,
   OPT_TRANS_BUILTINAI,
+  OPT_TRANS_BAIDU,
   OPT_TRANS_DEEPL,
   OPT_TRANS_DEEPLX,
   OPT_TRANS_OPENAI,
@@ -280,6 +286,106 @@ describe("apiTranslate BuiltinAI timeout", () => {
     ).rejects.toThrow(
       "apiBuiltinAITranslate got error: Automatic detection of source language failed: low confidence"
     );
+  });
+
+  test("falls back to the configured detection service when the built-in detector is unavailable", async () => {
+    getSetting.mockResolvedValue({ langDetector: OPT_TRANS_BAIDU });
+    fetchData.mockResolvedValueOnce({ error: 0, lan: "en" });
+    fnPolyfill
+      .mockResolvedValueOnce([
+        "",
+        "auto",
+        "Automatic detection of source language failed: LanguageDetector unavailable",
+      ])
+      .mockResolvedValueOnce(["translated text", "en", ""]);
+
+    const translation = await apiTranslate({
+      text: "hello",
+      fromLang: "auto",
+      toLang: "zh-CN",
+      apiSetting: getBuiltinAiApiSetting(30),
+      useCache: false,
+    });
+
+    expect(fetchData).toHaveBeenCalledWith(
+      "https://fanyi.baidu.com/langdetect",
+      expect.anything(),
+      { useCache: true }
+    );
+    expect(fnPolyfill.mock.calls[1][0].from).toBe("en");
+    expect(translation.trText).toBe("translated text");
+    expect(translation.srLang).toBe("en");
+    expect(fnPolyfill).toHaveBeenCalledTimes(2);
+  });
+
+  test("keeps the original error when no fallback detector resolves a language", async () => {
+    getSetting.mockResolvedValue({ langDetector: OPT_TRANS_BAIDU });
+    fnPolyfill.mockResolvedValueOnce([
+      "",
+      "auto",
+      "Automatic detection of source language failed: LanguageDetector unavailable",
+    ]);
+    fetchData.mockResolvedValueOnce({ error: 1 });
+
+    await expect(
+      apiTranslate({
+        text: "hello",
+        fromLang: "auto",
+        toLang: "zh-CN",
+        apiSetting: getBuiltinAiApiSetting(30),
+        useCache: false,
+      })
+    ).rejects.toThrow(
+      "apiBuiltinAITranslate got error: Automatic detection of source language failed: LanguageDetector unavailable"
+    );
+    expect(fnPolyfill).toHaveBeenCalledTimes(1);
+  });
+
+  test("surfaces the concrete-language retry error", async () => {
+    getSetting.mockResolvedValue({ langDetector: OPT_TRANS_BAIDU });
+    fetchData.mockResolvedValueOnce({ error: 0, lan: "en" });
+    fnPolyfill
+      .mockResolvedValueOnce([
+        "",
+        "auto",
+        "Automatic detection of source language failed: LanguageDetector unavailable",
+      ])
+      .mockResolvedValueOnce(["", "en", "Language pair unavailable"]);
+
+    await expect(
+      apiTranslate({
+        text: "hello",
+        fromLang: "auto",
+        toLang: "zh-CN",
+        apiSetting: getBuiltinAiApiSetting(30),
+        useCache: false,
+      })
+    ).rejects.toThrow(
+      "apiBuiltinAITranslate got error: Language pair unavailable"
+    );
+    expect(fnPolyfill).toHaveBeenCalledTimes(2);
+  });
+
+  test("reports a null concrete-language retry result", async () => {
+    getSetting.mockResolvedValue({ langDetector: OPT_TRANS_BAIDU });
+    fetchData.mockResolvedValueOnce({ error: 0, lan: "en" });
+    fnPolyfill
+      .mockResolvedValueOnce([
+        "",
+        "auto",
+        "Automatic detection of source language failed: LanguageDetector unavailable",
+      ])
+      .mockResolvedValueOnce(null);
+
+    await expect(
+      apiTranslate({
+        text: "hello",
+        fromLang: "auto",
+        toLang: "zh-CN",
+        apiSetting: getBuiltinAiApiSetting(30),
+        useCache: false,
+      })
+    ).rejects.toThrow("apiBuiltinAITranslate retry got null result");
   });
 });
 

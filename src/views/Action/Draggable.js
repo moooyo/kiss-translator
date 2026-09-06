@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useRef, useCallback } from "react";
-import { limitNumber } from "../../libs/utils";
+import { limitFloat, limitNumber } from "../../libs/utils";
 import { isMobile } from "../../libs/mobile";
 import { putFab } from "../../libs/storage";
 import { debounce } from "../../libs/utils";
@@ -7,7 +7,7 @@ import Paper from "@mui/material/Paper";
 
 const FAB_EDGES = ["left", "right", "top", "bottom"];
 
-// 计算当前位置最近的视口边缘
+// Find the viewport edge nearest to the current position.
 export const getNearestEdge = ({
   x: left,
   y: top,
@@ -42,30 +42,40 @@ export const getEdgePosition = ({
   revealed,
   edge,
 }) => {
+  // Normalize non-finite values before calculating viewport bounds.
+  const safeCoord = (value, fallback) =>
+    typeof value === "number" && Number.isFinite(value) ? value : fallback;
+  width = safeCoord(width, 1);
+  height = safeCoord(height, 1);
+  windowWidth = safeCoord(windowWidth, 1);
+  windowHeight = safeCoord(windowHeight, 1);
+  left = safeCoord(left, 0);
+  top = safeCoord(top, 0);
   const maxLeft = Math.max(0, windowWidth - width);
   const maxTop = Math.max(0, windowHeight - height);
 
   switch (edge) {
     case "right":
       left = revealed ? windowWidth - width : windowWidth - width / 2;
-      top = limitNumber(top, 0, maxTop);
+      top = limitFloat(top, 0, maxTop);
       break;
     case "left":
       left = revealed ? 0 : -width / 2;
-      top = limitNumber(top, 0, maxTop);
+      top = limitFloat(top, 0, maxTop);
       break;
     case "bottom":
-      left = limitNumber(left, 0, maxLeft);
+      left = limitFloat(left, 0, maxLeft);
       top = revealed ? windowHeight - height : windowHeight - height / 2;
       break;
     default:
-      left = limitNumber(left, 0, maxLeft);
+      left = limitFloat(left, 0, maxLeft);
       top = revealed ? 0 : -height / 2;
   }
+
   return { x: left, y: top };
 };
 
-// 拖拽容器的包装器组件，支持通过 usePaper 配置决定是否使用 Material UI 的 Paper 阴影卡片背景
+// Optionally wrap the draggable content in a Material UI Paper surface.
 function DraggableWrapper({ children, usePaper, ...props }) {
   if (usePaper) {
     return (
@@ -78,8 +88,7 @@ function DraggableWrapper({ children, usePaper, ...props }) {
 }
 
 /**
- * 拖拽交互容器组件，支持非移动端 Pointer 事件和移动端 Touch 事件
- * 同时支持贴边自动吸附及鼠标悬浮半展开效果
+ * Support pointer and touch dragging with edge snapping and hover reveal.
  */
 export default function Draggable({
   windowSize: { w: windowWidth, h: windowHeight },
@@ -92,8 +101,8 @@ export default function Draggable({
   snapEdge,
   onStart,
   onMove,
-  handler, // 点击并开始拖拽的触发区域
-  children, // 容器内部的主体渲染元素
+  handler, // The drag handle.
+  children, // The main content.
   usePaper,
   // The transformed wrapper is the containing block for fixed descendants.
   // Let it fit the action menu while edge snapping still uses the explicit width.
@@ -104,7 +113,7 @@ export default function Draggable({
   const [focusWithin, setFocusWithin] = useState(false);
   const [positionTransitionEnabled, setPositionTransitionEnabled] =
     useState(false);
-  const [origin, setOrigin] = useState(null); // 拖动起始的参考原点坐标和 client 坐标
+  const [origin, setOrigin] = useState(null); // Starting position and client coordinates.
   const [edge, setEdge] = useState(
     FAB_EDGES.includes(savedEdge) ? savedEdge : null
   );
@@ -112,9 +121,8 @@ export default function Draggable({
   const draggedRef = useRef(false);
   const revealed = hover || focusWithin || expanded || Boolean(origin);
 
-  // 用百分比的形式保存位置，以便在视口大小 resize 时等比例缩放位置
-  // REVIEW: 这里的 left / windowWidth 和 top / windowHeight 在首帧 windowWidth/Height 为 0 的异常场景下，
-  // 会产生值为 NaN 或 Infinity 的致命错误。推荐使用 (windowWidth || 1) 对除数进行安全拦截。
+  // Store proportional positions so they scale with viewport changes.
+  // Edge snapping normalizes invalid coordinates from zero-sized viewports.
   const latestPosition = useRef({
     x: left / windowWidth,
     y: top / windowHeight,
@@ -124,17 +132,17 @@ export default function Draggable({
     x: left / windowWidth,
     y: top / windowHeight,
   });
-  // 缓存防抖的 putFab，用于将最新的拖拽坐标写入本地 storage 持久化
+  // Debounce storage updates for the latest drag position.
   const setFabPosition = useMemo(() => debounce(putFab, 500), []);
 
-  // 执行 transform 移动的 DOM 操作
+  // Apply the current position directly to the container.
   const applyTransform = useCallback((x, y) => {
     if (containerRef.current) {
       containerRef.current.style.transform = `translate(${x}px, ${y}px)`;
     }
   }, []);
 
-  // 同步最新位置的 Ref
+  // Keep event handlers synchronized with the latest position.
   useEffect(() => {
     latestPosition.current = position;
   }, [position]);
@@ -143,7 +151,7 @@ export default function Draggable({
     latestEdge.current = edge;
   }, [edge]);
 
-  // 监听 resize 事件，自适应保持拖拽组件在屏幕中的相对比例坐标
+  // Preserve proportional positions and the locked edge on viewport resize.
   useEffect(() => {
     const onResize = () => {
       if (!containerRef.current) return;
@@ -176,7 +184,7 @@ export default function Draggable({
     return () => window.removeEventListener("resize", onResize);
   }, [applyTransform, height, revealed, snapEdge, width]);
 
-  // 贴边自动吸附效果逻辑
+  // Snap to the locked edge and persist the resulting position.
   useEffect(() => {
     if (!snapEdge || !!origin) {
       return;
@@ -238,7 +246,7 @@ export default function Draggable({
     setPositionTransitionEnabled(true);
   }, []);
 
-  // 鼠标/手指按下，标记拖拽开始并记录起始坐标
+  // Begin dragging and capture the initial coordinates.
   const handlePointerDown = (e) => {
     if (
       usePaper &&
@@ -246,10 +254,9 @@ export default function Draggable({
     ) {
       return;
     }
-    // 注意：这里不能像 Selection/DraggableResizable 那样加「按在 button 上就不起拖」
-    // 的护栏——悬浮球的拖拽触发区本身就是一个 <button>，加了它整个球就拖不动了。
-    // 动作菜单挂在 children 上，那一侧没有绑指针监听，本来就不会误触发拖拽。
-    !isMobile && e.target.setPointerCapture(e.pointerId); // 捕获指针事件，使得移出当前元素时仍能响应 move
+    // Only panel controls skip dragging: the FAB handle is itself a button.
+    // Capture pointer movement even after the pointer leaves the handle.
+    !isMobile && e.target.setPointerCapture(e.pointerId);
     onStart && onStart();
     draggedRef.current = false;
     const rect = containerRef.current?.getBoundingClientRect();
@@ -259,7 +266,7 @@ export default function Draggable({
     setOrigin({ x: currentX, y: currentY, clientX, clientY });
   };
 
-  // 鼠标/手指拖动，计算当前位移偏差并移动 DOM
+  // Move the container by the current pointer or touch displacement.
   const handlePointerMove = (e) => {
     if (!origin) return;
     onMove && onMove();
@@ -270,7 +277,7 @@ export default function Draggable({
     let x = origin.x + dx;
     let y = origin.y + dy;
 
-    // 对拖动范围做视口越界拦截保护
+    // Keep the dragged control within the reachable viewport bounds.
     x = limitNumber(x, -width / 2, windowWidth - width / 2);
     y = limitNumber(y, 0, windowHeight - height / 2);
 
@@ -283,7 +290,7 @@ export default function Draggable({
     latestPosition.current = relativePosition;
   };
 
-  // 鼠标松开/手指抬起，清除拖拽 origin，并阻止事件冒泡防止底层元素误触
+  // Finish dragging without forwarding the event to underlying elements.
   const handlePointerUp = (e) => {
     e.stopPropagation();
     if (snapEdge && draggedRef.current) {
@@ -341,11 +348,7 @@ export default function Draggable({
       ? "opacity 160ms ease, transform 180ms cubic-bezier(.2, 0, 0, 1)"
       : "opacity 160ms ease";
 
-  // 根据移动端/PC端不同绑定不同的触摸/指针监听属性
-  // cancel 分支不是可选的：pointercancel / touchcancel 之后浏览器不会再补发
-  // pointerup / touchend，而清空 origin 的唯一出口就在 handlePointerUp 里。
-  // 少了它，一次被系统手势打断的拖拽会让 origin 永久残留，之后指针只要掠过
-  // 触发区就会继续拖动——没有按下任何键。
+  // Cancellation must end a drag because browsers do not emit a later up event.
   const touchProps = isMobile
     ? {
         onTouchStart: handlePointerDown,
@@ -383,7 +386,7 @@ export default function Draggable({
       <DraggableWrapper usePaper={usePaper}>
         <div
           style={{
-            touchAction: "none", // 阻止浏览器默认的手势滑页行为，以便拖拽正常工作
+            touchAction: "none", // Prevent scrolling gestures while dragging.
           }}
           {...touchProps}
         >

@@ -369,7 +369,8 @@ export const syncData = async (
   }
 
   let { updateAt = 0, syncAt = 0 } = syncMeta[key] || {};
-  if (syncAt === 0) {
+  const isFirstSync = syncAt === 0;
+  if (isFirstSync) {
     updateAt = 0; // 若从未同步过，将更新时间置 0 以触发首次拉取云端
   }
 
@@ -399,8 +400,10 @@ export const syncData = async (
     syncEncryptKey
   );
   const newVal = JSON.parse(res.value);
-  // 若返回的云端数据更新时间戳晚于本地，则说明云端有新更改需要覆盖本地
-  const isNew = res.updateAt > updateAt;
+  // 首次同步时本地与远端时间戳可能同为 0；此时内容不同仍需应用远端数据。
+  const isNew =
+    res.updateAt > updateAt ||
+    (isFirstSync && res.updateAt === updateAt && res.value !== data.value);
 
   // 新版客户端首次遇到旧版明文远端数据时，读取后立即迁移为密文。
   if (!encrypted && !forceRemoteRead) {

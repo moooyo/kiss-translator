@@ -423,6 +423,7 @@ export default function SubtitleSetting() {
     translationStyle,
     showLoadNotification = true,
     hideSubtitleButton = false,
+    rememberPosition = false,
   } = subtitleSetting;
 
   // 整理悬浮查词模式和字幕列表模式的回退逻辑
@@ -1044,6 +1045,21 @@ export default function SubtitleSetting() {
                 name="hideSubtitleButton"
                 value={hideSubtitleButton}
                 label={i18n("hide_subtitle_button")}
+                onChange={handleChange}
+              >
+                <MenuItem value={true}>{i18n("enable")}</MenuItem>
+                <MenuItem value={false}>{i18n("disable")}</MenuItem>
+              </TextField>
+            </Grid>
+            {/* Remember the dragged subtitle position for subsequent videos. */}
+            <Grid item xs={12} sm={12} md={6} lg={6}>
+              <TextField
+                fullWidth
+                select
+                size="small"
+                name="rememberPosition"
+                value={rememberPosition}
+                label={i18n("remember_subtitle_position")}
                 onChange={handleChange}
               >
                 <MenuItem value={true}>{i18n("enable")}</MenuItem>

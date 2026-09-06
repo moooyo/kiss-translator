@@ -29,6 +29,7 @@ import {
   MSG_CLEAR_CACHES,
   MSG_OPEN_SEPARATE_WINDOW,
   MSG_FIT_SEPARATE_WINDOW,
+  MSG_UPDATE_SEPARATE_WINDOW_BOUNDS,
   SEPARATE_WINDOW_CONTENT_WIDTH,
   STOKEY_SEPARATE_WINDOW,
   PORT_STREAM_FETCH,
@@ -147,12 +148,13 @@ const CSP_REMOVE_HEADERS = [
 // 独立窗口 (TranBox 独立窗口模式) 的全局状态变量
 let separateWindowId = null; // 当前已打开窗口的 ID
 let lastKnownBounds = null; // 缓存窗口最后一次有效的屏幕位置坐标与大小
-let separateWindowFitPending = false; // 本次是否按出厂值打开、还等着按内容收一次
+let separateWindowFitPending = false; // Whether a default-sized window still needs content fitting.
+let separateWindowBoundsRevision = 0;
+let separateWindowBoundsRead = 0;
 
-// 独立翻译窗口的出厂尺寸,只是「测出真实高度之前」的一个起手值 ——
-// 窗口内容一渲染完就会由 MSG_FIT_SEPARATE_WINDOW 收到刚好合适的高度。
-// 宽度不参与自适应:内容有设计上限,再宽只是两侧留白(见 Popup/styles.js)。
-// 之所以还要个像样的起手值,是为了少一次肉眼可见的窗口跳动。
+// Start near the expected content size to reduce visible resizing during rendering.
+// MSG_FIT_SEPARATE_WINDOW adjusts the height after layout; content width is capped
+// by design in Popup/styles.js, with extra window width becoming side margins.
 const SEPARATE_WINDOW_CHROME_ALLOWANCE = 24;
 const DEFAULT_SEPARATE_WINDOW_BOUNDS = {
   left: 100,
@@ -162,13 +164,13 @@ const DEFAULT_SEPARATE_WINDOW_BOUNDS = {
 };
 
 /**
- * 把新窗口摆在当前聚焦窗口的中央。
+ * Center a new window over the last focused browser window.
  *
- * 固定的 left/top 会让窗口永远出现在主屏左上角 —— 多显示器时可能直接飞到
- * 另一块屏上。后台 service worker 没有 `screen`,只能借聚焦窗口的位置定位。
+ * Fixed coordinates can place it on the wrong monitor. The background service
+ * worker has no screen object, so use the focused window's bounds instead.
  *
- * @param {{width: number, height: number}} bounds 期望的窗口宽高
- * @returns {Promise<{left: number, top: number}|null>} 居中坐标,拿不到时返回 null
+ * @param {{width: number, height: number}} bounds Desired window size.
+ * @returns {Promise<{left: number, top: number}|null>} Centered coordinates, if available.
  */
 async function centerOnFocusedWindow({ width, height }) {
   try {
@@ -194,43 +196,68 @@ async function centerOnFocusedWindow({ width, height }) {
 }
 
 /**
- * 把独立窗口收到内容刚好需要的大小。
+ * Fit the separate window to its rendered content.
  *
- * 高度没法在编译期算准 —— 它随界面语言(标签换不换行)、浏览器缩放、系统字号
- * 变化。所以窗口先按起手值打开,页面渲染完自己量一遍再回来告诉后台。
+ * Content height depends on language, browser zoom, and system font size.
+ * The page measures its layout after opening and sends the required bounds.
  *
- * 只在「这次是按出厂值打开的」时候生效:用户存过尺寸就说明他自己调过,
- * 再去收窄等于把他的选择推翻。
+ * Fit only when opened with default bounds, preserving any saved user size.
  *
- * @param {Object} args 页面量出来的期望尺寸(已含窗口边框)与屏幕可用区域
+ * @param {Object} args Measured size including window chrome, and available screen bounds.
  * @returns {Promise<void>}
  */
 async function fitSeparateWindow(args) {
   if (!separateWindowFitPending || separateWindowId === null) return;
-  separateWindowFitPending = false;
 
   const { width, height, availWidth, availHeight } = args || {};
   if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+  const windowId = separateWindowId;
+  separateWindowFitPending = false;
 
-  // 留一点余量,免得贴着屏幕边或被任务栏压住
+  // Leave room around the screen edges and taskbar.
   const maxWidth = Number.isFinite(availWidth) ? availWidth - 40 : Infinity;
   const maxHeight = Number.isFinite(availHeight) ? availHeight - 80 : Infinity;
   const nextWidth = Math.round(Math.max(360, Math.min(width, maxWidth)));
   const nextHeight = Math.round(Math.max(320, Math.min(height, maxHeight)));
 
   try {
-    const win = await browser.windows.get(separateWindowId);
-    // 用户在我们量完之前就自己拖过了,那就别动
-    if (!win || win.state !== "normal") return;
+    const win = await browser.windows.get(windowId);
+    // Preserve windows that are no longer in their normal state.
+    if (windowId !== separateWindowId || !win || win.state !== "normal") return;
 
-    await browser.windows.update(separateWindowId, {
+    const boundsRevision = separateWindowBoundsRevision;
+    const updatedWindow = await browser.windows.update(windowId, {
       width: nextWidth,
       height: nextHeight,
     });
+    if (boundsRevision === separateWindowBoundsRevision) {
+      cacheSeparateWindowBounds(updatedWindow);
+    } else if (windowId === separateWindowId) {
+      await updateCacheFromActual(windowId);
+    }
     kissLog("Separate window fitted to content", { nextWidth, nextHeight });
   } catch (err) {
     kissLog("fit separate window", err);
   }
+}
+
+// Cache the actual browser result even when onBoundsChanged is unavailable.
+function cacheSeparateWindowBounds(win) {
+  if (
+    !win ||
+    win.id !== separateWindowId ||
+    win.state !== "normal" ||
+    ![win.left, win.top, win.width, win.height].every(Number.isFinite)
+  ) {
+    return;
+  }
+  lastKnownBounds = {
+    left: Math.round(win.left),
+    top: Math.round(win.top),
+    width: Math.round(win.width),
+    height: Math.round(win.height),
+  };
+  separateWindowBoundsRevision += 1;
 }
 
 /**
@@ -271,8 +298,7 @@ async function openSeparateWindowWithSavedBounds() {
       saved || {}
     );
 
-    // 只有第一次打开(没有存过位置)才居中、才按内容收窄。
-    // 存过就说明用户自己调过,两样都不该再动。
+    // Center and fit only on the first opening, preserving saved user bounds.
     separateWindowFitPending = !saved;
     if (!saved) {
       const centered = await centerOnFocusedWindow(bounds);
@@ -308,21 +334,18 @@ async function openSeparateWindowWithSavedBounds() {
  * @param {number} windowId 窗口 ID
  */
 async function updateCacheFromActual(windowId) {
+  const read = ++separateWindowBoundsRead;
+  const revision = separateWindowBoundsRevision;
   try {
     const win = await browser.windows.get(windowId);
-    // 只有在窗口处于正常状态时才更新，最小化或最大化时不保存其 bounds
-    if (win && win.state === "normal") {
-      lastKnownBounds = {
-        left: Math.round(win.left),
-        top: Math.round(win.top),
-        width: Math.round(win.width),
-        height: Math.round(win.height),
-      };
-      kissLog("Bounds cached via fallback:", lastKnownBounds);
-      // REVIEW: 针对“获取到的 left 和 top 均为 0”以及“重启后窗口越来越大”的问题：
-      // 在一些 Linux 窗口管理器、macOS 或 Firefox 兼容层中，如果窗口刚创建就立即触发或在焦点切换时，
-      // OS 返回的 window.left/top 经常会存在暂时的 0 值。应该在 left/top 均不为 0 时才允许覆盖 lastKnownBounds。
+    if (read !== separateWindowBoundsRead || windowId !== separateWindowId)
+      return;
+    if (revision !== separateWindowBoundsRevision) {
+      // Another update may have cached an older snapshot while this read was
+      // pending. Read again instead of dropping the only notification of a move.
+      return updateCacheFromActual(windowId);
     }
+    cacheSeparateWindowBounds(win);
   } catch (e) {
     // 忽略窗口已被关闭时的查询异常
   }
@@ -342,15 +365,7 @@ browser.windows?.onFocusChanged?.addListener?.(async (windowId) => {
  * 此时只实时更新内存中的 lastKnownBounds 缓存，不频繁写入 Storage，防止 Storage API 限频报错。
  */
 browser.windows?.onBoundsChanged?.addListener?.((win) => {
-  if (separateWindowId !== null && win.id === separateWindowId) {
-    // REVIEW: 同样需要警惕在拖拽过程中 win.left / top 偶尔返回 0 的异常，此处可判定 if (win.left !== 0 && win.top !== 0) 再予更新
-    lastKnownBounds = {
-      left: win.left ?? lastKnownBounds.left,
-      top: win.top ?? lastKnownBounds.top,
-      width: win.width ?? lastKnownBounds.width,
-      height: win.height ?? lastKnownBounds.height,
-    };
-  }
+  cacheSeparateWindowBounds(win);
 });
 
 /**
@@ -360,13 +375,11 @@ browser.windows?.onBoundsChanged?.addListener?.((win) => {
  */
 browser.windows?.onRemoved?.addListener?.(async (windowId) => {
   if (windowId === separateWindowId) {
-    if (lastKnownBounds) {
-      await persistSeparateWindowBounds(lastKnownBounds);
-    }
-
+    const bounds = lastKnownBounds;
     separateWindowId = null;
     lastKnownBounds = null;
     separateWindowFitPending = false;
+    await persistSeparateWindowBounds(bounds);
   }
 });
 
@@ -664,7 +677,11 @@ const messageHandlers = {
   [MSG_SET_LOGLEVEL]: (args) => logger.setLevel(args), // 修改运行时的日志记录等级
   [MSG_CLEAR_CACHES]: () => tryClearCaches(), // 清空翻译缓存
   [MSG_OPEN_SEPARATE_WINDOW]: () => openSeparateWindowWithSavedBounds(), // 打开独立翻译小窗口
-  [MSG_FIT_SEPARATE_WINDOW]: (args) => fitSeparateWindow(args), // 独立窗口按内容收到合适大小
+  [MSG_FIT_SEPARATE_WINDOW]: (args) => fitSeparateWindow(args), // Fit the separate window to its content.
+  [MSG_UPDATE_SEPARATE_WINDOW_BOUNDS]: (args) =>
+    args?.windowId === separateWindowId
+      ? updateCacheFromActual(args.windowId)
+      : undefined,
   [MSG_UPDATE_ICON]: (args, sender) => updateIcon(args, sender?.tab?.id), // 变更页面的插件高亮图标
 };
 

@@ -26,6 +26,7 @@ import { kissLog } from "../../libs/log";
 import PopupCont from "./PopupCont";
 import TranForm from "../Selection/TranForm";
 import { useSetting } from "../../hooks/Setting";
+import { useSeparateWindowBounds } from "../../hooks/SeparateWindowBounds";
 import { isAutoTranslateClipboardSupported } from "../../libs/client";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
 import { POPUP_STYLES } from "./styles";
@@ -72,6 +73,7 @@ function useFitSeparateWindow(enabled) {
  * 文本翻译面板组件 (用于直接在 Popup 中输入文本进行翻译)
  */
 export function Trantab({ isSeparate = false }) {
+  useSeparateWindowBounds(isSeparate);
   const [text, setText] = useState("");
   const i18n = useI18n();
   const { setting } = useSetting();

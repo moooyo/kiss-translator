@@ -39,8 +39,8 @@ jest.mock("../../hooks/useFullscreenDetect", () => ({
 jest.mock("../../libs/client", () => ({ isExt: true }));
 jest.mock("../../libs/msg", () => ({ sendBgMsg: jest.fn() }));
 
-// Draggable 只负责定位与拖拽，这里替换掉它以便直接触达悬浮球与菜单；
-// onStart/onMove 保留成可调用的引用，用来模拟「拖过之后的那一下点击」。
+// Replace Draggable to access the FAB and menu directly.
+// Keep onStart/onMove callable to simulate the click after a drag.
 jest.mock("./Draggable", () => {
   const React = require("react");
   return function Draggable(props) {
@@ -54,8 +54,10 @@ jest.mock("./Draggable", () => {
   };
 });
 
-describe("ContentFab action menu", () => {
+describe.each(["document", "shadow root"])("ContentFab in %s", (context) => {
   let container;
+  let host;
+  let focusRoot;
   let root;
   let processActions;
 
@@ -63,15 +65,22 @@ describe("ContentFab action menu", () => {
     mockIsVideoFullscreen = false;
     draggableProps = null;
     processActions = jest.fn();
+    host = document.createElement("div");
+    document.body.appendChild(host);
+    focusRoot =
+      context === "shadow root"
+        ? host.attachShadow({ mode: "open" })
+        : document;
     container = document.createElement("div");
-    document.body.appendChild(container);
+    (focusRoot === document ? host : focusRoot).appendChild(container);
     root = createRoot(container);
   });
 
   afterEach(() => {
     act(() => root.unmount());
-    container.remove();
+    host.remove();
     sendBgMsg.mockReset();
+    jest.restoreAllMocks();
   });
 
   function render(fabConfig = {}) {
@@ -86,6 +95,16 @@ describe("ContentFab action menu", () => {
   const menuItems = () =>
     Array.from(container.querySelectorAll(".kt-content-fab-menu__item"));
   const clickFab = () => act(() => fab().click());
+  const pressMenuKey = (key) => {
+    const event = new KeyboardEvent("keydown", {
+      key,
+      bubbles: true,
+      cancelable: true,
+      composed: true,
+    });
+    act(() => focusRoot.activeElement.dispatchEvent(event));
+    return event;
+  };
 
   test("uses Material 3 regular FAB geometry for edge snapping", () => {
     render();
@@ -123,6 +142,11 @@ describe("ContentFab action menu", () => {
     const menu = container.querySelector("#kt-content-fab-menu");
     expect(menu.getAttribute("aria-labelledby")).toBe(fab().id);
     expect(menu.closest(".kt-m3-root")).not.toBeNull();
+    expect(menu.getRootNode()).toBe(focusRoot);
+    expect(focusRoot.activeElement).toBe(menuItems()[0]);
+    if (context === "shadow root") {
+      expect(document.activeElement).toBe(host);
+    }
     expect(menuItems().map((item) => item.textContent)).toEqual([
       "popup_translate_page",
       "text_style_alt",
@@ -165,7 +189,7 @@ describe("ContentFab action menu", () => {
 
     expect(processActions).toHaveBeenCalledWith({ action });
     expect(menuItems()).toHaveLength(0);
-    expect(document.activeElement).toBe(fab());
+    expect(focusRoot.activeElement).toBe(fab());
   });
 
   test.each(["Escape", "Tab"])(
@@ -184,9 +208,69 @@ describe("ContentFab action menu", () => {
 
       expect(event.defaultPrevented).toBe(true);
       expect(menuItems()).toHaveLength(0);
-      expect(document.activeElement).toBe(fab());
+      expect(focusRoot.activeElement).toBe(fab());
     }
   );
+
+  test("moves focus with arrow keys, wraps, and supports Home and End", () => {
+    render();
+    clickFab();
+
+    expect(pressMenuKey("ArrowDown").defaultPrevented).toBe(true);
+    expect(focusRoot.activeElement).toBe(menuItems()[1]);
+    pressMenuKey("ArrowDown");
+    expect(focusRoot.activeElement).toBe(menuItems()[2]);
+    pressMenuKey("ArrowUp");
+    expect(focusRoot.activeElement).toBe(menuItems()[1]);
+    expect(pressMenuKey("End").defaultPrevented).toBe(true);
+    expect(focusRoot.activeElement).toBe(menuItems()[4]);
+    pressMenuKey("ArrowDown");
+    expect(focusRoot.activeElement).toBe(menuItems()[0]);
+    pressMenuKey("ArrowUp");
+    expect(focusRoot.activeElement).toBe(menuItems()[4]);
+    expect(pressMenuKey("Home").defaultPrevented).toBe(true);
+    expect(focusRoot.activeElement).toBe(menuItems()[0]);
+    expect(processActions).not.toHaveBeenCalled();
+  });
+
+  test("cycles matching labels when the same character is typed repeatedly", () => {
+    render();
+    clickFab();
+
+    expect(pressMenuKey("o").defaultPrevented).toBe(true);
+    expect(focusRoot.activeElement).toBe(menuItems()[3]);
+    pressMenuKey("o");
+    expect(focusRoot.activeElement).toBe(menuItems()[4]);
+    pressMenuKey("o");
+    expect(focusRoot.activeElement).toBe(menuItems()[3]);
+  });
+
+  test("matches typed prefixes after the first character", () => {
+    render();
+    clickFab();
+
+    for (const key of "open_s") {
+      pressMenuKey(key);
+    }
+
+    expect(focusRoot.activeElement).toBe(menuItems()[4]);
+    expect(processActions).not.toHaveBeenCalled();
+  });
+
+  test("resets typeahead when the menu is quickly closed and reopened", () => {
+    jest.spyOn(performance, "now").mockReturnValue(1000);
+    jest.spyOn(Date, "now").mockReturnValue(1000);
+    render();
+    clickFab();
+    pressMenuKey("o");
+    expect(focusRoot.activeElement).toBe(menuItems()[3]);
+
+    pressMenuKey("Escape");
+    clickFab();
+    pressMenuKey("t");
+
+    expect(focusRoot.activeElement).toBe(menuItems()[1]);
+  });
 
   test("the settings item goes to the background, not through processActions", () => {
     render();
@@ -199,8 +283,8 @@ describe("ContentFab action menu", () => {
     expect(menuItems()).toHaveLength(0);
   });
 
-  // fabClickAction === 1 是既有设置项「单击直接翻译」。移植动作菜单不能把它吃掉，
-  // 否则升级后这批用户的悬浮球会从「一下就翻译」变成「还要再点一次菜单」。
+  // Preserve the existing direct-translation behavior of fabClickAction === 1.
+  // The action menu must not add an extra click for users with this setting.
   test("fabClickAction=1 translates directly and never opens the menu", () => {
     render({ fabClickAction: 1 });
 
@@ -229,8 +313,46 @@ describe("ContentFab action menu", () => {
     expect(menuItems()).toHaveLength(0);
   });
 
-  // 悬浮球在视频全屏时会被隐藏。菜单若不跟着收起，就会剩下一个没有锚点、
-  // 点不到也关不掉的悬空面板盖在视频上。
+  test.each([
+    { x: -28, y: 0, edge: "left" },
+    { x: 772, y: 544, edge: "right" },
+    { x: 744, y: -28, edge: "top" },
+    { x: 0, y: 572, edge: "bottom" },
+  ])("closes an open menu when dragged from $edge", (fabConfig) => {
+    render(fabConfig);
+    clickFab();
+    expect(draggableProps.expanded).toBe(true);
+
+    act(() => draggableProps.onStart());
+    expect(menuItems()).toHaveLength(5);
+    act(() => draggableProps.onMove());
+
+    expect(menuItems()).toHaveLength(0);
+    expect(draggableProps.expanded).toBe(false);
+    expect(focusRoot.activeElement).toBe(fab());
+    clickFab();
+    expect(menuItems()).toHaveLength(0);
+    expect(processActions).not.toHaveBeenCalled();
+
+    act(() => draggableProps.onStart());
+    clickFab();
+    expect(menuItems()).toHaveLength(5);
+    expect(draggableProps.expanded).toBe(true);
+  });
+
+  test("pressing an open FAB without moving still toggles the menu closed", () => {
+    render();
+    clickFab();
+
+    act(() => draggableProps.onStart());
+    clickFab();
+
+    expect(menuItems()).toHaveLength(0);
+    expect(processActions).not.toHaveBeenCalled();
+  });
+
+  // Video fullscreen hides the FAB, so its menu must close too.
+  // Otherwise an unreachable, undismissable panel remains over the video.
   test("entering video fullscreen closes an open menu", () => {
     render();
     clickFab();

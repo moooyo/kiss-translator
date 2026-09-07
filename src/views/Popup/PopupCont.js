@@ -12,18 +12,12 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Snackbar from "@mui/material/Snackbar";
 import Switch from "@mui/material/Switch";
-import {
-  sendBgMsg,
-  sendTabMsg,
-  sendTopFrameMsg,
-  getCurTab,
-} from "../../libs/msg";
+import { sendBgMsg, sendTabMsg, getCurTab } from "../../libs/msg";
 import { isExt } from "../../libs/client";
 import { useI18n } from "../../hooks/I18n";
 import {
   MSG_TRANS_TOGGLE,
   MSG_TRANS_PUTRULE,
-  MSG_TRANS_GETRULE,
   MSG_SAVE_RULE,
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
   OPT_LANGS_TO_REVERSED as OPT_LANGS_TO,
@@ -44,6 +38,7 @@ import { COLLAPSED_SERVICE_LIMIT, getVisibleServices } from "./services";
 import { usePopupFeatureToggles } from "./usePopupFeatureToggles";
 import CompactLanguageSelect from "./CompactLanguageSelect";
 import PopupStylePreview from "./PopupStylePreview";
+import { queryPopupData } from "./loadData";
 
 export function resolvePopupTextStyles(
   allTextStyles,
@@ -203,7 +198,7 @@ export default function PopupCont({
           });
         } else {
           await sendTabMsg(MSG_TRANS_TOGGLE, { enabled });
-          response = await sendTopFrameMsg(MSG_TRANS_GETRULE);
+          response = await queryPopupData();
         }
 
         if (response?.error) {

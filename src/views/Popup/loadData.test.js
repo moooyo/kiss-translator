@@ -1,8 +1,10 @@
 const mockSendTopFrameMsg = jest.fn();
+const mockSendTabMsg = jest.fn();
 
 jest.mock("../../libs/msg", () => ({
   getCurTab: jest.fn(),
   sendTopFrameMsg: (...args) => mockSendTopFrameMsg(...args),
+  sendTabMsg: (...args) => mockSendTabMsg(...args),
 }));
 
 const { MSG_TRANS_GETRULE } = require("../../config");
@@ -16,6 +18,7 @@ const popupData = {
 describe("loadPopupData", () => {
   beforeEach(() => {
     mockSendTopFrameMsg.mockReset();
+    mockSendTabMsg.mockReset();
   });
 
   test("uses only the top-frame response for the default readiness probe", async () => {
@@ -28,6 +31,7 @@ describe("loadPopupData", () => {
 
     expect(mockSendTopFrameMsg).toHaveBeenCalledWith(MSG_TRANS_GETRULE);
     expect(executeScript).not.toHaveBeenCalled();
+    expect(mockSendTabMsg).not.toHaveBeenCalled();
   });
 
   test("returns immediately when the content script is already responsive", async () => {
@@ -68,6 +72,7 @@ describe("loadPopupData", () => {
       files: ["content.js"],
     });
     expect(sendMessage).toHaveBeenCalledTimes(3);
+    expect(mockSendTabMsg).not.toHaveBeenCalled();
   });
 
   test("does not inject scripts into browser or extension pages", async () => {
@@ -112,5 +117,61 @@ describe("loadPopupData", () => {
     });
     expect(sendMessage).toHaveBeenCalledTimes(8);
     expect(waitMock).toHaveBeenCalledTimes(7);
+  });
+
+  test("uses an enabled child after top-frame recovery is exhausted", async () => {
+    const sendMessage = jest.fn().mockResolvedValue(undefined);
+    const sendFallbackMessage = jest.fn().mockResolvedValue(popupData);
+    const executeScript = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      loadPopupData({
+        sendMessage,
+        sendFallbackMessage,
+        getTab: jest
+          .fn()
+          .mockResolvedValue({ id: 20, url: "https://example.com" }),
+        executeScript,
+        wait: jest.fn(),
+      })
+    ).resolves.toBe(popupData);
+
+    expect(sendMessage).toHaveBeenCalledTimes(8);
+    expect(sendFallbackMessage).toHaveBeenCalledTimes(1);
+    expect(sendFallbackMessage.mock.invocationCallOrder[0]).toBeGreaterThan(
+      sendMessage.mock.invocationCallOrder[7]
+    );
+  });
+
+  test("uses an enabled child even if reinjection is unavailable", async () => {
+    mockSendTopFrameMsg.mockResolvedValue(undefined);
+    mockSendTabMsg.mockResolvedValue(popupData);
+
+    await expect(
+      loadPopupData({ getTab: jest.fn(), wait: jest.fn() })
+    ).resolves.toBe(popupData);
+
+    expect(mockSendTabMsg).toHaveBeenCalledWith(MSG_TRANS_GETRULE);
+  });
+
+  test("preserves explicit top-frame errors instead of accepting child data", async () => {
+    const response = { error: "Page unavailable" };
+    mockSendTopFrameMsg.mockResolvedValue(response);
+    mockSendTabMsg.mockResolvedValue(popupData);
+
+    await expect(
+      loadPopupData({ getTab: jest.fn(), wait: jest.fn() })
+    ).resolves.toBe(response);
+
+    expect(mockSendTabMsg).not.toHaveBeenCalled();
+  });
+
+  test("ignores incomplete child-frame data", async () => {
+    mockSendTopFrameMsg.mockResolvedValue(undefined);
+    mockSendTabMsg.mockResolvedValue({ rule: {} });
+
+    await expect(
+      loadPopupData({ getTab: jest.fn(), wait: jest.fn() })
+    ).resolves.toBeUndefined();
   });
 });

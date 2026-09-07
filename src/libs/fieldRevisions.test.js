@@ -39,6 +39,13 @@ describe("patch path collection", () => {
     ]);
   });
 
+  test.each([{ value: [] }, { value: [{ pattern: "example.com" }] }])(
+    "tracks a root array as one revision",
+    ({ value }) => {
+      expect(collectPatchPaths(value)).toEqual([encodePath([])]);
+    }
+  );
+
   // 设置里的键名可能带点号（提示词 slug 之类），用点号拼路径会产生歧义。
   test("keeps dotted key names unambiguous", () => {
     const dotted = collectPatchPaths({ "a.b": { c: 1 } });
@@ -117,6 +124,23 @@ describe("regression detection", () => {
 });
 
 describe("replay patch construction", () => {
+  test.each([
+    { value: [] },
+    { value: [{ pattern: "example.com", enabled: false }] },
+  ])(
+    "replays the entire root array when its revision regresses",
+    ({ value }) => {
+      expect(buildReplayPatch(value, [encodePath([])])).toEqual(value);
+    }
+  );
+
+  test.each([undefined, null, false, "invalid", SETTING_PATCH_DELETE])(
+    "does not reinterpret an unsupported root replay value: %p",
+    (value) => {
+      expect(buildReplayPatch(value, [encodePath([])])).toBeUndefined();
+    }
+  );
+
   test("rebuilds a nested patch from the value I wrote", () => {
     const patch = buildReplayPatch(
       { nested: { beta: 2, other: 9 }, alpha: 1 },

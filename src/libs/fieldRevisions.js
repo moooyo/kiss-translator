@@ -180,6 +180,14 @@ export function findRegressedPaths(storedRevisions, writtenRevisions) {
  * @returns {Object|undefined} 重放补丁,无可重放内容时返回 undefined
  */
 export function buildReplayPatch(value, paths) {
+  // A root array has one revision for the whole list, including an empty list.
+  if (
+    Array.isArray(value) &&
+    paths.some((encoded) => decodePath(encoded)?.length === 0)
+  ) {
+    return value;
+  }
+
   const patch = {};
   let hasAny = false;
 

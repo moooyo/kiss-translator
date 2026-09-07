@@ -82,4 +82,32 @@ describe("setting patches", () => {
       )
     ).toBeUndefined();
   });
+
+  test.each([
+    [[{ pattern: "old.example" }], [{ pattern: "new.example" }]],
+    [[{ pattern: "old.example" }], []],
+    [null, [{ pattern: "new.example" }]],
+    [undefined, []],
+  ])("replaces a root array as one value", (current, next) => {
+    const patch = createSettingPatch(current, next);
+
+    expect(patch).toEqual(next);
+    expect(mergeSettingPatch(current, patch)).toEqual(next);
+  });
+
+  test("returns no patch for an unchanged root array", () => {
+    const current = [{ pattern: "example.com", nested: { enabled: true } }];
+    const next = [{ pattern: "example.com", nested: { enabled: true } }];
+
+    expect(createSettingPatch(current, next)).toBeUndefined();
+  });
+
+  test.each([undefined, null, false, 0, "invalid", SETTING_PATCH_DELETE])(
+    "keeps unsupported root patches as no-ops: %p",
+    (patch) => {
+      const current = [{ pattern: "example.com" }];
+
+      expect(mergeSettingPatch(current, patch)).toBe(current);
+    }
+  );
 });

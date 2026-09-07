@@ -65,6 +65,8 @@ export function createSettingPatch(current, next) {
 }
 
 export function mergeSettingPatch(current, patch) {
+  // Root lists are atomic values, just like arrays inside an object patch.
+  if (Array.isArray(patch)) return patch;
   if (!isPlainObject(patch) || isDeleteOperation(patch)) return current;
 
   const next = isPlainObject(current) ? { ...current } : {};

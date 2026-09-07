@@ -71,9 +71,13 @@ export default function Action({ translator, processActions }) {
     }
   }, []);
 
-  // 绑定挂载副作用：点击页面空白区域（window 外部）时自动收起面板
+  // Keep this panel's controls and portals inside the same click boundary.
   useEffect(() => {
-    const handleWindowClick = () => {
+    const handleWindowClick = (event) => {
+      const popupRoot = headerRef.current?.closest(".kt-m3-root");
+      // A menu opened on mousedown can move mouseup onto its backdrop, making
+      // the browser dispatch click on their shared theme root instead.
+      if (popupRoot && event.composedPath().includes(popupRoot)) return;
       setShowPopup(false);
     };
     window.addEventListener("click", handleWindowClick);

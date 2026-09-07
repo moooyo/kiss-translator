@@ -63,6 +63,18 @@ export const formatLanguageOptionName = (name) => {
 // 全空白的提示词等同于没有配置：非空字符串才算数。
 const hasPrompt = (value) => typeof value === "string" && Boolean(value.trim());
 
+const resolveActiveApiSlugs = (apiSlugs, optApis) => {
+  const validSlugs = new Set(optApis.map((api) => api.key));
+  const activeSlugs = (apiSlugs || []).filter((slug) => validSlugs.has(slug));
+  const hasExplicitEmptySelection =
+    Array.isArray(apiSlugs) && apiSlugs.length === 0;
+  if (activeSlugs.length > 0 || hasExplicitEmptySelection) {
+    return activeSlugs;
+  }
+
+  return optApis.slice(0, 1).map((api) => api.key);
+};
+
 /**
  * 翻译交互核心表单组件 (集成源/目标语言选择、多引擎翻译、词典展示、汉典展示、语言检测与文本输入)
  */
@@ -265,17 +277,10 @@ export default function TranForm({
   const xs = useMemo(() => (isPlaygound ? 6 : 4), [isPlaygound]);
   const md = useMemo(() => (isPlaygound ? 3 : 4), [isPlaygound]);
 
-  const activeApiSlugs = useMemo(() => {
-    const validSlugs = new Set(optApis.map((api) => api.key));
-    const activeSlugs = (apiSlugs || []).filter((slug) => validSlugs.has(slug));
-    const hasExplicitEmptySelection =
-      Array.isArray(apiSlugs) && apiSlugs.length === 0;
-    if (activeSlugs.length > 0 || hasExplicitEmptySelection) {
-      return activeSlugs;
-    }
-
-    return optApis.slice(0, 1).map((api) => api.key);
-  }, [apiSlugs, optApis]);
+  const activeApiSlugs = useMemo(
+    () => resolveActiveApiSlugs(apiSlugs, optApis),
+    [apiSlugs, optApis]
+  );
 
   // 默认词典覆盖英文单词和单个汉字：英文走 Bing/有道，单字走汉典。
   const defaultDictAvailable =
@@ -362,10 +367,7 @@ export default function TranForm({
   const togglePopupService = (slug) => {
     setHasUserChangedApiSlugs(true);
     setApiSlugs((current) => {
-      const validSlugs = new Set(optApis.map((api) => api.key));
-      const validCurrent = (current || []).filter((currentSlug) =>
-        validSlugs.has(currentSlug)
-      );
+      const validCurrent = resolveActiveApiSlugs(current, optApis);
       if (!validCurrent.includes(slug)) return [...validCurrent, slug];
       return validCurrent.length > 1
         ? validCurrent.filter((currentSlug) => currentSlug !== slug)

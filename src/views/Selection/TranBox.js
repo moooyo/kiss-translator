@@ -1,6 +1,5 @@
 import DraggableResizable from "./DraggableResizable";
 import Box from "@mui/material/Box";
-import ClickAwayListener from "@mui/material/ClickAwayListener";
 import IconButton from "@mui/material/IconButton";
 import UnfoldLessIcon from "@mui/icons-material/UnfoldLess";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
@@ -129,6 +128,27 @@ function TranBoxHeader({
     return () => ownerWindow.removeEventListener("resize", updateMenuPosition);
   }, [showMore, updateMenuPosition]);
 
+  useEffect(() => {
+    if (!showMore) return;
+    const ownerDocument = menuButtonRef.current.ownerDocument;
+    const handleOutsideClick = (event) => {
+      const path = event.composedPath();
+      if (
+        path.includes(menuRef.current) ||
+        path.includes(menuButtonRef.current)
+      ) {
+        return;
+      }
+      setShowMore(false);
+    };
+
+    // Capture clicks before the panel isolates them from the host page. The
+    // composed path retains the original target across the selection shadow root.
+    ownerDocument.addEventListener("click", handleOutsideClick, true);
+    return () =>
+      ownerDocument.removeEventListener("click", handleOutsideClick, true);
+  }, [showMore]);
+
   const handleMenuKeyDown = (event) => {
     if (event.key === "Escape" || event.key === "Tab") {
       if (event.key === "Escape") event.preventDefault();
@@ -206,73 +226,69 @@ function TranBoxHeader({
       </span>
 
       {showMore && (
-        <ClickAwayListener onClickAway={() => setShowMore(false)}>
-          <div
-            ref={menuRef}
-            id={menuId}
-            className="kt-tranbox-header__menu"
-            style={
-              menuPosition ? { ...menuPosition, right: "auto" } : undefined
-            }
-            role="menu"
-            aria-labelledby={menuButtonId}
-            onKeyDown={handleMenuKeyDown}
-          >
-            {/* 独立窗口打开 */}
-            {isExt && (
-              <button
-                type="button"
-                tabIndex={-1}
-                role="menuitem"
-                onClick={openSeparateWindow}
-              >
-                <OpenInNewIcon />
-                {i18n("open_separate_window")}
-              </button>
-            )}
-
-            {/* 极简折叠样式切换 */}
-            <button
-              type="button"
-              tabIndex={-1}
-              role="menuitemcheckbox"
-              aria-checked={simpleStyle}
-              onClick={() => setSimpleStyle((pre) => !pre)}
-            >
-              {simpleStyle ? <UnfoldMoreIcon /> : <UnfoldLessIcon />}
-              {i18n("btn_tip_simple_style")}
-            </button>
-
-            {/* 固定位置/跟随划词选区位置切换 */}
-            <button
-              type="button"
-              tabIndex={-1}
-              role="menuitemcheckbox"
-              aria-checked={followSelection}
-              onClick={() => setFollowSelection((pre) => !pre)}
-            >
-              {followSelection ? <PushPinOutlinedIcon /> : <PushPinIcon />}
-              {i18n("btn_tip_follow_selection")}
-            </button>
-
-            {/* 深色/浅色/自动主题模式切换 */}
+        <div
+          ref={menuRef}
+          id={menuId}
+          className="kt-tranbox-header__menu"
+          style={menuPosition ? { ...menuPosition, right: "auto" } : undefined}
+          role="menu"
+          aria-labelledby={menuButtonId}
+          onKeyDown={handleMenuKeyDown}
+        >
+          {/* 独立窗口打开 */}
+          {isExt && (
             <button
               type="button"
               tabIndex={-1}
               role="menuitem"
-              onClick={toggleDarkMode}
+              onClick={openSeparateWindow}
             >
-              {darkMode === "dark" ? (
-                <DarkModeIcon />
-              ) : darkMode === "auto" ? (
-                <BrightnessAutoIcon />
-              ) : (
-                <LightModeIcon />
-              )}
-              {i18n("btn_tip_dark_mode")}
+              <OpenInNewIcon />
+              {i18n("open_separate_window")}
             </button>
-          </div>
-        </ClickAwayListener>
+          )}
+
+          {/* 极简折叠样式切换 */}
+          <button
+            type="button"
+            tabIndex={-1}
+            role="menuitemcheckbox"
+            aria-checked={simpleStyle}
+            onClick={() => setSimpleStyle((pre) => !pre)}
+          >
+            {simpleStyle ? <UnfoldMoreIcon /> : <UnfoldLessIcon />}
+            {i18n("btn_tip_simple_style")}
+          </button>
+
+          {/* 固定位置/跟随划词选区位置切换 */}
+          <button
+            type="button"
+            tabIndex={-1}
+            role="menuitemcheckbox"
+            aria-checked={followSelection}
+            onClick={() => setFollowSelection((pre) => !pre)}
+          >
+            {followSelection ? <PushPinOutlinedIcon /> : <PushPinIcon />}
+            {i18n("btn_tip_follow_selection")}
+          </button>
+
+          {/* 深色/浅色/自动主题模式切换 */}
+          <button
+            type="button"
+            tabIndex={-1}
+            role="menuitem"
+            onClick={toggleDarkMode}
+          >
+            {darkMode === "dark" ? (
+              <DarkModeIcon />
+            ) : darkMode === "auto" ? (
+              <BrightnessAutoIcon />
+            ) : (
+              <LightModeIcon />
+            )}
+            {i18n("btn_tip_dark_mode")}
+          </button>
+        </div>
       )}
     </div>
   );

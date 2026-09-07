@@ -18,6 +18,7 @@ import {
   MSG_OPEN_SEPARATE_WINDOW,
   MSG_FIT_SEPARATE_WINDOW,
   SEPARATE_WINDOW_CONTENT_WIDTH,
+  CLIENT_THUNDERBIRD,
   DEFAULT_SETTING,
   GLOBLA_RULE,
   resolveApiPromptList,
@@ -27,45 +28,126 @@ import PopupCont from "./PopupCont";
 import TranForm from "../Selection/TranForm";
 import { useSetting } from "../../hooks/Setting";
 import { useSeparateWindowBounds } from "../../hooks/SeparateWindowBounds";
-import { isAutoTranslateClipboardSupported } from "../../libs/client";
+import { browser } from "../../libs/browser";
+import {
+  client,
+  isFirefox,
+  isAutoTranslateClipboardSupported,
+} from "../../libs/client";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
 import { POPUP_STYLES } from "./styles";
 import { loadPopupData } from "./loadData";
 
 /**
- * 独立窗口打开后,量出内容真正需要多高,请后台把窗口收到那个尺寸。
- *
- * 为什么不在后台直接算:高度取决于界面语言(标签换不换行)、浏览器缩放、
- * 系统字号 —— 这些只有页面自己渲染完才知道。宽度反过来不测,它有设计上限
- * (SEPARATE_WINDOW_CONTENT_WIDTH),再宽一行文字就长到扫不过来了。
- *
- * 只量一次:内容会随着输入和译文返回变高,跟着变会让窗口在用户打字时乱跳。
- *
- * @param {boolean} enabled 是否处于独立窗口且内容已经渲染
- * @returns {void}
+ * Fit a newly opened separate window after measuring its rendered content.
+ * Extension window bounds use screen pixels, while layout sizes must be scaled
+ * by the tab zoom. DOM outer dimensions are not consistent across browsers.
  */
 function useFitSeparateWindow(enabled) {
   useEffect(() => {
-    if (!enabled) return undefined;
+    if (
+      !enabled ||
+      typeof browser?.windows?.getCurrent !== "function" ||
+      typeof browser?.tabs?.getCurrent !== "function" ||
+      typeof browser?.tabs?.getZoom !== "function"
+    ) {
+      return undefined;
+    }
 
-    // 等一帧,让布局落定再量,否则量到的是上一帧的高度
-    const frame = requestAnimationFrame(() => {
-      const panel = document.querySelector(".kt-popup-text-panel");
-      if (!panel) return;
+    let active = true;
+    let frame;
+    const initialize = async () => {
+      try {
+        const tab = await browser.tabs.getCurrent();
+        if (!active || !Number.isInteger(tab?.id) || tab.id < 0) return;
+        const zoom = await browser.tabs.getZoom(tab.id);
+        const currentWindow = await browser.windows.getCurrent();
+        if (
+          !active ||
+          !Number.isFinite(zoom) ||
+          zoom <= 0 ||
+          !Number.isFinite(currentWindow?.width) ||
+          !Number.isFinite(currentWindow?.height)
+        ) {
+          return;
+        }
 
-      // outer - inner 就是标题栏和边框占掉的部分,各平台不一样,只能实测
-      const chromeHeight = Math.max(0, window.outerHeight - window.innerHeight);
-      const chromeWidth = Math.max(0, window.outerWidth - window.innerWidth);
+        frame = requestAnimationFrame(() => {
+          if (!active) return;
+          const panel = document.querySelector(".kt-popup-text-panel");
+          if (!panel) return;
 
-      sendBgMsg(MSG_FIT_SEPARATE_WINDOW, {
-        width: SEPARATE_WINDOW_CONTENT_WIDTH + chromeWidth,
-        height: Math.ceil(panel.scrollHeight) + chromeHeight,
-        availWidth: window.screen?.availWidth,
-        availHeight: window.screen?.availHeight,
-      });
-    });
+          // Gecko scales DOM outer/screen values with layout zoom. Its tab zoom
+          // may instead be text-only, which is already reflected in scrollHeight.
+          const isGecko = isFirefox || client === CLIENT_THUNDERBIRD;
+          const screenScale =
+            isGecko && window.outerWidth > 0
+              ? currentWindow.width / window.outerWidth
+              : 1;
+          const layoutZoom = isGecko ? screenScale : zoom;
+          const chromeHeight = Math.max(
+            0,
+            currentWindow.height - window.innerHeight * layoutZoom
+          );
+          const chromeWidth = Math.max(
+            0,
+            currentWindow.width - window.innerWidth * layoutZoom
+          );
+          const availWidth = window.screen?.availWidth * screenScale;
+          const maxWidth = Number.isFinite(availWidth)
+            ? availWidth - 40
+            : Infinity;
+          // Match the background's width limits before measuring wrapped text.
+          const width = Math.round(
+            Math.max(
+              360,
+              Math.min(
+                SEPARATE_WINDOW_CONTENT_WIDTH * layoutZoom + chromeWidth,
+                maxWidth
+              )
+            )
+          );
+          const contentWidth = Math.min(
+            SEPARATE_WINDOW_CONTENT_WIDTH,
+            Math.max(1, (width - chromeWidth) / layoutZoom)
+          );
+          const previousWidth = panel.style.getPropertyValue("width");
+          const previousPriority = panel.style.getPropertyPriority("width");
+          let contentHeight;
+          try {
+            // Read at the final width without painting an intermediate layout.
+            panel.style.setProperty("width", `${contentWidth}px`, "important");
+            contentHeight = panel.scrollHeight;
+          } finally {
+            if (previousWidth) {
+              panel.style.setProperty("width", previousWidth, previousPriority);
+            } else {
+              panel.style.removeProperty("width");
+            }
+          }
 
-    return () => cancelAnimationFrame(frame);
+          Promise.resolve(
+            sendBgMsg(MSG_FIT_SEPARATE_WINDOW, {
+              width,
+              height: Math.ceil(contentHeight * layoutZoom + chromeHeight),
+              availWidth,
+              availHeight: window.screen?.availHeight * screenScale,
+              availLeft: window.screen?.availLeft * screenScale,
+              availTop: window.screen?.availTop * screenScale,
+            })
+          ).catch((error) => kissLog("fit separate window", error));
+        });
+      } catch (error) {
+        // Keep the default size if the window closes or its APIs are unavailable.
+        kissLog("measure separate window", error);
+      }
+    };
+
+    void initialize();
+    return () => {
+      active = false;
+      if (frame !== undefined) cancelAnimationFrame(frame);
+    };
   }, [enabled]);
 }
 

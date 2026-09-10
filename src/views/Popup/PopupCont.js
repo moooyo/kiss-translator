@@ -405,7 +405,7 @@ export default function PopupCont({
   ];
 
   const advancedRows = [
-    ["transOnly", i18n("transonly_alt"), transOnly === "true"],
+    ["transOnly", i18n("show_only_translations"), transOnly === "true"],
     ["hasRichText", i18n("richtext_alt"), hasRichText === "true"],
     ["scanAll", i18n("scan_all_nodes"), scanAll === "true"],
     ["isPlainText", i18n("plain_text_translate"), isPlainText],

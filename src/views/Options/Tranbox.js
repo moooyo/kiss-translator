@@ -122,10 +122,10 @@ export default function Tranbox() {
       <Stack spacing={3}>
         <SettingsSection title={i18n("settings_trigger_group")}>
           <SettingsCard>
-            <SettingsRow label={i18n("toggle_selection_translate")}>
+            <SettingsRow label={i18n("selection_translate")}>
               <SettingsSwitch
                 checked={transOpen}
-                label={i18n("toggle_selection_translate")}
+                label={i18n("selection_translate")}
                 onChange={(checked) => updateTranbox({ transOpen: checked })}
               />
             </SettingsRow>

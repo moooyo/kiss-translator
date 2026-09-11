@@ -43,14 +43,14 @@ import {
 } from "./SettingsCard";
 
 /**
- * 按声明边界切分 CSS 字符串。
+ * Split CSS at declaration boundaries.
  *
- * 不能直接 split(";")：分号也会合法地出现在引号、括号和注释内部，
- * 最典型的是 `url("data:image/svg+xml;utf8,...")`。裸切会把值拦腰截断，
- * 而只要用户之后碰任意一个样式滑块，截断结果就会被写回存储、无法恢复。
+ * Semicolons inside strings, parentheses, or comments are part of the value.
+ * Preserve them so editing a style slider cannot truncate values such as
+ * `url("data:image/svg+xml;utf8,...")` when saving the updated declarations.
  *
- * @param {string} cssString CSS 源码
- * @returns {string[]} 各条声明（未 trim，保留原始空白与注释）
+ * @param {string} cssString CSS source.
+ * @returns {string[]} Declarations with their original whitespace and comments.
  */
 const splitCssDeclarations = (cssString) => {
   const parts = [];
@@ -530,12 +530,12 @@ export default function SubtitleSetting() {
   const transCssRef = useRef(parseCssToObject(localTransStyle));
   const windowCssRef = useRef(parseCssToObject(localWindowStyle));
 
-  // 组件卸载时销毁所有动画帧，并把仍在等待的防抖写入立即落盘
+  // Cancel animation frames and flush pending debounced writes on unmount.
   useEffect(() => {
     return () => {
-      // 必须 flush 而不是丢弃：本文件没有任何 onChangeCommitted，
-      // 200ms 防抖是样式改动唯一的持久化路径。直接 clearTimeout 会让
-      // 「拖完滑块立刻切到别的设置分页」的改动凭空消失。
+      // Flush the pending write because these controls have no onChangeCommitted.
+      // The debounce is the only persistence path for style edits.
+      // Clearing the timer would lose edits when navigating away after dragging.
       Object.values(debounceTimers.current).forEach((pending) => {
         clearTimeout(pending.timer);
         pending.flush();
@@ -826,9 +826,8 @@ export default function SubtitleSetting() {
                 }))}
               />
             </SettingsRow>
-            {/* 保留原生 TextField：SettingsSelect 不暴露 helperText / error，
-                而断句与翻译服务不一致时的红色告警必须留着（b436d5b 加入，
-                a07d39f 删除，1b10d45 有意恢复）。 */}
+            {/* Keep TextField so mismatched segmentation and translation
+                services retain their helper text and error state. */}
             <SettingsRow label={i18n("ai_segmentation")}>
               <TextField
                 select
@@ -912,7 +911,7 @@ export default function SubtitleSetting() {
           </SettingsCard>
         </SettingsSection>
 
-        {/* 字幕分句分词策略、超前预翻译等长尾参数 */}
+        {/* Advanced segmentation, tokenization, and pretranslation settings. */}
         <SettingsAdvanced label={i18n("settings_detailed_controls")}>
           <Grid container spacing={2} columns={12}>
             {segSlug !== "-" && (
@@ -1142,7 +1141,7 @@ export default function SubtitleSetting() {
             }}
           >
             <Stack spacing={2} useFlexGap>
-              {/* 字幕预览展示窗 */}
+              {/* Subtitle preview. */}
               <SubtitleStylePreview
                 windowStyle={localWindowStyle}
                 originStyle={localOriginStyle}
@@ -1152,7 +1151,7 @@ export default function SubtitleSetting() {
 
               <Divider />
 
-              {/* 字号与字体颜色修改 */}
+              {/* Font size and color controls. */}
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
                   {textStyleControls(
@@ -1174,13 +1173,13 @@ export default function SubtitleSetting() {
 
               <Divider />
 
-              {/* 字幕窗格背景样式控制区域 */}
+              {/* Subtitle window background controls. */}
               <Box>
                 <Typography variant="subtitle2" gutterBottom>
                   {i18n("background_styles")}
                 </Typography>
                 <Grid container spacing={1.5} alignItems="center">
-                  {/* 窗格背景底色与透明度滑动条 */}
+                  {/* Background color and opacity controls. */}
                   <Grid item xs={12} sm={6}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Typography
@@ -1250,7 +1249,7 @@ export default function SubtitleSetting() {
                       </Typography>
                     </Box>
                   </Grid>
-                  {/* 行高微调 Slider */}
+                  {/* Line height slider. */}
                   <Grid item xs={12} sm={6}>
                     <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                       <Typography
@@ -1280,7 +1279,7 @@ export default function SubtitleSetting() {
                       </Typography>
                     </Box>
                   </Grid>
-                  {/* 上下与左右内边距微调 Slider */}
+                  {/* Vertical and horizontal padding sliders. */}
                   <Grid item xs={12} sm={6}>
                     <Box
                       sx={{
@@ -1335,7 +1334,7 @@ export default function SubtitleSetting() {
                       />
                     </Box>
                   </Grid>
-                  {/* 字幕文字四周的阴影开关 */}
+                  {/* Subtitle text shadow toggle. */}
                   <Grid item xs={12} sm={6}>
                     <FormControlLabel
                       control={
@@ -1366,7 +1365,7 @@ export default function SubtitleSetting() {
                 </Grid>
               </Box>
 
-              {/* 折叠的高级 CSS 源码编辑器面板 (可自由手写额外的样式规则覆盖视频字幕的外观) */}
+              {/* Advanced CSS editor for overriding the subtitle appearance. */}
               <Accordion
                 sx={{ boxShadow: "none", "&:before": { display: "none" } }}
               >

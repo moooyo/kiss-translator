@@ -7,6 +7,13 @@ const mockPopupInstances = [];
 const mockFabInstances = [];
 const activeManagers = [];
 
+jest.mock("./ruleEditorManager", () => ({
+  RuleEditorManager: class {
+    destroy = jest.fn();
+    open = jest.fn();
+  },
+}));
+
 jest.mock("../config", () => ({
   EVENT_KISS_INNER: "kiss-inner",
   EVENT_KISS_TRANSLATOR: "kiss-translator",
@@ -20,6 +27,7 @@ jest.mock("../config", () => ({
   MSG_OPEN_TRANBOX: "open-tranbox",
   MSG_TRANSBOX_TOGGLE: "transbox-toggle",
   MSG_POPUP_TOGGLE: "popup-toggle",
+  MSG_RULE_EDITOR: "rule-editor",
   MSG_MOUSEHOVER_TOGGLE: "mousehover-toggle",
   MSG_TRANSINPUT_TOGGLE: "transinput-toggle",
   OPT_SHORTCUT_TRANSLATE: "translate",
@@ -116,6 +124,7 @@ jest.mock("./popupManager", () => ({
     const instance = {
       destroy: jest.fn(),
       processActions: args.processActions,
+      hide: jest.fn(),
       toggle: jest.fn(),
     };
     mockPopupInstances.push(instance);
@@ -228,6 +237,7 @@ function setupMockConstructors() {
     const instance = {
       destroy: jest.fn(),
       processActions: args.processActions,
+      hide: jest.fn(),
       toggle: jest.fn(),
     };
     mockPopupInstances.push(instance);
@@ -370,6 +380,46 @@ describe("TranslatorManager SPA lifecycle", () => {
     expect(mockTranslatorInstances[0].stop).toHaveBeenCalledTimes(1);
   });
 
+  test("finishes runtime cleanup when rule editor teardown fails", () => {
+    const manager = createManager();
+    manager.start();
+    const editor = manager._ruleEditorManager;
+    editor.destroy.mockImplementationOnce(() => {
+      throw new Error("Extension context invalidated.");
+    });
+
+    expect(() => manager.stop()).not.toThrow();
+
+    expect(editor.destroy).toHaveBeenCalledTimes(1);
+    expect(mockPopupInstances[0].destroy).toHaveBeenCalledTimes(1);
+    expect(mockFabInstances[0].destroy).toHaveBeenCalledTimes(1);
+    expect(mockTransboxInstances[0].disable).toHaveBeenCalledTimes(1);
+    expect(mockInputTranslatorInstances[0].disable).toHaveBeenCalledTimes(1);
+    expect(mockTranslatorInstances[0].stop).toHaveBeenCalledTimes(1);
+    expect(manager._ruleEditorManager).toBeNull();
+  });
+
+  test("keeps rule editing in its own frame and suppresses translation commands", () => {
+    const manager = createManager();
+    manager.start();
+    const popup = mockPopupInstances[0];
+    const editor = manager._ruleEditorManager;
+
+    popup.processActions({ action: "rule-editor" });
+
+    expect(popup.hide).toHaveBeenCalledTimes(1);
+    expect(editor.open).toHaveBeenCalledTimes(1);
+    expect(sendIframeMsg).not.toHaveBeenCalled();
+
+    editor.session = {
+      runtimeState: { enabled: true, mouseHover: false },
+    };
+    popup.processActions({ action: "trans-toggle" });
+
+    expect(mockTranslatorInstances[0].toggle).not.toHaveBeenCalled();
+    expect(sendIframeMsg).not.toHaveBeenCalled();
+  });
+
   test("ignores stale popup callbacks after the manager stops", () => {
     const manager = createManager();
     manager.start();
@@ -400,6 +450,88 @@ describe("TranslatorManager SPA lifecycle", () => {
     expect(mockTransboxArgs[1].tranboxSetting.transOpen).toBe(false);
     expect(mockTranslatorArgs[1].setting.inputRule.transOpen).toBe(false);
   });
+
+  test.each([true, false])(
+    "restores pre-editor translation state %s and explicit feature settings on restart",
+    (enabled) => {
+      const manager = createManager();
+      manager.start();
+      sendRuntimeMessage({
+        action: "transbox-toggle",
+        args: { enabled: false },
+      });
+      sendRuntimeMessage({
+        action: "transinput-toggle",
+        args: { enabled: false },
+      });
+
+      const translator = mockTranslatorInstances[0];
+      const editor = manager._ruleEditorManager;
+      editor.session = {
+        runtimeState: { enabled, mouseHover: enabled },
+        savedContext: {
+          effective: { transOpen: "false", selector: ".article" },
+        },
+      };
+      translator.rule = {
+        transOpen: enabled ? "false" : "true",
+        selector: ".draft",
+      };
+      translator.setting.mouseHoverSetting.useMouseHover = !enabled;
+
+      manager.restart("rule-editor-state-test");
+
+      expect(editor.destroy).toHaveBeenCalledTimes(1);
+      expect(mockTranslatorArgs[1].rule).toEqual({
+        transOpen: enabled ? "true" : "false",
+        selector: ".article",
+      });
+      expect(
+        mockTranslatorArgs[1].setting.mouseHoverSetting.useMouseHover
+      ).toBe(enabled);
+      expect(mockTransboxArgs[1].tranboxSetting.transOpen).toBe(false);
+      expect(mockTranslatorArgs[1].setting.inputRule.transOpen).toBe(false);
+      expect(translator.setting.mouseHoverSetting.useMouseHover).toBe(!enabled);
+      expect(editor.session.savedContext.effective.transOpen).toBe("false");
+    }
+  );
+
+  test.each([
+    ["saved page rule", null],
+    ["resolved route rule", { transOpen: "false", selector: ".article" }],
+  ])(
+    "restores the %s instead of the editor draft when the body is replaced",
+    async (_, restoreRule) => {
+      const manager = createManager();
+      manager.start();
+      const editor = manager._ruleEditorManager;
+      editor.session = {
+        runtimeState: { enabled: true, mouseHover: false },
+        restoreRule,
+        savedContext: {
+          effective: { transOpen: "false", selector: ".renamed-rule" },
+          pageEffective: {
+            transOpen: "false",
+            selector: restoreRule ? ".previous-page" : ".article",
+          },
+        },
+      };
+      mockTranslatorInstances[0].rule = {
+        transOpen: "false",
+        selector: ".draft",
+      };
+
+      replaceBody();
+      await flushMutationObserver();
+      jest.runOnlyPendingTimers();
+
+      expect(editor.destroy).toHaveBeenCalledTimes(1);
+      expect(mockTranslatorArgs[1].rule).toEqual({
+        transOpen: "true",
+        selector: ".article",
+      });
+    }
+  );
 
   test("coalesces navigation rescan and body replacement into one restart", async () => {
     const manager = createManager();

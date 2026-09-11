@@ -11,9 +11,7 @@ jest.mock("../../hooks/I18n", () => ({
 
 jest.mock("../../components/Logo", () => () => null);
 
-// 这个文件原本测的是赞赏菜单。那个功能已经删掉:它指向的「评价」是我们没有的
-// 商店页、「赞赏」是我们没有的捐赠页,对这个 fork 是两个死链接。
-// 现在钉住的是删干净这件事本身 —— header 只剩独立窗口和设置两个动作。
+// The fork offers window and settings actions without store or donation links.
 describe("Popup Header actions", () => {
   let container;
   let root;

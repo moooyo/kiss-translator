@@ -5,6 +5,7 @@
 
 import { SETTINGS_I18N } from "./locales/settings";
 import { RU_I18N } from "./i18n.ru";
+import { RULE_EDITOR_I18N } from "./i18n.ruleEditor";
 
 export const UI_LANGS = [
   ["en", "English"],
@@ -1066,6 +1067,7 @@ const SUBTITLE_PLAYGROUND_I18N = {
 
 export const I18N = {
   ...SETTINGS_I18N,
+  ...RULE_EDITOR_I18N,
   ...SUBTITLE_PLAYGROUND_I18N,
   app_name: {
     zh: `简约翻译 M3`,
@@ -2383,8 +2385,8 @@ export const I18N = {
     vi: "Mẫu URL",
   },
   pattern_helper: {
-    zh: `1、支持星号(*)通配符。2、多个URL用换行或英文逗号“,”分隔。`,
-    en: `1. Supports the asterisk (*) wildcard character. 2. Separate multiple URLs with newlines or English commas ",".`,
+    zh: `1、支持星号(*)通配符。2、多个URL用换行或英文逗号“,”分隔。3、hostname:example.com 仅匹配该主机，不包含子域名；此格式单独使用。`,
+    en: `1. Supports the asterisk (*) wildcard character. 2. Separate multiple URLs with newlines or English commas ",". 3. hostname:example.com matches only that host, without subdomains; use this format alone.`,
     zh_TW: `1. 支援星號 (*) 萬用字元。2. 多個 URL 請以換行或英文逗號「,」分隔。`,
     ja: `1. アスタリスク (*) ワイルドカードをサポートします。 2. 複数のURLは改行または英語のコンマ「,」で区切ります。`,
     ko: `1. 별표(*) 와일드카드 문자를 지원합니다. 2. 여러 URL은 줄바꿈 또는 영어 쉼표 ","로 구분합니다.`,
@@ -2437,9 +2439,9 @@ export const I18N = {
     vi: "Bộ chọn",
   },
   target_selector: {
-    zh: `目标元素选择器`,
+    zh: `需翻译节点选择器`,
     en: `Target element selector`,
-    zh_TW: `目標元素選擇器`,
+    zh_TW: `需翻譯節點選擇器`,
     ja: `対象要素セレクタ`,
     ko: `대상 요소 선택자`,
     tr: `Hedef Öğe Seçici`,
@@ -3805,6 +3807,24 @@ export const I18N = {
     ko: `활성화하면 중국어 간체와 번체 같은 언어 변형 간에도 번역합니다. 비활성화하면 같은 언어로 간주하여 건너뜁니다.`,
     tr: `Etkinleştirildiğinde Basitleştirilmiş ve Geleneksel Çince gibi dil varyantları arasında çeviri yapılır. Devre dışı bırakıldığında aynı dil sayılarak atlanır.`,
     vi: `Khi bật, các biến thể như tiếng Trung giản thể và phồn thể sẽ được dịch qua lại. Khi tắt, chúng được xem là cùng một ngôn ngữ và bị bỏ qua.`,
+  },
+  parse_latex: {
+    zh: `LaTeX 公式转换`,
+    en: `Parse LaTeX Math`,
+    zh_TW: `LaTeX 公式轉換`,
+    ja: `LaTeX 数式を変換`,
+    ko: `LaTeX 수식 변환`,
+    tr: `LaTeX Matematiğini Dönüştür`,
+    vi: `Chuyển đổi công thức LaTeX`,
+  },
+  parse_latex_helper: {
+    zh: `将译文中的行内 LaTeX 公式转换为可读的 Unicode 文本（如 \\dot{x}_1 → ẋ₁）。作用于字幕、划词翻译、输入翻译与悬停气泡。`,
+    en: `Convert inline LaTeX in translated text to readable Unicode (e.g. \\dot{x}_1 → ẋ₁). Applies to subtitles, selection popup, input translate and hover bubble.`,
+    zh_TW: `將譯文中的行內 LaTeX 公式轉換為可讀的 Unicode 文字（如 \\dot{x}_1 → ẋ₁）。作用於字幕、劃詞翻譯、輸入翻譯與懸停氣泡。`,
+    ja: `訳文中のインライン LaTeX 数式を読みやすい Unicode に変換します（例：\\dot{x}_1 → ẋ₁）。字幕、選択範囲翻訳、入力翻訳、ホバーバブルに適用されます。`,
+    ko: `번역문에 포함된 인라인 LaTeX 수식을 읽기 쉬운 유니코드로 변환합니다(예: \\dot{x}_1 → ẋ₁). 자막, 단어 선택 번역, 입력 번역, 호버 말풍선에 적용됩니다.`,
+    tr: `Çeviri metnindeki satır içi LaTeX ifadelerini okunabilir Unicode'a dönüştürür (ör. \\dot{x}_1 → ẋ₁). Altyazılara, seçim kutusuna, giriş çevirisine ve fareyle üzerine gelme balonuna uygulanır.`,
+    vi: `Chuyển các công thức LaTeX nội dòng trong bản dịch thành Unicode dễ đọc (ví dụ \\dot{x}_1 → ẋ₁). Áp dụng cho phụ đề, hộp dịch khi bôi đen, dịch ô nhập liệu và bong bóng khi di chuột.`,
   },
   context_menus: {
     zh: `右键菜单`,

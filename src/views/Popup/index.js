@@ -152,7 +152,7 @@ function useFitSeparateWindow(enabled) {
 }
 
 /**
- * 文本翻译面板组件 (用于直接在 Popup 中输入文本进行翻译)
+ * Text translation panel for direct input in the popup.
  */
 export function Trantab({ isSeparate = false }) {
   useSeparateWindowBounds(isSeparate);
@@ -226,8 +226,7 @@ export function Trantab({ isSeparate = false }) {
     return () => window.removeEventListener("focus", translateClipboard);
   }, [isSeparate, translateClipboard]);
 
-  // 必须等设置加载完 —— 在那之前渲染的是 260px 高的加载态,
-  // 这时候量会把窗口收成一条缝。
+  // Wait for settings so the fixed 260px loading state cannot shrink the window.
   useFitSeparateWindow(isSeparate && Boolean(setting?.tranboxSetting));
 
   const serializedTransApis = useMemo(
@@ -274,6 +273,7 @@ export function Trantab({ isSeparate = false }) {
     langDetector = {},
     prompts = [],
     translateVariants,
+    parseLatex,
   } = setting;
 
   return (
@@ -294,6 +294,7 @@ export function Trantab({ isSeparate = false }) {
         aiDictPromptSlug={aiDictPromptSlug}
         prompts={prompts}
         translateVariants={translateVariants}
+        parseLatex={parseLatex}
         autoFocusInput={autoFocusInput}
         syncExternalTextWhileEditing
         popupStyle

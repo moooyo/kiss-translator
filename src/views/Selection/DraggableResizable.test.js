@@ -130,8 +130,8 @@ describe("DraggableResizable auto height bounds", () => {
     expect(updater({ x: 0, y: 400 })).toEqual({ x: 0, y: 200 });
   });
 
-  // header 同时是拖拽触发区，里面坐着一排图标按钮和一个溢出菜单。
-  // 没有这条护栏，点开菜单的同时整个框会跟着指针跑。
+  // The header contains buttons and an overflow menu as well as the drag area.
+  // Opening the menu must not make the panel follow the pointer.
   test("pressing a control inside the header does not start a drag", () => {
     const panel = renderPanel({
       header: (
@@ -162,9 +162,9 @@ describe("DraggableResizable auto height bounds", () => {
     expect(panel.setPosition).not.toHaveBeenCalled();
   });
 
-  // pointercancel 之后浏览器不会再补发 pointerup，而清空 origin 的唯一出口
-  // 就在 pointerup 里。少了 cancel 分支，被系统手势打断的一次拖拽会让 origin
-  // 永久残留，之后指针只要掠过 header 就继续拖动——没有按下任何键。
+  // Browsers do not emit pointerup after pointercancel, so cancellation must
+  // clear origin too. Otherwise, an interrupted drag leaves a stale origin and
+  // moving over the header resumes dragging without any button pressed.
   test("a cancelled pointer ends the drag instead of leaving it stuck", () => {
     const panel = renderPanel();
     const header = container.querySelector(".KT-draggable-header");

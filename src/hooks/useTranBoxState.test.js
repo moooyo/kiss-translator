@@ -80,8 +80,8 @@ describe("useTranBoxState", () => {
     });
   });
 
-  // 下面几组数字由 tranboxPosition.js 的 TRANBOX_SIDE_GRIP_WIDTH (16) 和
-  // TRANBOX_CHROME_HEIGHT (74) 推出来。改那两个常量时这里必须一起改。
+  // These expectations use TRANBOX_SIDE_GRIP_WIDTH (16) and TRANBOX_CHROME_HEIGHT (74).
+  // Update them when either constant in tranboxPosition.js changes.
   test("clamps restored fixed-position boxes inside the viewport", async () => {
     getTranBox.mockResolvedValue({ w: 320, h: 240, x: 790, y: 480 });
     const controller = renderTranBoxState();

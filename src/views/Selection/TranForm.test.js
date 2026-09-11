@@ -653,9 +653,8 @@ describe("TranForm AI dictionary tab", () => {
   });
 });
 
-// 设置页的选择器只列出「已启用的 AI 接口」和「词典分类的提示词」，但存下来的只是
-// slug。用户之后停用那个接口、把它改成非 AI 类型、或改掉提示词分类，这里都收不到
-// 通知——不重新校验的话，词典请求会带着词典提示词发到一个非 AI 端点上去。
+// Stored slugs can outlive changes to API availability, API type, or prompt category.
+// Recheck eligibility to avoid sending dictionary prompts to a non-AI endpoint.
 describe("TranForm AI dictionary revalidates stale settings", () => {
   beforeEach(() => {
     apiDict.mockReset();
@@ -663,9 +662,8 @@ describe("TranForm AI dictionary revalidates stale settings", () => {
     document.body.innerHTML = "";
   });
 
-  // AI 词典不可用时 TranForm 根本不渲染 Tabs（只剩默认词典那一段），可用时是
-  // 「默认词典 + AI 词典」两个。按数量判断比按文案判断稳 —— 文案跟着 uiLang 走，
-  // 一旦对不上，"找不到那个 tab" 的断言就会永远为真，测试变成空跑。
+  // Unavailable AI dictionaries render no tabs; available ones render both dictionary tabs.
+  // Count tabs so a localized label mismatch cannot make an absence assertion pass incorrectly.
   const tabCount = (container) =>
     container.querySelectorAll('[role="tab"]').length;
 

@@ -10,6 +10,7 @@ import {
 import { resolveApiPromptSettings } from "../config/prompt";
 import { isMobile } from "./mobile";
 import { genEventName, removeEndchar, matchInputStr, sleep } from "./utils";
+import { parseMathInText } from "./mathParse";
 import { stepShortcutRegister } from "./shortcut";
 import { apiTranslate } from "../apis";
 import { createLoadingSVG } from "./svg";
@@ -336,6 +337,7 @@ export class InputTranslator {
     subtitleSetting = {},
     translateVariants = true,
     uiLang = "en",
+    parseLatex = false,
   } = {}) {
     this.#config = {
       inputRule,
@@ -344,6 +346,7 @@ export class InputTranslator {
       transApis,
       translateVariants,
       uiLang,
+      parseLatex,
     };
 
     const { triggerShortcut: initialTriggerShortcut } = this.#config.inputRule;
@@ -771,7 +774,11 @@ export class InputTranslator {
       });
       if (!isCurrentRequest()) return;
 
-      const newText = trText?.trim() || "";
+      // Input fields receive plain text, with optional LaTeX-to-Unicode conversion.
+      const trimmedText = trText?.trim() || "";
+      const newText = this.#config.parseLatex
+        ? parseMathInText(trimmedText)
+        : trimmedText;
       if (!newText || isSame) return;
 
       // 6. 执行替换 (使用新的智能替换函数)

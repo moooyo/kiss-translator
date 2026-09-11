@@ -12,14 +12,15 @@ import {
   OPT_TRANS_GOOGLE,
 } from "../../config";
 import { useI18n } from "../../hooks/I18n";
+import { parseMathInText } from "../../libs/mathParse";
 import CopyBtn from "./CopyBtn";
 import { BrowserTtsBtn } from "./AudioBtn";
 
 /**
- * 判断划词翻译结果是否允许进行可见的流式渲染。
+ * Determine whether selection translation results can render incrementally.
  *
- * @param {Object} apiSetting 翻译接口配置。
- * @returns {boolean} 当前接口是否应把增量 chunk 直接写入划词翻译输出框。
+ * @param {Object} apiSetting Translation API settings.
+ * @returns {boolean} Whether this API should display streaming chunks immediately.
  */
 const canRenderStream = (apiSetting) =>
   Boolean(
@@ -29,10 +30,10 @@ const canRenderStream = (apiSetting) =>
   );
 
 /**
- * 归一化流式回调中的文本载荷。
+ * Normalize the text payload from a streaming callback.
  *
- * @param {string|string[]} text 流式回调返回的局部文本或最终翻译结果。
- * @returns {string} 可直接写入 UI 的译文字符串。
+ * @param {string|string[]} text Partial or final text from a streaming callback.
+ * @returns {string} Translation text ready for display.
  */
 const normalizeChunkText = (text) => {
   if (Array.isArray(text)) {
@@ -43,24 +44,31 @@ const normalizeChunkText = (text) => {
 };
 
 /**
- * 将接口响应转换为文本框可直接显示和复制的纯文本。
+ * Convert an API response to plain text for display and copying.
  *
- * @param {string} text 翻译接口返回的文本。
- * @param {string} apiType 翻译接口类型。
- * @param {string} sourceText 原始待翻译文本。
- * @returns {string} 供文本 UI 使用的译文。
+ * @param {string} text Text returned by the translation API.
+ * @param {string} apiType Translation API type.
+ * @param {string} sourceText Original text to translate.
+ * @param {boolean} parseLatex Whether to render inline LaTeX as Unicode.
+ * @returns {string} Translation text ready for the text UI.
  */
-const normalizeTranslationText = (text, apiType, sourceText) => {
+const normalizeTranslationText = (text, apiType, sourceText, parseLatex) => {
   const normalizedText = normalizeChunkText(text);
+  // Convert inline LaTeX before unescaping newlines so commands such as
+  // `\right` are not split by the escaped carriage-return replacement.
+  const mathText = parseLatex
+    ? parseMathInText(normalizedText)
+    : normalizedText;
+
   if (apiType === OPT_TRANS_GOOGLE) {
-    return normalizedText.replace(/[\t ]*(\r\n|\r|\n)[\t ]*/g, "\n");
+    return mathText.replace(/[\t ]*(\r\n|\r|\n)[\t ]*/g, "\n");
   }
 
   if (API_SPE_TYPES.ai.has(apiType) && /\r\n|\r|\n/.test(sourceText)) {
-    return normalizedText.replace(/\\r\\n|\\n|\\r/g, "\n");
+    return mathText.replace(/\\r\\n|\\n|\\r/g, "\n");
   }
 
-  return normalizedText;
+  return mathText;
 };
 
 /**
@@ -94,8 +102,8 @@ const translateBuiltinText = async (
     fromLang === "auto" && detectedLang ? detectedLang : fromLang;
   let remainingIndexes = translatableIndexes;
 
-  // 完整文本检测仍未解析出语言时，只允许首个片段走 auto/fallback。
-  // 成功后复用其源语言，避免其余片段并发触发远程检测。
+  // If full-input detection has no result, use auto/fallback only for the first fragment.
+  // Reuse its source language to avoid concurrent remote detection for later fragments.
   if (requestFromLang === "auto") {
     const [firstIndex, ...restIndexes] = translatableIndexes;
     const firstResult = await translate(parts[firstIndex], "auto");
@@ -125,15 +133,15 @@ const translateBuiltinText = async (
 };
 
 /**
- * 单个划词翻译结果组件，负责发起指定服务商的翻译请求并渲染译文。
+ * Request and display a selection translation from one provider.
  *
- * @param {Object} props 组件参数。
- * @param {string} props.text 需要翻译的原始文本。
- * @param {string} props.fromLang 源语言代码。
- * @param {string} props.toLang 目标语言代码。
- * @param {string} props.apiSlug 选用的翻译 API 唯一标识。
- * @param {Array<Object>} props.transApis 可用翻译 API 配置列表。
- * @param {boolean} [props.simpleStyle=false] 是否使用极简文本样式渲染。
+ * @param {Object} props Component props.
+ * @param {string} props.text Original text to translate.
+ * @param {string} props.fromLang Source language code.
+ * @param {string} props.toLang Target language code.
+ * @param {string} props.apiSlug Selected translation API identifier.
+ * @param {Array<Object>} props.transApis Available translation API settings.
+ * @param {boolean} [props.simpleStyle=false] Whether to use the simple text layout.
  * @param {boolean} [props.isPlayground=false] Whether to render the full Playground result surface.
  * @param {boolean} [props.popupStyle=false] Whether to use the Popup M3 result card.
  * @param {number} [props.requestRevision=0] Explicit submission revision for retrying unchanged input.
@@ -146,6 +154,7 @@ export default function TranCont({
   apiSlug,
   transApis,
   translateVariants = true,
+  parseLatex = false,
   detectedLang = "",
   sourceDetectionPending = false,
   simpleStyle = false,
@@ -161,7 +170,7 @@ export default function TranCont({
   const [attemptRevision, setAttemptRevision] = useState(requestRevision);
   const requestPendingRef = useRef(false);
 
-  // 根据 slug 找到当前组件实例负责调用的翻译接口配置。
+  // Resolve the translation API settings for this instance's slug.
   const apiSetting = useMemo(
     () => transApis.find((api) => api.apiSlug === apiSlug),
     [transApis, apiSlug]
@@ -196,14 +205,14 @@ export default function TranCont({
     const startedAt = Date.now();
 
     /**
-     * 接收底层翻译队列吐出的流式增量文本，并同步到当前输出框。
+     * Synchronize streaming text from the translation queue with the output field.
      *
-     * @param {Object} chunk 流式翻译分块。
-     * @param {string|string[]} chunk.text 当前分块中已经解析出的译文。
+     * @param {Object} chunk Streaming translation chunk.
+     * @param {string|string[]} chunk.text Translation text parsed from this chunk.
      */
     const handleStreamChunk = enableStreamRender
       ? ({ text: chunkText }) => {
-          // 旧请求被切换或取消后，晚到的流式分块不能再覆盖当前划词结果。
+          // Ignore late chunks from replaced or canceled requests.
           if (!active || controller.signal.aborted) {
             return;
           }
@@ -211,7 +220,8 @@ export default function TranCont({
           const nextText = normalizeTranslationText(
             chunkText,
             apiSetting.apiType,
-            text
+            text,
+            parseLatex
           );
           if (nextText) {
             setTrText(nextText);
@@ -235,7 +245,7 @@ export default function TranCont({
             textFormat: "text",
             translateVariants,
             onStreamChunk: handleStreamChunk,
-            // 将组件生命周期的取消信号下传，避免划词内容变化后旧请求继续占用网络与回写 UI。
+            // Pass cancellation through so stale requests stop using the network and updating the UI.
             signal: controller.signal,
           });
         const { trText, isSame } =
@@ -252,7 +262,12 @@ export default function TranCont({
           setTrText(
             isSame
               ? ""
-              : normalizeTranslationText(trText, apiSetting.apiType, text)
+              : normalizeTranslationText(
+                  trText,
+                  apiSetting.apiType,
+                  text,
+                  parseLatex
+                )
           );
           setElapsedMs(Date.now() - startedAt);
         }
@@ -284,6 +299,7 @@ export default function TranCont({
     toLang,
     apiSetting,
     translateVariants,
+    parseLatex,
     builtinDetectedLang,
     waitForBuiltinDetection,
     attemptRevision,
@@ -440,7 +456,7 @@ export default function TranCont({
                     }
               }
             >
-              {/* 复制当前译文；流式渲染期间复制到的是已经到达的部分文本。 */}
+              {/* Copy the current translation, including partial text during streaming. */}
               {trText && (
                 <CopyBtn
                   text={trText}

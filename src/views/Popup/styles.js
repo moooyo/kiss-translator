@@ -12,11 +12,8 @@ export const POPUP_STYLES = String.raw`
   color: var(--kt-on);
 }
 
-/* 独立翻译窗口。曾经是 width: min(560px, 100vw) 且不居中 —— 窗口一放大,
-   面板就死贴在左边,右侧留一大片空白。
-   这里让外壳铺满整个窗口(背景才不会在两侧断成色带),再把内容本身居中并限宽:
-   窗口拉宽时留白对称,而一行文字不会宽到扫不过来。
-   min-height 用 100dvh 而不是 100vh,免得移动端浏览器地址栏把底部顶掉。 */
+/* Fill the separate window while keeping its content centered and readable.
+   Dynamic viewport units account for the mobile browser toolbar. */
 .kt-popup-shell--window {
   width: 100%;
   min-width: 0;
@@ -53,6 +50,7 @@ export const POPUP_STYLES = String.raw`
 
 .kt-popup-header__logo { border-radius: 8px; }
 .kt-popup-brand-button { display: block; padding: 0; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+.kt-popup-header__identity { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
 .kt-popup-header__title { min-width: 0; max-width: 100%; overflow: hidden; font-size: 15px; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
 .kt-popup-header__version { padding: 3px 8px; border-radius: 999px; background: var(--kt-sf2); color: var(--kt-onv); font-size: 10.5px; font-weight: 650; }
 .kt-popup-header__spacer { flex: 1; }
@@ -145,6 +143,9 @@ export const POPUP_STYLES = String.raw`
 .kt-popup-language .kt-popup-language-select { width: 100%; margin-top: 1px; color: var(--kt-on); font-size: 13px; font-weight: 600; }
 .kt-popup-language-select { border-radius: 12px; }
 .kt-popup-language-select .MuiSelect-select { min-height: 0; padding: 0 24px 0 0 !important; border-radius: inherit; color: var(--kt-on); cursor: pointer; transition: background-color .2s ease; }
+/* Keep the rounded focus ring without clipping edge glyphs. The label spans
+   below handle long-name truncation independently. */
+.kt-popup-language .kt-popup-language-select .MuiSelect-select { overflow: visible; }
 .kt-popup-language-select .MuiSelect-select.MuiInputBase-input:focus { outline: 3px solid var(--kt-pri); outline-offset: 2px; background: transparent; }
 @supports selector(:focus-visible) {
   .kt-popup-language-select .MuiSelect-select.MuiInputBase-input:focus { outline: none; }

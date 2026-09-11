@@ -249,7 +249,7 @@ describe("Prompts", () => {
       nameInput.dispatchEvent(new Event("input", { bubbles: true }));
     });
 
-    // 提示词列表重建后是全新对象，内容完全一致 —— 不得冲掉未保存的草稿。
+    // Preserve the unsaved draft when list rebuilding produces an equivalent object.
     rerender([{ ...prompt }]);
     expect(container.querySelector('input[name="name"]').value).toBe(
       "Changed prompt"

@@ -196,8 +196,8 @@ function PromptFields({
     formData.category === PROMPT_CATEGORY_USER ||
     formData.category === PROMPT_CATEGORY_DICTIONARY;
 
-  // prompt 的对象身份会随所在列表的每次重建而变化，内容却未必变。
-  // 与 StyleFields 同理：只有持久化内容真的发生变化时才覆盖用户未保存的草稿。
+  // Rebuilding the prompt list can replace objects without changing their content.
+  // Reset the unsaved draft only when the persisted content changes.
   useLayoutEffect(() => {
     const nextSnapshot = JSON.stringify(normalizePrompt(prompt));
     if (lastSyncedPromptRef.current === nextSnapshot) {

@@ -14,6 +14,7 @@ import {
 import { touchTapListener } from "./touch";
 import { PopupManager } from "./popupManager";
 import { FabManager } from "./fabManager";
+import { RuleEditorManager } from "./ruleEditorManager";
 import {
   OPT_SHORTCUT_TRANSLATE,
   OPT_SHORTCUT_TRANSONLY,
@@ -28,6 +29,7 @@ import {
   MSG_OPEN_TRANBOX,
   MSG_TRANSBOX_TOGGLE,
   MSG_POPUP_TOGGLE,
+  MSG_RULE_EDITOR,
   MSG_MOUSEHOVER_TOGGLE,
   MSG_TRANSINPUT_TOGGLE,
 } from "../config";
@@ -81,6 +83,7 @@ export default class TranslatorManager {
   _inputTranslator = null;
   _popupManager = null;
   _fabManager = null;
+  _ruleEditorManager = null;
 
   /**
    * 保存启动参数并绑定全局 handler。
@@ -268,6 +271,19 @@ export default class TranslatorManager {
         translator: this._translator,
         processActions: this.#processActions.bind(this),
       });
+      this._ruleEditorManager = new RuleEditorManager({
+        translator: this._translator,
+        pauseInteractions: () => {
+          const selectionEnabled = this._transboxManager.isEnabled();
+          const inputEnabled = this._translator.setting.inputRule?.transOpen;
+          this._transboxManager.disable();
+          this._inputTranslator.disable();
+          return () => {
+            if (selectionEnabled) this._transboxManager?.enable();
+            if (inputEnabled) this._inputTranslator?.enable();
+          };
+        },
+      });
       this._fabManager = new FabManager({
         processActions: this.#processActions.bind(this),
         fabConfig: this.#cloneConfig(this.#fabConfig),
@@ -284,6 +300,7 @@ export default class TranslatorManager {
    */
   #destroyRuntimeModules() {
     [
+      () => this._ruleEditorManager?.destroy(),
       () => this._popupManager?.destroy(),
       () => this._fabManager?.destroy(),
       () => this._transboxManager?.disable(),
@@ -299,6 +316,7 @@ export default class TranslatorManager {
       }
     });
 
+    this._ruleEditorManager = null;
     this._translator = null;
     this._transboxManager = null;
     this._inputTranslator = null;
@@ -331,9 +349,25 @@ export default class TranslatorManager {
    * 用户在页面内切换过的全文翻译、划词翻译、输入框翻译等开关。
    */
   #snapshotRuntimeState() {
+    const session = this._ruleEditorManager?.session;
+    const editing = session?.runtimeState;
+    const setting = this.#cloneConfig(this.#getRuntimeSetting());
+    // Draft previews mutate the translator rule. Restart from the same saved
+    // page rule that closing the editor would restore, never an unsaved draft.
+    const rule = this.#cloneConfig(
+      session?.restoreRule ||
+        session?.savedContext?.pageEffective ||
+        session?.savedContext?.effective ||
+        this._translator?.rule ||
+        this.#rule
+    );
+    if (editing) {
+      rule.transOpen = editing.enabled ? "true" : "false";
+      setting.mouseHoverSetting.useMouseHover = editing.mouseHover;
+    }
     return {
-      setting: this.#cloneConfig(this.#getRuntimeSetting()),
-      rule: this.#cloneConfig(this._translator?.rule || this.#rule),
+      setting,
+      rule,
       fabConfig: this.#cloneConfig(this.#fabConfig),
       favWords: this.#cloneConfig(this.#favWords),
     };
@@ -698,6 +732,16 @@ export default class TranslatorManager {
    */
   #processActions({ action, args } = {}, fromExt = false) {
     if (!this.#isActive || !action) return;
+    // Editing belongs to this frame. Never broadcast the editor or its changes.
+    if (action === MSG_RULE_EDITOR) {
+      if (!this.#isIframe) {
+        this._popupManager?.hide();
+        this._ruleEditorManager?.open();
+      }
+      return;
+    }
+    if (this._ruleEditorManager?.session && action !== MSG_TRANS_GETRULE)
+      return;
 
     // 非 background 指令需要主动同步给子 iframe，保持多 frame 页面状态一致。
     if (!fromExt && action !== MSG_OPEN_TRANBOX) {

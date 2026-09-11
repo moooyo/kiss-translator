@@ -4,8 +4,8 @@ import {
   getTranBoxOuterHeight,
 } from "./tranboxPosition";
 
-// 这里的数字直接钉住 TRANBOX_CHROME_HEIGHT。M3 改版把 header 从 36px 提到 56px
-// 并加了 1px 卡片边框，常量当时没跟着改，垂直边界因此放宽了 22px。
+// These values pin TRANBOX_CHROME_HEIGHT. The redesign increased the header
+// from 36px to 56px and added a 1px card border, requiring 22px more outer height.
 describe("translation box vertical bounds", () => {
   beforeEach(() => {
     Object.defineProperty(window, "innerHeight", {

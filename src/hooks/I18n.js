@@ -14,10 +14,9 @@ export const getI18n = (uiLang, key, defaultText = "") => {
   return I18N?.[key]?.[uiLang] ?? defaultText;
 };
 
-// 预柯里化语言参数，返回一个只需传入 key 的获取翻译函数。
-// 必须走 useCallback：i18n 出现在 Menus / Apis / Layout / Confirm / CustomStyles
-// 等十几处 useMemo、useCallback 的依赖数组里，每次渲染换一个函数身份会让那些
-// 缓存全部失效，等于没写。uiLang 不变时身份必须稳定。
+// Bind the language and keep the lookup function stable until uiLang changes.
+// Consumers use it in memo and callback dependencies, so a new identity on every
+// render would invalidate their caches.
 export const useLangMap = (uiLang) => {
   return useCallback(
     (key, defaultText = "") => getI18n(uiLang, key, defaultText),

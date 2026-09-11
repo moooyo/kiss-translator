@@ -248,7 +248,7 @@ function RuleFields({ rule, rules, setShow, setKeyword }) {
     }
   };
 
-  // 通用的表单输入变化处理器
+  // Update the draft when a form field changes.
   const handleChange = (e) => {
     e.preventDefault();
     updateFormValue(e.target.name, e.target.value);
@@ -1662,11 +1662,19 @@ function SubRules({ subRules, syncCaches }) {
     delSub, // 删除订阅源方法
     selectedUrl, // 当前选中的订阅 URL
     selectedRules, // 当前选中订阅源下的规则集列表
-    setSelectedRulesForUrl, // 更新当前选中订阅源规则集列表的方法
+    setSelectedRulesForUrl, // Update the rules for the currently selected subscription.
     loading, // 是否正在同步/加载
   } = subRules;
 
-  const { dataCaches, updateDataCache, deleteDataCache } = syncCaches;
+  const { dataCaches, updateDataCache, deleteDataCache, reloadSync } =
+    syncCaches;
+
+  useEffect(() => {
+    if (loading) return;
+    // Automatic downloads write timestamps outside this view's cache state.
+    // Refresh when opening the tab or finishing a subscription load.
+    reloadSync().catch((error) => kissLog("load sync caches", error));
+  }, [loading, selectedUrl, reloadSync]);
 
   useLayoutEffect(() => {
     const listElement = rulesListRef.current;

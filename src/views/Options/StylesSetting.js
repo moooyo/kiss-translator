@@ -46,10 +46,10 @@ function StyleFields({ customStyle, deleteStyle, updateStyle, isBuiltin }) {
   const lastSyncedStyleRef = useRef(JSON.stringify(customStyle || {}));
   const confirm = useConfirm();
 
-  // useAllTextStyles 会在 customStyles 每次写入时用 .map() 重建每一条样式对象，
-  // 内容一个字没变、对象身份却是全新的。若在此无条件重置表单，
-  // 用户正在编辑但尚未保存的草稿会被这种身份抖动冲掉（例如展开某条样式编辑
-  // CSS 的同时新增另一条样式）。因此只在持久化内容真的发生变化时才覆盖草稿。
+  // useAllTextStyles rebuilds style objects whenever customStyles changes.
+  // Equivalent objects must not reset the active form.
+  // Preserve unsaved edits when another style is added or changed.
+  // Reset the draft only when the persisted style content changes.
   useEffect(() => {
     const nextSnapshot = JSON.stringify(customStyle || {});
     if (lastSyncedStyleRef.current === nextSnapshot) {

@@ -7,7 +7,7 @@ import Logo from "../../components/Logo";
 import { SettingsAdvanced } from "./SettingsCard";
 
 /**
- * 关于面板组件 (在设置页展示关于/帮助的 MD 格式文档)
+ * Render the localized project details in Markdown.
  */
 function AboutDetails() {
   const i18n = useI18n();

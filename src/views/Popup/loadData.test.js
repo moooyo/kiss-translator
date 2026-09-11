@@ -37,13 +37,33 @@ describe("loadPopupData", () => {
   test("returns immediately when the content script is already responsive", async () => {
     const sendMessage = jest.fn().mockResolvedValue(popupData);
     const executeScript = jest.fn();
+    const wait = jest.fn();
 
     await expect(
-      loadPopupData({ sendMessage, executeScript, wait: jest.fn() })
+      loadPopupData({ sendMessage, executeScript, wait })
     ).resolves.toBe(popupData);
 
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(executeScript).not.toHaveBeenCalled();
+    expect(wait).not.toHaveBeenCalled();
+  });
+
+  test("retries once while the content script initializes", async () => {
+    const sendMessage = jest
+      .fn()
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(popupData);
+    const executeScript = jest.fn();
+    const wait = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      loadPopupData({ sendMessage, executeScript, wait })
+    ).resolves.toBe(popupData);
+
+    expect(wait).toHaveBeenCalledWith(80);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(executeScript).not.toHaveBeenCalled();
+    expect(mockSendTabMsg).not.toHaveBeenCalled();
   });
 
   test("injects content.js and retries when an open tab lost its receiver", async () => {
@@ -151,7 +171,48 @@ describe("loadPopupData", () => {
       loadPopupData({ getTab: jest.fn(), wait: jest.fn() })
     ).resolves.toBe(popupData);
 
+    expect(mockSendTopFrameMsg).toHaveBeenCalledTimes(2);
+    expect(mockSendTabMsg).toHaveBeenCalledTimes(1);
     expect(mockSendTabMsg).toHaveBeenCalledWith(MSG_TRANS_GETRULE);
+    expect(mockSendTabMsg.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mockSendTopFrameMsg.mock.invocationCallOrder[1]
+    );
+  });
+
+  test("stops after the fallback when no frame has a receiver and reinjection is unavailable", async () => {
+    const sendMessage = jest.fn().mockRejectedValue(new Error("No receiver"));
+    const sendFallbackMessage = jest
+      .fn()
+      .mockRejectedValue(new Error("No receiver"));
+    const wait = jest.fn().mockResolvedValue(undefined);
+
+    await expect(
+      loadPopupData({
+        sendMessage,
+        sendFallbackMessage,
+        getTab: jest.fn(),
+        wait,
+      })
+    ).resolves.toBeUndefined();
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendFallbackMessage).toHaveBeenCalledTimes(1);
+    expect(wait).toHaveBeenCalledTimes(1);
+  });
+
+  test("retries incomplete data and preserves the final error response", async () => {
+    const errorResponse = { error: "Page unavailable" };
+    const sendMessage = jest
+      .fn()
+      .mockResolvedValueOnce({ rule: {} })
+      .mockResolvedValueOnce(errorResponse);
+
+    await expect(
+      loadPopupData({ sendMessage, getTab: jest.fn(), wait: jest.fn() })
+    ).resolves.toBe(errorResponse);
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(mockSendTabMsg).not.toHaveBeenCalled();
   });
 
   test("preserves explicit top-frame errors instead of accepting child data", async () => {

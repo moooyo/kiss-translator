@@ -32,9 +32,11 @@ export default function Header({ onClose, openSeparateWindow, openSettings }) {
       >
         <Logo size={24} className="kt-popup-header__logo" />
       </button>
-      <span className="kt-popup-header__title">{i18n("app_name")}</span>
-      <span className="kt-popup-header__version">
-        v{process.env.REACT_APP_VERSION}
+      <span className="kt-popup-header__identity">
+        <span className="kt-popup-header__title">{i18n("app_name")}</span>
+        <span className="kt-popup-header__version">
+          v{process.env.REACT_APP_VERSION}
+        </span>
       </span>
       <span className="kt-popup-header__spacer" />
       {onClose ? (

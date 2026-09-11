@@ -258,8 +258,8 @@ describe.each(["document", "shadow"])("TranBox header in %s", (scope) => {
     }
   );
 
-  // 这四个开关在改版前是 header 上的常驻按钮。收进溢出菜单后它们依然要能触达，
-  // 否则「上 M3」就悄悄弄丢了功能。
+  // These four controls were always visible in the previous header.
+  // Moving them into the overflow menu must preserve every action.
   test.each([
     [1, "setSimpleStyle"],
     [2, "setFollowSelection"],

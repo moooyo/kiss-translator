@@ -58,16 +58,16 @@ export function getOverflowMenuPosition(anchor, menu, viewport) {
 }
 
 /**
- * 划词翻译框的顶部导航栏组件
+ * Header navigation for the selection translation panel.
  *
  * @param {Object} props
- * @param {Function} props.setShowBox - 控制划词翻译框显隐的 React setter
- * @param {boolean} props.simpleStyle - 极简模式开关状态
- * @param {Function} props.setSimpleStyle - 控制极简模式开关的 React setter
- * @param {boolean} props.hideClickAway - 点击外部是否自动隐藏划词框的锁定开关状态
- * @param {Function} props.setHideClickAway - 锁定开关的 React setter
- * @param {boolean} props.followSelection - 划词框是否紧跟选区的定位锁定状态
- * @param {Function} props.setFollowSelection - 定位锁定状态的 React setter
+ * @param {Function} props.setShowBox - React setter for panel visibility.
+ * @param {boolean} props.simpleStyle - Whether minimal mode is enabled.
+ * @param {Function} props.setSimpleStyle - React setter for minimal mode.
+ * @param {boolean} props.hideClickAway - Whether outside clicks can hide the panel.
+ * @param {Function} props.setHideClickAway - React setter for the outside-click lock.
+ * @param {boolean} props.followSelection - Whether the panel follows the selection.
+ * @param {Function} props.setFollowSelection - React setter for selection following.
  */
 function TranBoxHeader({
   setShowBox,
@@ -161,21 +161,21 @@ function TranBoxHeader({
     navigateMenu(event);
   };
 
-  // 请求在独立的无边框小窗口中打开翻译框
+  // Request a separate borderless translation window.
   const openSeparateWindow = useCallback(() => {
     sendBgMsg(MSG_OPEN_SEPARATE_WINDOW);
-    // REVIEW: 在独立小窗口中打开翻译后，并未同时调用 setShowBox(false) 来隐藏当前页面上的划词翻译框，这可能导致页面上残留已打开的翻译框，体验上可进一步优化。
+    // REVIEW: Opening a separate window does not call setShowBox(false), so the page's translation panel remains visible. Hiding it could improve the experience.
   }, []);
 
   return (
-    // onMouseUp 的 stopPropagation 必须保留：整条 header 同时是拖拽触发区，
-    // 松手事件冒到外层会干扰页面自身的选区处理。
+    // Keep stopPropagation on mouseup: the header also starts drags, and bubbling
+    // the release event would interfere with the page's selection handling.
     <div className="kt-tranbox-header" onMouseUp={(e) => e.stopPropagation()}>
       <span className="kt-tranbox-header__drag" aria-hidden="true">
         <DragIndicatorRoundedIcon />
       </span>
 
-      {/* 左侧：Logo 图标与版本号显示 */}
+      {/* Left: logo and version. */}
       <span className="kt-tranbox-header__brand">
         <span className="kt-tranbox-header__logo">
           <Logo size={16} />
@@ -185,9 +185,9 @@ function TranBoxHeader({
         </span>
       </span>
 
-      {/* 右侧：常驻操作按钮组 */}
+      {/* Right: always-visible actions. */}
       <span className="kt-tranbox-header__actions">
-        {/* 锁定划词框 (点击外部不消失) */}
+        {/* Lock the panel against outside clicks. */}
         <IconButton
           title={i18n("btn_tip_click_away")}
           aria-pressed={hideClickAway}
@@ -196,7 +196,7 @@ function TranBoxHeader({
           {hideClickAway ? <LockOpenIcon /> : <LockIcon />}
         </IconButton>
 
-        {/* 其余低频开关收进溢出菜单 */}
+        {/* Keep less frequent controls in the overflow menu. */}
         <IconButton
           id={menuButtonId}
           ref={menuButtonRef}
@@ -219,7 +219,7 @@ function TranBoxHeader({
           <MoreVertIcon />
         </IconButton>
 
-        {/* 关闭翻译框 */}
+        {/* Close the translation panel. */}
         <IconButton title={i18n("close")} onClick={() => setShowBox(false)}>
           <CloseIcon />
         </IconButton>
@@ -235,7 +235,7 @@ function TranBoxHeader({
           aria-labelledby={menuButtonId}
           onKeyDown={handleMenuKeyDown}
         >
-          {/* 独立窗口打开 */}
+          {/* Open in a separate window. */}
           {isExt && (
             <button
               type="button"
@@ -248,7 +248,7 @@ function TranBoxHeader({
             </button>
           )}
 
-          {/* 极简折叠样式切换 */}
+          {/* Toggle the minimal collapsed style. */}
           <button
             type="button"
             tabIndex={-1}
@@ -260,7 +260,7 @@ function TranBoxHeader({
             {i18n("btn_tip_simple_style")}
           </button>
 
-          {/* 固定位置/跟随划词选区位置切换 */}
+          {/* Toggle between a fixed position and following the selection. */}
           <button
             type="button"
             tabIndex={-1}
@@ -272,7 +272,7 @@ function TranBoxHeader({
             {i18n("btn_tip_follow_selection")}
           </button>
 
-          {/* 深色/浅色/自动主题模式切换 */}
+          {/* Cycle through dark, light, and automatic themes. */}
           <button
             type="button"
             tabIndex={-1}
@@ -295,7 +295,7 @@ function TranBoxHeader({
 }
 
 /**
- * 划词翻译框的内部表单内容渲染容器组件
+ * Container for the selection translation form.
  */
 function TranBoxContent({
   simpleStyle,
@@ -308,6 +308,7 @@ function TranBoxContent({
   transApis,
   langDetector,
   translateVariants,
+  parseLatex,
   enDict,
   enSug,
   aiDictApiSlug,
@@ -351,13 +352,13 @@ function TranBoxContent({
         scrollbarColor: `${scrollbarThumbColor} ${scrollbarTrackColor}`,
 
         color: isDark
-          ? "rgba(255,255,255,0.82)" // 柔白字体, 避免极暗背景下过于刺眼
+          ? "rgba(255,255,255,0.82)" // Soften white text on very dark backgrounds.
           : theme.palette.text.primary,
 
         lineHeight: 1.55,
       }}
     >
-      {/* 嵌入实际的翻译表单 */}
+      {/* Embed the translation form. */}
       <TranForm
         text={text}
         setText={setText}
@@ -370,6 +371,7 @@ function TranBoxContent({
         simpleStyle={simpleStyle}
         langDetector={langDetector}
         translateVariants={translateVariants}
+        parseLatex={parseLatex}
         enDict={enDict}
         enSug={enSug}
         aiDictApiSlug={aiDictApiSlug}
@@ -381,7 +383,7 @@ function TranBoxContent({
 }
 
 /**
- * 划词翻译框的主容器入口组件 (控制拖拽外壳及规则分发)
+ * Main selection translation panel, managing its draggable shell and settings.
  */
 export default function TranBox(props) {
   const [mouseHover, setMouseHover] = useState(false);
@@ -394,9 +396,9 @@ export default function TranBox(props) {
   const setFollowSelection = props.setFollowSelection;
 
   let realApiSlugs = props.tranboxSetting.apiSlugs;
-  // 检查是否开启了“如果是单字，则不进行全文大模型/机器翻译，仅展示词典与建议”的性能优化设置
+  // Skip translation for single words when configured to show only dictionary results and suggestions.
   if (props.tranboxSetting.singleWordNoTrans && isValidWord(props.text)) {
-    // 强制清空要调用的翻译引擎 API slugs
+    // Clear the translation engine API slugs.
     realApiSlugs = [];
   }
 
@@ -435,6 +437,7 @@ export default function TranBox(props) {
         prompts={props.prompts}
         langDetector={props.langDetector}
         translateVariants={props.translateVariants}
+        parseLatex={props.parseLatex}
         enDict={props.tranboxSetting.enDict}
         enSug={props.tranboxSetting.enSug}
         aiDictApiSlug={props.tranboxSetting.aiDictApiSlug}

@@ -61,7 +61,7 @@ export const formatLanguageOptionName = (name) => {
   return parts.join(" - ");
 };
 
-// 全空白的提示词等同于没有配置：非空字符串才算数。
+// Treat whitespace-only prompts as unconfigured.
 const hasPrompt = (value) => typeof value === "string" && Boolean(value.trim());
 
 const resolveActiveApiSlugs = (apiSlugs, optApis) => {
@@ -74,7 +74,7 @@ const resolveActiveApiSlugs = (apiSlugs, optApis) => {
 };
 
 /**
- * 翻译交互核心表单组件 (集成源/目标语言选择、多引擎翻译、词典展示、汉典展示、语言检测与文本输入)
+ * Translation form with language and service choices, dictionaries, detection, and text input.
  */
 export default function TranForm({
   text,
@@ -88,6 +88,7 @@ export default function TranForm({
   simpleStyle = false,
   langDetector: initLangDetector = "-",
   translateVariants = true,
+  parseLatex = false,
   enDict: initEnDict = "-",
   enSug: initEnSug = "-",
   aiDictApiSlug = "-",
@@ -107,10 +108,10 @@ export default function TranForm({
   const aiDictionaryTabId = `${dictionaryTabsId}-ai-tab`;
   const aiDictionaryPanelId = `${dictionaryTabsId}-ai-panel`;
 
-  // 当前是否处于文本框获取焦点的编辑提交模式
+  // Track whether the focused input is being edited.
   const [editMode, setEditMode] = useState(false);
   const [popupInputFocused, setPopupInputFocused] = useState(false);
-  // 输入框中临时编辑的文本，在失焦或点击提交时同步至外层全局 text 状态
+  // Keep draft input until blur or submission updates the outer text state.
   const [editText, setEditText] = useState(text);
   const [requestRevision, setRequestRevision] = useState(0);
   const [apiSlugs, setApiSlugs] = useState(initApiSlugs);
@@ -164,8 +165,8 @@ export default function TranForm({
   const deLoading =
     Boolean(text.trim()) && (!hasCurrentDetection || detection.loading);
 
-  // 允许自动聚焦时，将输入框聚焦并把光标定位在文本尾部。
-  // autoFocusInput 可在异步初始化完成后由 false 切换为 true。
+  // Focus the input at the end of its text when autofocus is enabled.
+  // autoFocusInput may become true after asynchronous initialization.
   useEffect(() => {
     if (!autoFocusInput) return;
 
@@ -178,7 +179,7 @@ export default function TranForm({
     input.setSelectionRange(len, len);
   }, [autoFocusInput]);
 
-  // 监听划词/输入文本，如果是合法的英文单词，则分发自定义事件，便于其他监听器(如生词本系统)感知新单词
+  // Notify listeners, such as the vocabulary list, when selected or entered text is a valid English word.
   useEffect(() => {
     if (isValidWord(text)) {
       const event = new CustomEvent("kiss-add-word", {
@@ -188,21 +189,21 @@ export default function TranForm({
     }
   }, [text]);
 
-  // 同步外层传入的 API 启用列表状态
+  // Synchronize the selected APIs from the outer state.
   useEffect(() => {
     if (!hasUserChangedApiSlugs) {
       setApiSlugs(initApiSlugs);
     }
   }, [initApiSlugs, hasUserChangedApiSlugs]);
 
-  // 默认仅在非编辑态同步外部文本；主动文本翻译面板可选择让剪贴板更新覆盖临时编辑值。
+  // Normally sync external text only outside editing; text panels can allow clipboard updates to replace drafts.
   useEffect(() => {
     if (syncExternalTextWhileEditing || !editMode) {
       setEditText(text);
     }
   }, [text, editMode, syncExternalTextWhileEditing]);
 
-  // 文本改变或配置切换时，发起异步语种检测
+  // Detect the language asynchronously when text or settings change.
   useEffect(() => {
     let active = true;
     if (!text.trim()) {
@@ -236,7 +237,7 @@ export default function TranForm({
     };
   }, [text, langDetector, detectionKey]);
 
-  // 从剪贴板粘贴文本到翻译框
+  // Paste clipboard text into the translation input.
   const handlePaste = async () => {
     try {
       const text = await navigator.clipboard.readText();
@@ -246,7 +247,7 @@ export default function TranForm({
     }
   };
 
-  // 智能决策最终翻译的目标语言（实现源语种与主目标语种相同时，自动降级切换翻译到第二备用目标语种的逻辑）
+  // Use the secondary target when the detected source matches the primary target.
   const realToLang = useMemo(() => {
     if (
       fromLang === "auto" &&
@@ -260,7 +261,7 @@ export default function TranForm({
     return toLang;
   }, [fromLang, toLang, toLang2, deLang, translateVariants]);
 
-  // 过滤出未被禁用的翻译服务商
+  // Keep only enabled translation providers.
   const optApis = useMemo(
     () =>
       transApis
@@ -281,7 +282,7 @@ export default function TranForm({
     [apiSlugs, optApis]
   );
 
-  // 默认词典覆盖英文单词和单个汉字：英文走 Bing/有道，单字走汉典。
+  // Use Bing/Youdao for English words and Zdic for single Chinese characters.
   const defaultDictAvailable =
     (isWord && OPT_DICT_MAP.has(enDict)) || isSingleChineseChar(text);
   const aiDictApiSetting = useMemo(() => {
@@ -289,9 +290,8 @@ export default function TranForm({
       return null;
     }
 
-    // 设置页的选择器只列出「已启用的 AI 接口」和「词典分类的提示词」，但存下来的是
-    // slug，之后接口被停用、改成非 AI 类型、或提示词被改分类，这里都不会收到通知。
-    // 不重新校验的话，词典请求会带着词典提示词发到一个非 AI 端点上去。
+    // Stored slugs can outlive changes to API availability, API type, or prompt category.
+    // Recheck eligibility to avoid sending dictionary prompts to a non-AI endpoint.
     const apiSetting = transApis.find(
       (api) =>
         api.apiSlug === aiDictApiSlug &&
@@ -302,13 +302,13 @@ export default function TranForm({
       return null;
     }
 
-    // 跟随接口时必须确保 API 配置已经解析出了 dictPrompt，否则 AI 词典不可用。
-    // 全空白的提示词等同于没有：送出去只会得到一次无意义的计费请求。
+    // Following the API requires a resolved, nonblank dictPrompt.
+    // Empty prompts would create a billed request without useful instructions.
     if (aiDictPromptSlug === PROMPT_MODE_FOLLOW_API) {
       return hasPrompt(apiSetting.dictPrompt) ? apiSetting : null;
     }
 
-    // 指定全局词典提示词时，用该提示词覆盖接口内置词典提示词。
+    // Override the API's dictionary prompt with the selected global prompt.
     const prompt = findPromptBySlug(prompts, aiDictPromptSlug);
     if (
       !prompt ||
@@ -332,7 +332,7 @@ export default function TranForm({
       return;
     }
 
-    // 默认词典可用时优先展示更快、更稳定的本地/在线词典；否则自动切到 AI 词典。
+    // Prefer the faster default dictionary when available, otherwise select the AI dictionary.
     if (defaultDictAvailable) {
       setDictTab("default");
       return;
@@ -365,6 +365,7 @@ export default function TranForm({
       transApis={transApis}
       isPlayground={isPlaygound}
       translateVariants={translateVariants}
+      parseLatex={parseLatex}
       detectedLang={deLang}
       sourceDetectionPending={fromLang === "auto" && deLoading}
       requestRevision={requestRevision}
@@ -545,6 +546,7 @@ export default function TranForm({
               apiSlug={slug}
               transApis={transApis}
               translateVariants={translateVariants}
+              parseLatex={parseLatex}
               detectedLang={deLang}
               sourceDetectionPending={fromLang === "auto" && deLoading}
               requestRevision={requestRevision}
@@ -589,19 +591,19 @@ export default function TranForm({
       spacing={simpleStyle ? 1 : 2}
       useFlexGap={isPlaygound}
     >
-      {/* 极简模式下不展示任何语言、服务商配置栏以及原始文本框 */}
+      {/* Hide language, provider, and source input controls in simple mode. */}
       {!simpleStyle && (
         <>
           <Box className={isPlaygound ? "kt-playground-config" : undefined}>
             {isPlaygound && playgroundConfigHeader}
-            {/* 各类服务参数、语种设置下拉菜单网格 */}
+            {/* Service and language settings grid. */}
             <Grid
               className={isPlaygound ? "kt-playground-config__grid" : undefined}
               container
               spacing={2}
               columns={12}
             >
-              {/* 多选框：允许同时勾选多个翻译引擎进行结果对比 */}
+              {/* Select multiple translation engines to compare their results. */}
               <Grid
                 className={
                   isPlaygound ? "kt-playground-config__service" : undefined
@@ -633,7 +635,7 @@ export default function TranForm({
                   ))}
                 </TextField>
               </Grid>
-              {/* 源语言 */}
+              {/* Source language. */}
               <Grid item xs={xs} md={md}>
                 <TextField
                   select
@@ -654,7 +656,7 @@ export default function TranForm({
                   ))}
                 </TextField>
               </Grid>
-              {/* 目标语言 */}
+              {/* Target language. */}
               <Grid item xs={xs} md={md}>
                 <TextField
                   select
@@ -676,10 +678,10 @@ export default function TranForm({
                 </TextField>
               </Grid>
 
-              {/* 如果是 Playground 设置测试环境，展示更丰富的参数调节滑块 */}
+              {/* Show additional configuration controls in the Playground. */}
               {isPlaygound && (
                 <>
-                  {/* 第二备用目标语言 */}
+                  {/* Secondary target language. */}
                   <Grid item xs={xs} md={md}>
                     <TextField
                       select
@@ -700,7 +702,7 @@ export default function TranForm({
                       ))}
                     </TextField>
                   </Grid>
-                  {/* 查词所用英语词典 */}
+                  {/* English dictionary service. */}
                   <Grid item xs={xs} md={md}>
                     <TextField
                       select
@@ -722,7 +724,7 @@ export default function TranForm({
                       ))}
                     </TextField>
                   </Grid>
-                  {/* 输入建议联想服务 */}
+                  {/* Input suggestion service. */}
                   <Grid item xs={xs} md={md}>
                     <TextField
                       select
@@ -744,7 +746,7 @@ export default function TranForm({
                       ))}
                     </TextField>
                   </Grid>
-                  {/* 语种检测引擎选择 */}
+                  {/* Language detection engine. */}
                   <Grid item xs={xs} md={md}>
                     <TextField
                       select
@@ -766,7 +768,7 @@ export default function TranForm({
                       ))}
                     </TextField>
                   </Grid>
-                  {/* 语种检测的实时计算结果展示 (只读) */}
+                  {/* Read-only language detection result. */}
                   <Grid item xs={xs} md={md}>
                     <TextField
                       fullWidth
@@ -807,7 +809,7 @@ export default function TranForm({
             </Grid>
           </Box>
 
-          {/* 原始文本输入区域 */}
+          {/* Source text input. */}
           <Box
             className={
               isPlaygound ? "kt-playground-translator__source" : undefined
@@ -870,7 +872,7 @@ export default function TranForm({
                     }
                   >
                     {editMode && editText !== text ? (
-                      /* 编辑模式：显示提交勾选图标 */
+                      /* Show the submit checkmark while editing. */
                       <IconButton
                         size="small"
                         onPointerDown={(e) => e.preventDefault()}
@@ -892,14 +894,14 @@ export default function TranForm({
                         <DoneIcon fontSize="inherit" />
                       </IconButton>
                     ) : text ? (
-                      /* 有内容时：显示一键复制按钮 */
+                      /* Show the copy action when text is present. */
                       <CopyBtn
                         text={text}
                         title={i18n("copy")}
                         copiedLabel={i18n("copy_success", "Copied")}
                       />
                     ) : (
-                      /* 无内容时：显示一键粘贴按钮 */
+                      /* Show the paste action when the input is empty. */
                       <IconButton
                         size="small"
                         onClick={handlePaste}
@@ -916,8 +918,8 @@ export default function TranForm({
         </>
       )}
 
-      {/* ---------------- 翻译及释义面板的按需渲染分发 ---------------- */}
-      {/* 1. 分别为每一个选定的翻译服务引擎渲染对应的 TranCont 内容翻译器 */}
+      {/* Translation and definition panels. */}
+      {/* 1. Render a TranCont result for each selected translation service. */}
       {isPlaygound ? (
         <Stack
           className="kt-playground-translator__results"
@@ -939,7 +941,7 @@ export default function TranForm({
         translationResults
       )}
 
-      {/* 2. 根据可用能力在默认词典与 AI 词典之间分流展示 */}
+      {/* 2. Show the default and AI dictionaries according to availability. */}
       {(defaultDictAvailable || aiDictAvailable) && (
         <Box
           className={
@@ -1001,7 +1003,7 @@ export default function TranForm({
                     toLang={realToLang}
                     apiSetting={aiDictApiSetting}
                     context={
-                      // 只在段落上下文确实包含当前文本时传入，避免手动输入内容复用旧划词上下文。
+                      // Pass context only when it contains the current text, so manual input cannot reuse stale selection context.
                       selectionContext && selectionContext.includes(text)
                         ? selectionContext
                         : ""
@@ -1021,7 +1023,7 @@ export default function TranForm({
         </Box>
       )}
 
-      {/* 3. 如果是合法的英文单词且启用了输入建议，渲染联想建议组件 */}
+      {/* 3. Show enabled input suggestions for valid English words. */}
       {isWord &&
         OPT_SUG_MAP.has(enSug) &&
         (isPlaygound ? (

@@ -83,8 +83,8 @@ export const sendTabMsg = async (action, args, options) => {
 };
 
 /**
- * Send a message to the top frame of the active tab and use only its response.
- * Commands that must reach every frame should continue to use sendTabMsg.
+ * Send a query to the active tab's top frame and use only its response.
+ * Commands intended for every frame should continue to use sendTabMsg.
  *
  * @param {string} action Message action.
  * @param {Object} args Message arguments.

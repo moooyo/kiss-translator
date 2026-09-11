@@ -1,12 +1,13 @@
 /**
  * @file styles.js
- * @description 划词翻译框的 Material 3 样式。
+ * @description Material 3 styles for the selection translation panel.
  *
- * 这些规则依赖 hooks/M3Theme 注入的 CSS 变量（--kt-sf0 / --kt-linev / --kt-spring 等）
- * 与 src/styles/m3.js 里的 kt-m3-rise / kt-m3-pop 关键帧，因此只能在 M3Theme 内部使用。
+ * These rules require CSS variables from hooks/M3Theme, including --kt-sf0,
+ * --kt-linev, and --kt-spring, plus the kt-m3-rise and kt-m3-pop keyframes
+ * from src/styles/m3.js. Use them only inside M3Theme.
  *
- * KT-draggable* 这几个类名由 DraggableResizable.js 输出，覆写时带 !important 是必要的：
- * 那些节点自身带 MUI 的 sx 内联样式，优先级高于普通类选择器。
+ * DraggableResizable.js emits the KT-draggable* classes. Their overrides need
+ * !important to take precedence over the nodes' MUI sx styles.
  */
 export const SELECTION_STYLES = String.raw`
 .KT-draggable { overflow: visible !important; border-radius: 16px !important; animation: kt-m3-rise .45s var(--kt-spring); }

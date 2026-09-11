@@ -24,6 +24,7 @@ import { isExt } from "../../libs/client";
 import { useI18n } from "../../hooks/I18n";
 import {
   MSG_TRANS_TOGGLE,
+  MSG_RULE_EDITOR,
   MSG_TRANS_PUTRULE,
   MSG_SAVE_RULE,
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
@@ -253,10 +254,8 @@ export default function PopupCont({
           }));
         }
 
-        // 开关成功不弹提示：结果就在上面那张卡片里 ——「翻译此页」下方的
-        // 已开启/已关闭 文案和开关位置都会同步变。再弹一个写着同样两个字的
-        // toast 只是重复，而且它锚在底部居中，正好盖住划词翻译/暂停翻译两个按钮。
-        // 失败仍然要弹，那种情况界面上没有任何别的迹象。
+        // The card already shows successful state changes. Reserve snackbars
+        // for failures so they do not obscure the other translation controls.
         busyTimerRef.current = window.setTimeout(
           () => {
             setTranslationBusy(false);
@@ -705,6 +704,19 @@ export default function PopupCont({
           </div>
         </div>
       )}
+
+      <Button
+        variant="outlined"
+        onClick={async () => {
+          if (processActions) processActions({ action: MSG_RULE_EDITOR });
+          else {
+            await sendTabMsg(MSG_RULE_EDITOR);
+            window.close();
+          }
+        }}
+      >
+        {i18n("rule_editor_open")}
+      </Button>
 
       {isContent && (
         <>

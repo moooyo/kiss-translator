@@ -1,6 +1,9 @@
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { STOKEY_SYNC, DEFAULT_SYNC } from "../config";
 import { useStorage } from "./Storage";
+import { getSyncWithDefault, storage } from "../libs/storage";
+import { SETTING_PATCH_DELETE } from "../libs/settingPatch";
+import { kissLog } from "../libs/log";
 
 /**
  * 远端云同步（如 WebDAV）配置数据的读取与更新自定义 Hook
@@ -40,45 +43,84 @@ export function useSyncMeta() {
   return { updateSyncMeta };
 }
 
-/**
- * 同步网页缓存数据的自定义 Hook，记录网页是否已被成功同步/缓存过及对应时间戳
- * @returns
- */
+// Keep cache mutations ordered even when the initiating Rules view unmounts.
+let syncCacheWriteQueue = Promise.resolve();
+
+function enqueueSyncCacheOperation(operation) {
+  const pending = syncCacheWriteQueue.then(operation, operation);
+  syncCacheWriteQueue = pending.then(
+    () => undefined,
+    () => undefined
+  );
+  return pending;
+}
+
+async function readSyncCacheState() {
+  // Userscript settings can be opened before any background initialization.
+  await storage.trySetObj(STOKEY_SYNC, DEFAULT_SYNC);
+  return getSyncWithDefault();
+}
+
+function writeSyncCache(url, timestamp) {
+  return enqueueSyncCacheOperation(async () => {
+    await readSyncCacheState();
+    // Share the settings write queue and revisions, changing only this URL.
+    const sync = await storage.patchObj(STOKEY_SYNC, {
+      dataCaches: {
+        [url]: timestamp === undefined ? SETTING_PATCH_DELETE : timestamp,
+      },
+    });
+    return sync.dataCaches || {};
+  });
+}
+
+/** Load cache timestamps without persisting previously loaded sync snapshots. */
 export function useSyncCaches() {
-  const { sync, updateSync, reloadSync } = useSync();
+  const [dataCaches, setDataCaches] = useState({});
+  const mountedRef = useRef(false);
+  const readRevisionRef = useRef(0);
 
-  // 将特定网页 URL 的最新同步缓存时间记录为当前时间戳
+  const reloadSync = useCallback(async () => {
+    const revision = ++readRevisionRef.current;
+    const sync = await enqueueSyncCacheOperation(readSyncCacheState);
+    if (mountedRef.current && revision === readRevisionRef.current) {
+      setDataCaches(sync.dataCaches || {});
+    }
+    return sync;
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    const unsubscribe = storage.subscribeObj(STOKEY_SYNC, (sync) => {
+      if (!mountedRef.current) return;
+      readRevisionRef.current += 1;
+      setDataCaches(sync?.dataCaches || {});
+    });
+    reloadSync().catch((error) => kissLog("load sync caches", error));
+    return () => {
+      mountedRef.current = false;
+      readRevisionRef.current += 1;
+      unsubscribe?.();
+    };
+  }, [reloadSync]);
+
+  const mutateCache = useCallback(async (url, timestamp) => {
+    const revision = ++readRevisionRef.current;
+    const nextCaches = await writeSyncCache(url, timestamp);
+    if (mountedRef.current && revision === readRevisionRef.current) {
+      setDataCaches(nextCaches);
+    }
+    return nextCaches;
+  }, []);
+
   const updateDataCache = useCallback(
-    (url) => {
-      updateSync((prevSync) => ({
-        dataCaches: {
-          ...(prevSync?.dataCaches || {}),
-          [url]: Date.now(),
-        },
-      }));
-    },
-    [updateSync]
+    (url) => mutateCache(url, Date.now()),
+    [mutateCache]
   );
-
-  // 删除特定网页 URL 的同步缓存记录
   const deleteDataCache = useCallback(
-    (url) => {
-      updateSync((prevSync) => {
-        const newDataCaches = { ...(prevSync?.dataCaches || {}) };
-        delete newDataCaches[url];
-        return { dataCaches: newDataCaches };
-      });
-    },
-    [updateSync]
+    (url) => mutateCache(url, undefined),
+    [mutateCache]
   );
 
-  // 对 dataCaches 缓存映射对象进行缓存优化
-  const dataCaches = useMemo(() => sync?.dataCaches || {}, [sync?.dataCaches]);
-
-  return {
-    dataCaches,
-    updateDataCache,
-    deleteDataCache,
-    reloadSync,
-  };
+  return { dataCaches, updateDataCache, deleteDataCache, reloadSync };
 }

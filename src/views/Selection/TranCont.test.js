@@ -49,9 +49,9 @@ jest.mock("./AudioBtn", () => {
 });
 
 /**
- * 创建一个可由测试主动 resolve/reject 的 Promise。
+ * Create a Promise that tests can resolve or reject explicitly.
  *
- * @returns {{promise: Promise<unknown>, resolve: Function, reject: Function}} 可控 Promise 句柄。
+ * @returns {{promise: Promise<unknown>, resolve: Function, reject: Function}} Controllable Promise handle.
  */
 function createDeferred() {
   let resolve;
@@ -65,9 +65,9 @@ function createDeferred() {
 }
 
 /**
- * 将 React effect 与 Promise 微任务推进到稳定状态。
+ * Flush React effects and Promise microtasks.
  *
- * @returns {Promise<void>} 等待队列清空的 Promise。
+ * @returns {Promise<void>} Promise that resolves after the queues settle.
  */
 async function flushEffects() {
   await act(async () => {
@@ -117,10 +117,10 @@ const microsoftApiSetting = {
 };
 
 /**
- * 渲染划词翻译结果组件。
+ * Render the selection translation result component.
  *
- * @param {Object} props 覆盖默认组件参数。
- * @returns {{container: HTMLElement, root: Object}} React 根节点与容器。
+ * @param {Object} props Overrides for the default component props.
+ * @returns {{container: HTMLElement, root: Object}} React root and container.
  */
 function renderTranCont(props = {}) {
   const container = document.createElement("div");
@@ -294,7 +294,7 @@ describe("TranCont", () => {
     ).not.toBeNull();
 
     await act(async () => {
-      // 模拟底层 SSE 增量返回，输出框应立即展示已经到达的部分译文。
+      // Simulate an SSE chunk; the output should display the partial translation immediately.
       apiTranslate.mock.calls[0][0].onStreamChunk({
         text: "阶段译文",
         isComplete: false,
@@ -758,7 +758,7 @@ describe("TranCont", () => {
     expect(apiTranslate.mock.calls[0][0].signal.aborted).toBe(true);
 
     await act(async () => {
-      // 旧请求即使晚返回，也不能覆盖新请求的最终译文。
+      // A late response from an old request must not overwrite the new translation.
       first.resolve({ trText: "旧译文" });
       await first.promise;
       second.resolve({ trText: "新译文" });
@@ -766,6 +766,104 @@ describe("TranCont", () => {
     });
 
     expect(container.querySelector("textarea").value).toBe("新译文");
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  test("leaves LaTeX untouched while the addon is off", async () => {
+    const deferred = createDeferred();
+    apiTranslate.mockReturnValueOnce(deferred.promise);
+
+    const { container, root } = renderTranCont();
+    await flushEffects();
+    const textarea = container.querySelector("textarea");
+
+    await act(async () => {
+      apiTranslate.mock.calls[0][0].onStreamChunk({
+        text: "\\(\\dot{x}_1\\) 部分",
+        isComplete: false,
+      });
+    });
+    expect(textarea.value).toBe("\\(\\dot{x}_1\\) 部分");
+
+    await act(async () => {
+      deferred.resolve({ trText: "\\(\\dot{x}_1\\) 是速度" });
+      await deferred.promise;
+    });
+    expect(textarea.value).toBe("\\(\\dot{x}_1\\) 是速度");
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  test("converts LaTeX in stream and final text when the addon is on", async () => {
+    const deferred = createDeferred();
+    apiTranslate.mockReturnValueOnce(deferred.promise);
+
+    const { container, root } = renderTranCont({ parseLatex: true });
+    await flushEffects();
+    const textarea = container.querySelector("textarea");
+
+    await act(async () => {
+      apiTranslate.mock.calls[0][0].onStreamChunk({
+        text: "\\(\\dot{x}_1\\) 部分",
+        isComplete: false,
+      });
+    });
+    expect(textarea.value).toBe("ẋ₁ 部分");
+
+    await act(async () => {
+      deferred.resolve({ trText: "\\(\\dot{x}_1\\) 是速度" });
+      await deferred.promise;
+    });
+    expect(textarea.value).toBe("ẋ₁ 是速度");
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  test("converts LaTeX before the multiline de-escaping of an AI response", async () => {
+    const deferred = createDeferred();
+    apiTranslate.mockReturnValueOnce(deferred.promise);
+
+    // Convert LaTeX before multiline de-escaping can treat `\right` as `\r`.
+    const { container, root } = renderTranCont({
+      parseLatex: true,
+      text: "hello\nworld",
+    });
+    await flushEffects();
+
+    await act(async () => {
+      deferred.resolve({ trText: "\\(\\left(x\\right)\\)" });
+      await deferred.promise;
+    });
+
+    const textarea = container.querySelector("textarea");
+    expect(textarea.value).toBe("(x)");
+    expect(textarea.value).not.toContain("ight");
+
+    act(() => {
+      root.unmount();
+    });
+  });
+
+  test("keeps the multiline de-escaping untouched while the addon is off", async () => {
+    const deferred = createDeferred();
+    apiTranslate.mockReturnValueOnce(deferred.promise);
+
+    const { container, root } = renderTranCont({ text: "hello\nworld" });
+    await flushEffects();
+
+    await act(async () => {
+      deferred.resolve({ trText: "第一行\\n第二行" });
+      await deferred.promise;
+    });
+
+    expect(container.querySelector("textarea").value).toBe("第一行\n第二行");
 
     act(() => {
       root.unmount();

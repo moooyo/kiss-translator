@@ -1,8 +1,8 @@
-import { browser } from "../../libs/browser";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { useSetting } from "../../hooks/Setting";
 import { readClipboardTextIfAllowed } from "../../libs/clipboard";
+import { browser } from "../../libs/browser";
 import { sendBgMsg } from "../../libs/msg";
 import { MSG_FIT_SEPARATE_WINDOW } from "../../config";
 import { SEPARATE_WINDOW_CONTENT_WIDTH } from "../../config/app";
@@ -181,10 +181,7 @@ describe("Trantab clipboard translation", () => {
     await flushEffects();
     expect(readClipboardTextIfAllowed).not.toHaveBeenCalled();
 
-    // 另一个扩展页面改了设置：storage 订阅把新值送进 SettingProvider，
-    // 组件从 useSetting 读到它并重新渲染。这是跨上下文变更真实走的路径 ——
-    // 此前这里手工喂给 chrome.storage.onChanged 一个对象载荷，
-    // 而 setObj 存的是 JSON 字符串，那种事件在生产中不会出现。
+    // Storage subscriptions update the shared provider before the panel rerenders.
     useSetting.mockReturnValue({
       setting: { ...setting, autoTranslateClipboard: true },
     });
@@ -201,10 +198,36 @@ describe("Trantab clipboard translation", () => {
     ).toBe("new clipboard text");
     act(() => root.unmount());
   });
+
+  test.each([
+    ["disabled", false],
+    ["removed", undefined],
+  ])(
+    "stops reading on focus when the clipboard setting is %s",
+    async (_case, enabled) => {
+      readClipboardTextIfAllowed.mockResolvedValue("initial clipboard text");
+      const { root, rerender } = renderTrantab({ isSeparate: true });
+      await flushEffects();
+      readClipboardTextIfAllowed.mockClear();
+
+      useSetting.mockReturnValue({
+        setting: { ...setting, autoTranslateClipboard: enabled },
+      });
+      rerender({ isSeparate: true });
+      await flushEffects();
+      await act(async () => {
+        window.dispatchEvent(new Event("focus"));
+      });
+      await flushEffects();
+
+      expect(readClipboardTextIfAllowed).not.toHaveBeenCalled();
+      act(() => root.unmount());
+    }
+  );
 });
 
-// 独立窗口的高度编译期算不准 —— 界面语言、浏览器缩放、系统字号都会改变它。
-// 所以窗口先按起手值打开,内容渲染完页面量一遍再让后台收到刚好。
+// Language, browser zoom, and system font size determine the rendered height.
+// Open at an initial size, then measure once and ask the background to fit it.
 describe("separate window auto-fit", () => {
   let container;
   let root;
@@ -238,7 +261,7 @@ describe("separate window auto-fit", () => {
     document.body.appendChild(container);
     root = createRoot(container);
 
-    // 先把 rAF 的回调攒起来:面板要先渲染出来,才能给它设 scrollHeight
+    // Queue rAF callbacks until the rendered panel has a mocked scrollHeight.
     rafCallbacks = [];
     originalRaf = window.requestAnimationFrame;
     window.requestAnimationFrame = (callback) => {
@@ -247,9 +270,9 @@ describe("separate window auto-fit", () => {
     };
 
     setWindowMetric("outerHeight", 800);
-    setWindowMetric("innerHeight", 760); // 标题栏 + 边框 = 40
+    setWindowMetric("innerHeight", 760); // Title bar and borders total 40px.
     setWindowMetric("outerWidth", 760);
-    setWindowMetric("innerWidth", 744); // 左右边框 = 16
+    setWindowMetric("innerWidth", 744); // Side borders total 16px.
   });
 
   afterEach(() => {
@@ -279,14 +302,14 @@ describe("separate window auto-fit", () => {
     expect(sendBgMsg).toHaveBeenCalledTimes(1);
     const [action, args] = sendBgMsg.mock.calls[0];
     expect(action).toBe(MSG_FIT_SEPARATE_WINDOW);
-    // 内容 612 + 窗口边框 40
+    // 612px of content plus 40px of window chrome.
     expect(args.height).toBe(652);
   });
 
   test("keeps width at the design cap rather than measuring it", async () => {
     await renderAndMeasure(612);
 
-    // 宽度不测:超过上限只会让一行文字长到扫不过来。加的是左右边框。
+    // Cap content width for readable lines, then add the side borders.
     expect(sendBgMsg.mock.calls[0][1].width).toBe(
       SEPARATE_WINDOW_CONTENT_WIDTH + 16
     );
@@ -429,7 +452,7 @@ describe("separate window auto-fit", () => {
   });
 
   test("waits for the settings before measuring", async () => {
-    // 设置没加载完时渲染的是固定高的加载态,这时候量会把窗口收成一条缝
+    // Measuring the fixed-height loading state would shrink the window too far.
     useSetting.mockReturnValue({ setting: null });
     await act(async () => {
       root.render(<Trantab isSeparate />);

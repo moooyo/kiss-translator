@@ -40,7 +40,7 @@ describe("tab messaging targets", () => {
   });
 
   test("targets frame zero when a top-frame response is required", async () => {
-    await sendTopFrameMsg("get-rule");
+    await expect(sendTopFrameMsg("get-rule")).resolves.toEqual({ ok: true });
 
     expect(mockSendMessage).toHaveBeenCalledWith(
       17,
@@ -59,8 +59,8 @@ describe("tab messaging targets", () => {
     });
   });
 
-  // 扩展重载后遗留在页面里的旧上下文会持续调用这几个入口，而 translator.js 的
-  // MSG_UPDATE_ICON 等调用点是即发即忘的，不吞掉就是一串 unhandled rejection。
+  // Stale content scripts can still call these helpers after an extension reload.
+  // Fire-and-forget callers must not produce unhandled rejection errors.
   test.each([
     ["sendBgMsg", () => sendBgMsg("update_icon", true)],
     ["getCurTab", () => getCurTab()],

@@ -1,0 +1,1627 @@
+{
+  "sourceCommit": "b35826388d157cece03e586fd84f26c121bf8e54",
+  "cssOverridesApplied": false,
+  "startedAt": "2026-09-11T07:55:03.994Z",
+  "cases": [
+    {
+      "name": "popup-light-400-dpr1",
+      "passed": true,
+      "viewport": {
+        "width": 400,
+        "height": 1100
+      },
+      "dpr": 1,
+      "theme": "light",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 230.25,
+            "width": 130,
+            "height": 14.9375,
+            "right": 158,
+            "bottom": 245.1875
+          },
+          "icon": {
+            "x": 134,
+            "y": 225.71875,
+            "width": 24,
+            "height": 24,
+            "right": 158,
+            "bottom": 249.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 230.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 134,
+                "bottom": 245.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 238,
+            "y": 230.25,
+            "width": 130,
+            "height": 26.859375,
+            "right": 368,
+            "bottom": 257.109375
+          },
+          "icon": {
+            "x": 344,
+            "y": 231.671875,
+            "width": 24,
+            "height": 24,
+            "right": 368,
+            "bottom": 255.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 238,
+                "y": 230.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 344,
+                "bottom": 245.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 238,
+                "y": 246.1875,
+                "width": 106,
+                "height": 10.921875,
+                "right": 344,
+                "bottom": 257.109375
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-light-400-dpr1.png"
+    },
+    {
+      "name": "popup-light-320-dpr1",
+      "passed": true,
+      "viewport": {
+        "width": 320,
+        "height": 1100
+      },
+      "dpr": 1,
+      "theme": "light",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 230.25,
+            "width": 92,
+            "height": 14.9375,
+            "right": 120,
+            "bottom": 245.1875
+          },
+          "icon": {
+            "x": 96,
+            "y": 225.71875,
+            "width": 24,
+            "height": 24,
+            "right": 120,
+            "bottom": 249.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 230.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 96,
+                "bottom": 245.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 83,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 200,
+            "y": 230.25,
+            "width": 92,
+            "height": 26.859375,
+            "right": 292,
+            "bottom": 257.109375
+          },
+          "icon": {
+            "x": 268,
+            "y": 231.671875,
+            "width": 24,
+            "height": 24,
+            "right": 292,
+            "bottom": 255.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 200,
+                "y": 230.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 268,
+                "bottom": 245.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 68,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 200,
+                "y": 246.1875,
+                "width": 68,
+                "height": 10.921875,
+                "right": 268,
+                "bottom": 257.109375
+              },
+              "clientWidth": 68,
+              "scrollWidth": 88,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-light-320-dpr1.png"
+    },
+    {
+      "name": "popup-dark-400-dpr1",
+      "passed": true,
+      "viewport": {
+        "width": 400,
+        "height": 1100
+      },
+      "dpr": 1,
+      "theme": "dark",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 230.25,
+            "width": 130,
+            "height": 14.9375,
+            "right": 158,
+            "bottom": 245.1875
+          },
+          "icon": {
+            "x": 134,
+            "y": 225.71875,
+            "width": 24,
+            "height": 24,
+            "right": 158,
+            "bottom": 249.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 230.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 134,
+                "bottom": 245.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 238,
+            "y": 230.25,
+            "width": 130,
+            "height": 26.859375,
+            "right": 368,
+            "bottom": 257.109375
+          },
+          "icon": {
+            "x": 344,
+            "y": 231.671875,
+            "width": 24,
+            "height": 24,
+            "right": 368,
+            "bottom": 255.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 238,
+                "y": 230.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 344,
+                "bottom": 245.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 238,
+                "y": 246.1875,
+                "width": 106,
+                "height": 10.921875,
+                "right": 344,
+                "bottom": 257.109375
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-dark-400-dpr1.png"
+    },
+    {
+      "name": "popup-dark-320-dpr1",
+      "passed": true,
+      "viewport": {
+        "width": 320,
+        "height": 1100
+      },
+      "dpr": 1,
+      "theme": "dark",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 230.25,
+            "width": 92,
+            "height": 14.9375,
+            "right": 120,
+            "bottom": 245.1875
+          },
+          "icon": {
+            "x": 96,
+            "y": 225.71875,
+            "width": 24,
+            "height": 24,
+            "right": 120,
+            "bottom": 249.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 230.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 96,
+                "bottom": 245.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 83,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 200,
+            "y": 230.25,
+            "width": 92,
+            "height": 26.859375,
+            "right": 292,
+            "bottom": 257.109375
+          },
+          "icon": {
+            "x": 268,
+            "y": 231.671875,
+            "width": 24,
+            "height": 24,
+            "right": 292,
+            "bottom": 255.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 200,
+                "y": 230.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 268,
+                "bottom": 245.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 68,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 200,
+                "y": 246.1875,
+                "width": 68,
+                "height": 10.921875,
+                "right": 268,
+                "bottom": 257.109375
+              },
+              "clientWidth": 68,
+              "scrollWidth": 88,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-dark-320-dpr1.png"
+    },
+    {
+      "name": "keyboard-focus-menu-escape-and-selection",
+      "passed": true,
+      "tabFocus": {
+        "text": "AutoDetect",
+        "value": "auto",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "borderRadius": "12px",
+        "padding": "0px 24px 0px 0px",
+        "fontSize": "13px",
+        "bounds": {
+          "x": 28,
+          "y": 230.25,
+          "width": 130,
+          "height": 14.9375,
+          "right": 158,
+          "bottom": 245.1875
+        },
+        "icon": {
+          "x": 134,
+          "y": 225.71875,
+          "width": 24,
+          "height": 24,
+          "right": 158,
+          "bottom": 249.71875
+        },
+        "shadowRoot": false,
+        "outline": {
+          "style": "solid",
+          "width": "3px",
+          "offset": "2px",
+          "color": "rgb(11, 87, 208)"
+        },
+        "focused": true,
+        "focusVisible": true,
+        "children": [
+          {
+            "text": "AutoDetect",
+            "bounds": {
+              "x": 28,
+              "y": 230.25,
+              "width": 106,
+              "height": 14.9375,
+              "right": 134,
+              "bottom": 245.1875
+            },
+            "clientWidth": 106,
+            "scrollWidth": 106,
+            "textWidth": 83.03125,
+            "overflow": "hidden",
+            "textOverflow": "ellipsis",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      },
+      "optionCount": 39,
+      "escapeRestoredFocus": true,
+      "selected": {
+        "text": "\u7e41\u9ad4\u4e2d\u6587Traditional Chinese",
+        "value": "zh-TW",
+        "overflowX": "visible",
+        "overflowY": "visible",
+        "borderRadius": "12px",
+        "padding": "0px 24px 0px 0px",
+        "fontSize": "13px",
+        "bounds": {
+          "x": 238,
+          "y": 230.25,
+          "width": 130,
+          "height": 26.859375,
+          "right": 368,
+          "bottom": 257.109375
+        },
+        "icon": {
+          "x": 344,
+          "y": 231.671875,
+          "width": 24,
+          "height": 24,
+          "right": 368,
+          "bottom": 255.671875
+        },
+        "shadowRoot": false,
+        "outline": {
+          "style": "none",
+          "width": "3px",
+          "offset": "2px",
+          "color": "rgb(31, 31, 31)"
+        },
+        "focused": true,
+        "focusVisible": false,
+        "children": [
+          {
+            "text": "\u7e41\u9ad4\u4e2d\u6587",
+            "bounds": {
+              "x": 238,
+              "y": 230.25,
+              "width": 106,
+              "height": 14.9375,
+              "right": 344,
+              "bottom": 245.1875
+            },
+            "clientWidth": 106,
+            "scrollWidth": 106,
+            "textWidth": 52,
+            "overflow": "hidden",
+            "textOverflow": "ellipsis",
+            "whiteSpace": "nowrap"
+          },
+          {
+            "text": "Traditional Chinese",
+            "bounds": {
+              "x": 238,
+              "y": 246.1875,
+              "width": 106,
+              "height": 10.921875,
+              "right": 344,
+              "bottom": 257.109375
+            },
+            "clientWidth": 106,
+            "scrollWidth": 106,
+            "textWidth": 90.4375,
+            "overflow": "hidden",
+            "textOverflow": "ellipsis",
+            "whiteSpace": "nowrap"
+          }
+        ]
+      },
+      "screenshot": "keyboard-focus.png"
+    },
+    {
+      "name": "long-language-narrow-ellipsis",
+      "passed": true,
+      "viewport": {
+        "width": 320,
+        "height": 1100
+      },
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 230.25,
+            "width": 92,
+            "height": 14.9375,
+            "right": 120,
+            "bottom": 245.1875
+          },
+          "icon": {
+            "x": 96,
+            "y": 225.71875,
+            "width": 24,
+            "height": 24,
+            "right": 120,
+            "bottom": 249.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 230.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 96,
+                "bottom": 245.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 83,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7e41\u9ad4\u4e2d\u6587Traditional Chinese",
+          "value": "zh-TW",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 200,
+            "y": 230.25,
+            "width": 92,
+            "height": 26.859375,
+            "right": 292,
+            "bottom": 257.109375
+          },
+          "icon": {
+            "x": 268,
+            "y": 231.671875,
+            "width": 24,
+            "height": 24,
+            "right": 292,
+            "bottom": 255.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "2px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": true,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7e41\u9ad4\u4e2d\u6587",
+              "bounds": {
+                "x": 200,
+                "y": 230.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 268,
+                "bottom": 245.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 68,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Traditional Chinese",
+              "bounds": {
+                "x": 200,
+                "y": 246.1875,
+                "width": 68,
+                "height": 10.921875,
+                "right": 268,
+                "bottom": 257.109375
+              },
+              "clientWidth": 68,
+              "scrollWidth": 90,
+              "textWidth": 90.4375,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "long-language-320.png"
+    },
+    {
+      "name": "text-translation-selector-preserves-original-clipping",
+      "passed": true,
+      "selects": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "hidden",
+          "overflowY": "hidden",
+          "borderRadius": "12px",
+          "padding": "7px 28px",
+          "fontSize": "11.5px",
+          "bounds": {
+            "x": 24.243711471557617,
+            "y": 323.6106872558594,
+            "width": 123.03199768066406,
+            "height": 26.577606201171875,
+            "right": 147.27570915222168,
+            "bottom": 350.18829345703125
+          },
+          "icon": {
+            "x": 117.98238372802734,
+            "y": 325.1821594238281,
+            "width": 23.434669494628906,
+            "height": 23.434661865234375,
+            "right": 141.41705322265625,
+            "bottom": 348.6168212890625
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 49.90589141845703,
+                "y": 330.44580078125,
+                "width": 71.722900390625,
+                "height": 12.907379150390625,
+                "right": 121.62879180908203,
+                "bottom": 343.3531799316406
+              },
+              "clientWidth": 73,
+              "scrollWidth": 73,
+              "textWidth": 71.722900390625,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "hidden",
+          "overflowY": "hidden",
+          "borderRadius": "12px",
+          "padding": "7px 28px",
+          "fontSize": "11.5px",
+          "bounds": {
+            "x": 172.72430419921875,
+            "y": 317.79779052734375,
+            "width": 123.03201293945312,
+            "height": 38.2186279296875,
+            "right": 295.7563171386719,
+            "bottom": 356.01641845703125
+          },
+          "icon": {
+            "x": 266.4629821777344,
+            "y": 325.1821594238281,
+            "width": 23.434661865234375,
+            "height": 23.434661865234375,
+            "right": 289.89764404296875,
+            "bottom": 348.6168212890625
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 211.78207397460938,
+                "y": 324.6329040527344,
+                "width": 44.916473388671875,
+                "height": 12.907379150390625,
+                "right": 256.69854736328125,
+                "bottom": 337.540283203125
+              },
+              "clientWidth": 46,
+              "scrollWidth": 46,
+              "textWidth": 44.916473388671875,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 191.24623107910156,
+                "y": 338.5167236328125,
+                "width": 86.00340270996094,
+                "height": 10.66461181640625,
+                "right": 277.2496337890625,
+                "bottom": 349.18133544921875
+              },
+              "clientWidth": 88,
+              "scrollWidth": 88,
+              "textWidth": 86.00340270996094,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "text-translation-direction.png"
+    },
+    {
+      "name": "page-popup-shadow-dom",
+      "passed": true,
+      "viewport": {
+        "width": 1040,
+        "height": 900
+      },
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 165,
+            "width": 112,
+            "height": 14.9375,
+            "right": 140,
+            "bottom": 179.9375
+          },
+          "icon": {
+            "x": 116,
+            "y": 160.46875,
+            "width": 24,
+            "height": 24,
+            "right": 140,
+            "bottom": 184.46875
+          },
+          "shadowRoot": true,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 165,
+                "width": 88,
+                "height": 14.9375,
+                "right": 116,
+                "bottom": 179.9375
+              },
+              "clientWidth": 88,
+              "scrollWidth": 88,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 220,
+            "y": 165,
+            "width": 112,
+            "height": 26.859375,
+            "right": 332,
+            "bottom": 191.859375
+          },
+          "icon": {
+            "x": 308,
+            "y": 166.421875,
+            "width": 24,
+            "height": 24,
+            "right": 332,
+            "bottom": 190.421875
+          },
+          "shadowRoot": true,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 220,
+                "y": 165,
+                "width": 88,
+                "height": 14.9375,
+                "right": 308,
+                "bottom": 179.9375
+              },
+              "clientWidth": 88,
+              "scrollWidth": 88,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 220,
+                "y": 180.9375,
+                "width": 88,
+                "height": 10.921875,
+                "right": 308,
+                "bottom": 191.859375
+              },
+              "clientWidth": 88,
+              "scrollWidth": 88,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "shadow-popup-language.png"
+    },
+    {
+      "name": "popup-light-400-dpr3",
+      "passed": true,
+      "viewport": {
+        "width": 400,
+        "height": 1100
+      },
+      "dpr": 3,
+      "theme": "light",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 231.25,
+            "width": 130,
+            "height": 14.9375,
+            "right": 158,
+            "bottom": 246.1875
+          },
+          "icon": {
+            "x": 134,
+            "y": 226.71875,
+            "width": 24,
+            "height": 24,
+            "right": 158,
+            "bottom": 250.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 231.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 134,
+                "bottom": 246.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 238,
+            "y": 231.25,
+            "width": 130,
+            "height": 26.859375,
+            "right": 368,
+            "bottom": 258.109375
+          },
+          "icon": {
+            "x": 344,
+            "y": 232.671875,
+            "width": 24,
+            "height": 24,
+            "right": 368,
+            "bottom": 256.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 238,
+                "y": 231.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 344,
+                "bottom": 246.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 238,
+                "y": 247.1875,
+                "width": 106,
+                "height": 10.921875,
+                "right": 344,
+                "bottom": 258.109375
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-light-400.png"
+    },
+    {
+      "name": "popup-light-320-dpr3",
+      "passed": true,
+      "viewport": {
+        "width": 320,
+        "height": 1100
+      },
+      "dpr": 3,
+      "theme": "light",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 231.25,
+            "width": 92,
+            "height": 14.9375,
+            "right": 120,
+            "bottom": 246.1875
+          },
+          "icon": {
+            "x": 96,
+            "y": 226.71875,
+            "width": 24,
+            "height": 24,
+            "right": 120,
+            "bottom": 250.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 231.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 96,
+                "bottom": 246.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 83,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 200,
+            "y": 231.25,
+            "width": 92,
+            "height": 26.859375,
+            "right": 292,
+            "bottom": 258.109375
+          },
+          "icon": {
+            "x": 268,
+            "y": 232.671875,
+            "width": 24,
+            "height": 24,
+            "right": 292,
+            "bottom": 256.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(31, 31, 31)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 200,
+                "y": 231.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 268,
+                "bottom": 246.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 68,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 200,
+                "y": 247.1875,
+                "width": 68,
+                "height": 10.921875,
+                "right": 268,
+                "bottom": 258.109375
+              },
+              "clientWidth": 68,
+              "scrollWidth": 88,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-light-320-dpr3.png"
+    },
+    {
+      "name": "popup-dark-400-dpr3",
+      "passed": true,
+      "viewport": {
+        "width": 400,
+        "height": 1100
+      },
+      "dpr": 3,
+      "theme": "dark",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 231.25,
+            "width": 130,
+            "height": 14.9375,
+            "right": 158,
+            "bottom": 246.1875
+          },
+          "icon": {
+            "x": 134,
+            "y": 226.71875,
+            "width": 24,
+            "height": 24,
+            "right": 158,
+            "bottom": 250.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 231.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 134,
+                "bottom": 246.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 238,
+            "y": 231.25,
+            "width": 130,
+            "height": 26.859375,
+            "right": 368,
+            "bottom": 258.109375
+          },
+          "icon": {
+            "x": 344,
+            "y": 232.671875,
+            "width": 24,
+            "height": 24,
+            "right": 368,
+            "bottom": 256.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 238,
+                "y": 231.25,
+                "width": 106,
+                "height": 14.9375,
+                "right": 344,
+                "bottom": 246.1875
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 238,
+                "y": 247.1875,
+                "width": 106,
+                "height": 10.921875,
+                "right": 344,
+                "bottom": 258.109375
+              },
+              "clientWidth": 106,
+              "scrollWidth": 106,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-dark-400-dpr3.png"
+    },
+    {
+      "name": "popup-dark-320-dpr3",
+      "passed": true,
+      "viewport": {
+        "width": 320,
+        "height": 1100
+      },
+      "dpr": 3,
+      "theme": "dark",
+      "cards": [
+        {
+          "text": "AutoDetect",
+          "value": "auto",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 28,
+            "y": 231.25,
+            "width": 92,
+            "height": 14.9375,
+            "right": 120,
+            "bottom": 246.1875
+          },
+          "icon": {
+            "x": 96,
+            "y": 226.71875,
+            "width": 24,
+            "height": 24,
+            "right": 120,
+            "bottom": 250.71875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "AutoDetect",
+              "bounds": {
+                "x": 28,
+                "y": 231.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 96,
+                "bottom": 246.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 83,
+              "textWidth": 83.03125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        },
+        {
+          "text": "\u7b80\u4f53\u4e2d\u6587Simplified Chinese",
+          "value": "zh-CN",
+          "overflowX": "visible",
+          "overflowY": "visible",
+          "borderRadius": "12px",
+          "padding": "0px 24px 0px 0px",
+          "fontSize": "13px",
+          "bounds": {
+            "x": 200,
+            "y": 231.25,
+            "width": 92,
+            "height": 26.859375,
+            "right": 292,
+            "bottom": 258.109375
+          },
+          "icon": {
+            "x": 268,
+            "y": 232.671875,
+            "width": 24,
+            "height": 24,
+            "right": 292,
+            "bottom": 256.671875
+          },
+          "shadowRoot": false,
+          "outline": {
+            "style": "none",
+            "width": "3px",
+            "offset": "0px",
+            "color": "rgb(227, 227, 227)"
+          },
+          "focused": false,
+          "focusVisible": false,
+          "children": [
+            {
+              "text": "\u7b80\u4f53\u4e2d\u6587",
+              "bounds": {
+                "x": 200,
+                "y": 231.25,
+                "width": 68,
+                "height": 14.9375,
+                "right": 268,
+                "bottom": 246.1875
+              },
+              "clientWidth": 68,
+              "scrollWidth": 68,
+              "textWidth": 52,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            },
+            {
+              "text": "Simplified Chinese",
+              "bounds": {
+                "x": 200,
+                "y": 247.1875,
+                "width": 68,
+                "height": 10.921875,
+                "right": 268,
+                "bottom": 258.109375
+              },
+              "clientWidth": 68,
+              "scrollWidth": 88,
+              "textWidth": 88.078125,
+              "overflow": "hidden",
+              "textOverflow": "ellipsis",
+              "whiteSpace": "nowrap"
+            }
+          ]
+        }
+      ],
+      "screenshot": "popup-dark-320-dpr3.png"
+    }
+  ],
+  "failures": [],
+  "browser": "153.0.8010.12",
+  "finishedAt": "2026-09-11T07:55:10.455Z",
+  "passed": true
+}

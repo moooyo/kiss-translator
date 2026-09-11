@@ -1,0 +1,114 @@
+{
+  "sourceCommit": "b35826388d157cece03e586fd84f26c121bf8e54",
+  "upstreamBaseCommit": "8e1be70a99d127f3cd731088231f3530317955e2",
+  "sourceRepository": "https://github.com/moooyo/kiss-translator-m3",
+  "pullRequest": "https://github.com/fishjar/kiss-translator/pull/1079",
+  "sourceArchiveSha256": "d9271b9564678f32a9a96febf63c3848ad7d342c06d5ec462ec19fc9cb50505a",
+  "sourceFilesVerifiedBeforeAndAfter": 463,
+  "trackedSourceUnchanged": true,
+  "sourceVersion": "2.0.32",
+  "buildEnvironment": "Remote ssh test-env; Linux; Node.js v22.23.2; CI=true",
+  "builtAtUtc": "2026-09-11T07:54:52.927427+00:00",
+  "dependencyManifestSha256": {
+    "package.json": "b4bc0c223034c12ce042fb1e113891cf276610ed4e36cc73f64418be512c0ccc",
+    "pnpm-lock.yaml": "4b5c2e8157ab95548644b3efe6748c02e02979d030ad0318bf2cb8f4af85ca7d"
+  },
+  "dependencySetup": "Reused the remote dependency cache from the verified merge build, including postcss-selector-parser 6.1.2. Source manifests and lockfile were unchanged.",
+  "builds": {
+    "chrome": {
+      "exitCode": 0,
+      "durationSeconds": 28.73,
+      "command": [
+        "/opt/node22/bin/node",
+        "node_modules/zx/build/cli.js",
+        "src/scripts/build-task.mjs",
+        "--target=chrome"
+      ]
+    },
+    "firefox": {
+      "exitCode": 0,
+      "durationSeconds": 16.92,
+      "command": [
+        "/opt/node22/bin/node",
+        "node_modules/zx/build/cli.js",
+        "src/scripts/build-task.mjs",
+        "--target=firefox"
+      ]
+    },
+    "web": {
+      "exitCode": 0,
+      "durationSeconds": 14.89,
+      "command": [
+        "/opt/node22/bin/node",
+        "node_modules/zx/build/cli.js",
+        "src/scripts/build-task.mjs",
+        "--target=web"
+      ]
+    }
+  },
+  "webBuildEnvironmentOverrides": {
+    "PUBLIC_URL": "./",
+    "REACT_APP_NAME": "KISS Translator Material 3 PR Preview",
+    "REACT_APP_NAME_CN": "KISS Translator Material 3 PR Preview",
+    "REACT_APP_HOMEPAGE": "https://github.com/moooyo/kiss-translator-m3",
+    "REACT_APP_RELEASES_URL": "https://github.com/moooyo/kiss-translator-m3/releases/tag/pr-material3-b3582638",
+    "REACT_APP_LOGOURL": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/images/logo192.png",
+    "REACT_APP_USERSCRIPT_DOWNLOADURL": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/kiss-translator.user.js",
+    "REACT_APP_USERSCRIPT_IOS_DOWNLOADURL": "https://github.com/moooyo/kiss-translator-m3/releases/tag/pr-material3-b3582638",
+    "REACT_APP_SITEURL": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638",
+    "REACT_APP_VERSION_URL": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/version.txt",
+    "REACT_APP_SITEURL_GITHUB": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638",
+    "REACT_APP_VERSION_URL_GITHUB": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/version.txt",
+    "REACT_APP_SITEURL_DEV": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638",
+    "REACT_APP_VERSION_URL_DEV": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/version.txt",
+    "REACT_APP_OPTIONSPAGE": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/options.html",
+    "REACT_APP_OPTIONSPAGE_GITHUB": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/options.html",
+    "REACT_APP_OPTIONSPAGE_DEV": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/options.html",
+    "REACT_APP_OPTIONSPAGE_LOCAL": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/options.html"
+  },
+  "tests": {
+    "numTotalTestSuites": 134,
+    "numPassedTestSuites": 132,
+    "numFailedTestSuites": 2,
+    "numTotalTests": 1986,
+    "numPassedTests": 1984,
+    "numFailedTests": 2,
+    "numPendingTests": 0
+  },
+  "upstreamBaselineTests": {
+    "numTotalTests": 10,
+    "numPassedTests": 8,
+    "numFailedTests": 2
+  },
+  "knownTestFailures": [
+    "src/libs/batchQueue.test.js: keeps batches serial by default",
+    "src/apis/trans.dict.test.js: falls back to default dictionary user prompt for old api settings"
+  ],
+  "runtimeAcceptance": "Focused remote Chromium checks used the actual build with a disposable profile: 400/320 widths, light/dark themes, DPR 1/3, long-label ellipsis, keyboard focus/menu/language selection, the page popup in Shadow DOM, and unchanged text-translation direction controls. Current language-control screenshots are included. This is not a full browser/provider acceptance pass; Firefox has build verification only.",
+  "focusedBrowserChecks": {
+    "passedCases": 12,
+    "failedCases": 0,
+    "caseNames": [
+      "popup-light-400-dpr1",
+      "popup-light-320-dpr1",
+      "popup-dark-400-dpr1",
+      "popup-dark-320-dpr1",
+      "keyboard-focus-menu-escape-and-selection",
+      "long-language-narrow-ellipsis",
+      "text-translation-selector-preserves-original-clipping",
+      "page-popup-shadow-dom",
+      "popup-light-400-dpr3",
+      "popup-light-320-dpr3",
+      "popup-dark-400-dpr3",
+      "popup-dark-320-dpr3"
+    ],
+    "cssOverridesApplied": false,
+    "reportUrl": "https://moooyo.github.io/kiss-translator-m3/previews/material3-b3582638/review/language-report.json"
+  },
+  "formatChecks": {
+    "files": [
+      "src/views/Popup/styles.js"
+    ],
+    "passed": true
+  }
+}

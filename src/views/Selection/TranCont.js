@@ -143,7 +143,6 @@ const translateBuiltinText = async (
  * @param {Array<Object>} props.transApis Available translation API settings.
  * @param {boolean} [props.simpleStyle=false] Whether to use the simple text layout.
  * @param {boolean} [props.isPlayground=false] Whether to render the full Playground result surface.
- * @param {boolean} [props.popupStyle=false] Whether to use the Popup M3 result card.
  * @param {number} [props.requestRevision=0] Explicit submission revision for retrying unchanged input.
  * @returns {JSX.Element|null} Result view for one translation provider.
  */
@@ -159,14 +158,12 @@ export default function TranCont({
   sourceDetectionPending = false,
   simpleStyle = false,
   isPlayground = false,
-  popupStyle = false,
   requestRevision = 0,
 }) {
   const i18n = useI18n();
   const [trText, setTrText] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [elapsedMs, setElapsedMs] = useState(null);
   const [attemptRevision, setAttemptRevision] = useState(requestRevision);
   const requestPendingRef = useRef(false);
 
@@ -202,7 +199,6 @@ export default function TranCont({
     requestPendingRef.current = true;
     const controller = new AbortController();
     const enableStreamRender = canRenderStream(apiSetting);
-    const startedAt = Date.now();
 
     /**
      * Synchronize streaming text from the translation queue with the output field.
@@ -234,7 +230,6 @@ export default function TranCont({
         setLoading(true);
         setTrText("");
         setError("");
-        setElapsedMs(null);
 
         const translate = (requestText, requestFromLang = fromLang) =>
           apiTranslate({
@@ -269,7 +264,6 @@ export default function TranCont({
                   parseLatex
                 )
           );
-          setElapsedMs(Date.now() - startedAt);
         }
       } catch (err) {
         if (err?.name === "AbortError") {
@@ -339,51 +333,11 @@ export default function TranCont({
     );
   }
 
-  if (popupStyle) {
-    return (
-      <article className="kt-popup-translation-result">
-        <header>
-          <strong>{apiSetting.apiName || apiSetting.apiSlug}</strong>
-          {elapsedMs !== null && <span>{elapsedMs}ms</span>}
-          <div>
-            {trText && (
-              <CopyBtn
-                text={trText}
-                title={i18n("copy")}
-                copiedLabel={i18n("copy_success", "Copied")}
-              />
-            )}
-            <BrowserTtsBtn
-              text={trText}
-              lang={toLang}
-              title={i18n("read_aloud")}
-            />
-          </div>
-        </header>
-        <div
-          className="kt-popup-translation-result__body"
-          aria-live="polite"
-          aria-busy={loading}
-        >
-          {loading && !trText ? (
-            <CircularProgress size={18} />
-          ) : error ? (
-            <span className="kt-popup-translation-result__error">{error}</span>
-          ) : trText ? (
-            <span>{trText}</span>
-          ) : !text?.trim() ? (
-            <span className="kt-popup-translation-result__empty">
-              {i18n("popup_enter_text")}
-            </span>
-          ) : null}
-        </div>
-      </article>
-    );
-  }
-
   return (
     <Box
-      className={isPlayground ? "kt-playground-translator__result" : undefined}
+      className={`kt-translation-result ${
+        isPlayground ? "kt-playground-translator__result" : ""
+      }`}
     >
       <TextField
         className={
@@ -402,6 +356,7 @@ export default function TranCont({
           className: "kt-resizable-textarea",
           style: { resize: "vertical" },
           "aria-busy": loading,
+          "aria-label": `${i18n("translated_text")} - ${apiSetting.apiName}`,
         }}
         placeholder={
           isPlayground && !text
@@ -464,6 +419,11 @@ export default function TranCont({
                   copiedLabel={i18n("copy_success", "Copied")}
                 />
               )}
+              <BrowserTtsBtn
+                text={trText}
+                lang={toLang}
+                title={i18n("read_aloud")}
+              />
             </Stack>
           ),
         }}

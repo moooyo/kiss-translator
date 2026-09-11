@@ -290,7 +290,7 @@ describe("Popup focus", () => {
     });
 
     expect(container.textContent).toContain("content");
-    expect(container.textContent).not.toContain("load_setting_err");
+    expect(container.textContent).not.toContain("popup_page_unavailable");
 
     act(() => root.unmount());
     container.remove();

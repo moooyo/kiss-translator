@@ -4087,6 +4087,15 @@ export const I18N = {
     tr: `Yükleniyor…`,
     vi: `Đang tải…`,
   },
+  popup_page_unavailable: {
+    zh: `当前页面暂时无法使用网页翻译，可能是浏览器特殊页面、扩展页面，或扩展没有访问此页面的权限。你仍可使用文本翻译。`,
+    en: `Page translation is currently unavailable. This may be a special browser page, an extension page, or a page the extension does not have permission to access. You can still use text translation.`,
+    zh_TW: `目前頁面暫時無法使用網頁翻譯，可能是瀏覽器特殊頁面、擴充功能頁面，或擴充功能沒有存取此頁面的權限。你仍可使用文字翻譯。`,
+    ja: `現在、このページではページ翻訳を利用できません。ブラウザーの特殊なページや拡張機能のページであるか、拡張機能にこのページへのアクセス権限がない可能性があります。テキスト翻訳は引き続き利用できます。`,
+    ko: `현재 이 페이지에서는 웹페이지 번역을 사용할 수 없습니다. 브라우저 특수 페이지나 확장 프로그램 페이지이거나, 확장 프로그램에 이 페이지에 대한 접근 권한이 없을 수 있습니다. 텍스트 번역은 계속 사용할 수 있습니다.`,
+    tr: `Şu anda bu sayfada sayfa çevirisi kullanılamıyor. Bu, özel bir tarayıcı sayfası veya uzantı sayfası olabilir ya da uzantının bu sayfaya erişim izni olmayabilir. Metin çevirisini kullanmaya devam edebilirsiniz.`,
+    vi: `Hiện chưa thể dịch trang này. Đây có thể là trang đặc biệt của trình duyệt, trang tiện ích mở rộng hoặc trang mà tiện ích chưa có quyền truy cập. Bạn vẫn có thể sử dụng tính năng dịch văn bản.`,
+  },
   popup_more_services: {
     zh: `更多翻译服务`,
     en: `More translation services`,

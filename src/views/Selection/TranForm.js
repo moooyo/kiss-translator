@@ -5,13 +5,11 @@ import Tab from "@mui/material/Tab";
 import MenuItem from "@mui/material/MenuItem";
 import Grid from "@mui/material/Grid";
 import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import DoneIcon from "@mui/icons-material/Done";
+import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import CircularProgress from "@mui/material/CircularProgress";
 import ContentPasteIcon from "@mui/icons-material/ContentPaste";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import TranslateRoundedIcon from "@mui/icons-material/TranslateRounded";
 import { useI18n } from "../../hooks/I18n";
 import {
   OPT_LANGS_FROM_REVERSED as OPT_LANGS_FROM,
@@ -45,7 +43,6 @@ import { isValidWord, isSingleChineseChar } from "../../libs/utils";
 import { kissLog } from "../../libs/log";
 import { tryDetectLang } from "../../libs/detect";
 import { isSameTranslationLanguage } from "../../libs/language";
-import CompactLanguageSelect from "../Popup/CompactLanguageSelect";
 import { createMenuKeyDownHandler } from "../../libs/menuFocus";
 import { isShadowHostMoving } from "../../libs/shadowHost";
 
@@ -99,7 +96,6 @@ export default function TranForm({
   autoFocusInput = true,
   syncExternalTextWhileEditing = false,
   playgroundConfigHeader = null,
-  popupStyle = false,
 }) {
   const i18n = useI18n();
   const dictionaryTabsId = useId();
@@ -110,7 +106,6 @@ export default function TranForm({
 
   // Track whether the focused input is being edited.
   const [editMode, setEditMode] = useState(false);
-  const [popupInputFocused, setPopupInputFocused] = useState(false);
   // Keep draft input until blur or submission updates the outer text state.
   const [editText, setEditText] = useState(text);
   const [requestRevision, setRequestRevision] = useState(0);
@@ -123,7 +118,6 @@ export default function TranForm({
   const [enDict, setEnDict] = useState(initEnDict);
   const [enSug, setEnSug] = useState(initEnSug);
   const [dictTab, setDictTab] = useState("default");
-  const [showPopupServices, setShowPopupServices] = useState(false);
   const hasUserChangedDictTabRef = useRef(false);
   // Bind detection results to their input and detector to ignore stale requests.
   const [detection, setDetection] = useState({
@@ -132,6 +126,7 @@ export default function TranForm({
     loading: false,
   });
   const inputRef = useRef(null);
+  const previousSimpleStyleRef = useRef(simpleStyle);
   const [isShadowMenu, setIsShadowMenu] = useState(false);
   const setInputRef = useCallback((input) => {
     inputRef.current = input;
@@ -168,7 +163,9 @@ export default function TranForm({
   // Focus the input at the end of its text when autofocus is enabled.
   // autoFocusInput may become true after asynchronous initialization.
   useEffect(() => {
-    if (!autoFocusInput) return;
+    const expanded = previousSimpleStyleRef.current && !simpleStyle;
+    previousSimpleStyleRef.current = simpleStyle;
+    if (simpleStyle || (!autoFocusInput && !expanded)) return;
 
     const input = inputRef.current;
     if (!input) return;
@@ -177,7 +174,7 @@ export default function TranForm({
 
     const len = input.value.length;
     input.setSelectionRange(len, len);
-  }, [autoFocusInput]);
+  }, [autoFocusInput, simpleStyle]);
 
   // Notify listeners, such as the vocabulary list, when selected or entered text is a valid English word.
   useEffect(() => {
@@ -349,8 +346,22 @@ export default function TranForm({
   };
 
   const submitTranslation = () => {
-    commitEditText();
+    // Keyboard submissions keep editing active while the input retains focus.
+    setText(editText.trim());
     // Explicit submissions retry unchanged text; ordinary blur commits do not.
+    setRequestRevision((revision) => revision + 1);
+  };
+
+  const submitAndBlur = (event) => {
+    event.stopPropagation();
+    const input = inputRef.current;
+    // A focused input commits through blur, including inside a shadow root.
+    // Otherwise commit directly so pointer submissions update the text once.
+    if (input && input.getRootNode().activeElement === input) {
+      input.blur();
+    } else {
+      commitEditText();
+    }
     setRequestRevision((revision) => revision + 1);
   };
 
@@ -371,220 +382,6 @@ export default function TranForm({
       requestRevision={requestRevision}
     />
   ));
-  const togglePopupService = (slug) => {
-    setHasUserChangedApiSlugs(true);
-    setApiSlugs((current) => {
-      const validCurrent = resolveActiveApiSlugs(current, optApis);
-      if (!validCurrent.includes(slug)) return [...validCurrent, slug];
-      return validCurrent.length > 1
-        ? validCurrent.filter((currentSlug) => currentSlug !== slug)
-        : validCurrent;
-    });
-  };
-
-  const popupDictionaryPanels = (
-    <>
-      {(defaultDictAvailable || aiDictAvailable) && (
-        <Box className="kt-popup-dictionary">
-          {aiDictAvailable ? (
-            <>
-              <Tabs
-                value={defaultDictAvailable ? dictTab : "ai"}
-                onChange={(_, value) => {
-                  hasUserChangedDictTabRef.current = true;
-                  setDictTab(value);
-                }}
-                variant="scrollable"
-                allowScrollButtonsMobile
-                aria-label={i18n("default_dict", "Dictionary")}
-                sx={{ minHeight: 36, mb: 1 }}
-              >
-                {defaultDictAvailable && (
-                  <Tab
-                    id={defaultDictionaryTabId}
-                    aria-controls={defaultDictionaryPanelId}
-                    value="default"
-                    label={i18n("default_dict", "Default dictionary")}
-                    sx={{ minHeight: 36, py: 0.5 }}
-                  />
-                )}
-                <Tab
-                  id={aiDictionaryTabId}
-                  aria-controls={aiDictionaryPanelId}
-                  value="ai"
-                  label={i18n("ai_dict", "AI dictionary")}
-                  sx={{ minHeight: 36, py: 0.5 }}
-                />
-              </Tabs>
-              {defaultDictAvailable && dictTab === "default" && (
-                <Box
-                  id={defaultDictionaryPanelId}
-                  role="tabpanel"
-                  aria-labelledby={defaultDictionaryTabId}
-                >
-                  {isWord && OPT_DICT_MAP.has(enDict) && (
-                    <DictCont text={text} enDict={enDict} />
-                  )}
-                  {isSingleChineseChar(text) && <Zdic text={text} />}
-                </Box>
-              )}
-              {(!defaultDictAvailable || dictTab === "ai") && (
-                <Box
-                  id={aiDictionaryPanelId}
-                  role="tabpanel"
-                  aria-labelledby={aiDictionaryTabId}
-                >
-                  <AiDictCont
-                    text={text}
-                    fromLang={fromLang}
-                    speechLang={fromLang === "auto" ? deLang : fromLang}
-                    toLang={realToLang}
-                    apiSetting={aiDictApiSetting}
-                    context={
-                      selectionContext && selectionContext.includes(text)
-                        ? selectionContext
-                        : ""
-                    }
-                  />
-                </Box>
-              )}
-            </>
-          ) : (
-            <>
-              {isWord && OPT_DICT_MAP.has(enDict) && (
-                <DictCont text={text} enDict={enDict} />
-              )}
-              {isSingleChineseChar(text) && <Zdic text={text} />}
-            </>
-          )}
-        </Box>
-      )}
-
-      {isWord && OPT_SUG_MAP.has(enSug) && (
-        <Box className="kt-popup-dictionary">
-          <SugCont text={text} enSug={enSug} />
-        </Box>
-      )}
-    </>
-  );
-
-  if (popupStyle) {
-    return (
-      <div className="kt-popup-translation-form">
-        <div
-          className={`kt-popup-translation-input ${
-            popupInputFocused ? "kt-popup-translation-input--focused" : ""
-          }`}
-        >
-          <div className="kt-popup-translation-textarea">
-            <textarea
-              className="kt-resizable-textarea"
-              ref={setInputRef}
-              value={editText}
-              aria-label={i18n("original_text")}
-              placeholder={i18n("original_text")}
-              onFocus={() => setPopupInputFocused(true)}
-              onBlur={() => setPopupInputFocused(false)}
-              onChange={(event) => setEditText(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.nativeEvent.isComposing) return;
-                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-                  event.preventDefault();
-                  if (!event.repeat) submitTranslation();
-                }
-              }}
-            />
-          </div>
-          <div className="kt-popup-translation-input__footer">
-            <Stack direction="row" alignItems="center" spacing={0.5}>
-              <span>{editText.length}</span>
-              {!editText.trim() && (
-                <IconButton
-                  size="small"
-                  onClick={handlePaste}
-                  title={i18n("paste")}
-                  aria-label={i18n("paste")}
-                >
-                  <ContentPasteIcon fontSize="inherit" />
-                </IconButton>
-              )}
-            </Stack>
-            <Button
-              variant="contained"
-              disabled={!editText.trim()}
-              startIcon={<TranslateRoundedIcon />}
-              onClick={submitTranslation}
-            >
-              {i18n("translate")}
-            </Button>
-          </div>
-        </div>
-
-        <div className="kt-popup-translation-direction">
-          <CompactLanguageSelect
-            value={fromLang}
-            ariaLabel={i18n("from_lang")}
-            options={OPT_LANGS_FROM}
-            onChange={(event) => setFromLang(event.target.value)}
-          />
-          <span aria-hidden="true">→</span>
-          <CompactLanguageSelect
-            value={toLang}
-            ariaLabel={i18n("to_lang")}
-            options={OPT_LANGS_TO}
-            onChange={(event) => setToLang(event.target.value)}
-          />
-        </div>
-
-        <div className="kt-popup-translation-results">
-          {activeApiSlugs.map((slug) => (
-            <TranCont
-              key={slug}
-              text={translationText}
-              fromLang={fromLang}
-              toLang={realToLang}
-              apiSlug={slug}
-              transApis={transApis}
-              translateVariants={translateVariants}
-              parseLatex={parseLatex}
-              detectedLang={deLang}
-              sourceDetectionPending={fromLang === "auto" && deLoading}
-              requestRevision={requestRevision}
-              popupStyle
-            />
-          ))}
-        </div>
-
-        <button
-          type="button"
-          className="kt-popup-translation-compare"
-          aria-expanded={showPopupServices}
-          onClick={() => setShowPopupServices((current) => !current)}
-        >
-          {i18n("popup_compare_services")}
-          <ExpandMoreRoundedIcon />
-        </button>
-
-        {showPopupServices && (
-          <div className="kt-popup-translation-services">
-            {optApis.map((api) => (
-              <button
-                type="button"
-                aria-pressed={activeApiSlugs.includes(api.key)}
-                onClick={() => togglePopupService(api.key)}
-                key={api.key}
-              >
-                {api.name}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {popupDictionaryPanels}
-      </div>
-    );
-  }
-
   return (
     <Stack
       className={isPlaygound ? "kt-playground-translator" : undefined}
@@ -598,7 +395,11 @@ export default function TranForm({
             {isPlaygound && playgroundConfigHeader}
             {/* Service and language settings grid. */}
             <Grid
-              className={isPlaygound ? "kt-playground-config__grid" : undefined}
+              className={
+                isPlaygound
+                  ? "kt-playground-config__grid"
+                  : "kt-translation-config"
+              }
               container
               spacing={2}
               columns={12}
@@ -606,7 +407,9 @@ export default function TranForm({
               {/* Select multiple translation engines to compare their results. */}
               <Grid
                 className={
-                  isPlaygound ? "kt-playground-config__service" : undefined
+                  isPlaygound
+                    ? "kt-playground-config__service"
+                    : "kt-translation-config__service"
                 }
                 item
                 xs={xs}
@@ -636,7 +439,14 @@ export default function TranForm({
                 </TextField>
               </Grid>
               {/* Source language. */}
-              <Grid item xs={xs} md={md}>
+              <Grid
+                className={
+                  isPlaygound ? undefined : "kt-translation-config__language"
+                }
+                item
+                xs={xs}
+                md={md}
+              >
                 <TextField
                   select
                   SelectProps={{ MenuProps: selectMenuProps }}
@@ -657,7 +467,14 @@ export default function TranForm({
                 </TextField>
               </Grid>
               {/* Target language. */}
-              <Grid item xs={xs} md={md}>
+              <Grid
+                className={
+                  isPlaygound ? undefined : "kt-translation-config__language"
+                }
+                item
+                xs={xs}
+                md={md}
+              >
                 <TextField
                   select
                   SelectProps={{ MenuProps: selectMenuProps }}
@@ -816,11 +633,11 @@ export default function TranForm({
             }
           >
             <TextField
-              className={
+              className={`kt-translation-source ${
                 isPlaygound
                   ? "kt-resizable-text-field kt-translation-text-field kt-translation-text-field--source"
                   : "kt-resizable-text-field"
-              }
+              }`}
               size="small"
               label={i18n("original_text")}
               InputLabelProps={isPlaygound ? { shrink: true } : undefined}
@@ -852,6 +669,13 @@ export default function TranForm({
                 if (isShadowHostMoving(event.target)) return;
                 commitEditText();
               }}
+              onKeyDown={(event) => {
+                if (event.nativeEvent.isComposing) return;
+                if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  if (!event.repeat && editText.trim()) submitTranslation();
+                }
+              }}
               InputProps={{
                 endAdornment: (
                   <Stack
@@ -876,20 +700,9 @@ export default function TranForm({
                       <IconButton
                         size="small"
                         onPointerDown={(e) => e.preventDefault()}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const input = inputRef.current;
-                          // Read focus within the input's root, including shadow roots.
-                          if (
-                            input &&
-                            input.getRootNode().activeElement === input
-                          ) {
-                            input.blur();
-                          } else {
-                            commitEditText();
-                          }
-                        }}
+                        onClick={submitAndBlur}
                         title={i18n("submit")}
+                        aria-label={i18n("submit")}
                       >
                         <DoneIcon fontSize="inherit" />
                       </IconButton>
@@ -908,6 +721,17 @@ export default function TranForm({
                         title={i18n("paste")}
                       >
                         <ContentPasteIcon fontSize="inherit" />
+                      </IconButton>
+                    )}
+                    {text && editText.trim() === text && (
+                      <IconButton
+                        size="small"
+                        onPointerDown={(event) => event.preventDefault()}
+                        onClick={submitAndBlur}
+                        title={i18n("translate")}
+                        aria-label={i18n("translate")}
+                      >
+                        <ReplayRoundedIcon fontSize="inherit" />
                       </IconButton>
                     )}
                   </Stack>

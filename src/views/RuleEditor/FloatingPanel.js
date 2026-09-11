@@ -1,7 +1,10 @@
 import { useLayoutEffect, useRef, useState } from "react";
-import { Box, ButtonBase, Paper } from "@mui/material";
+import { Box, ButtonBase, Paper, Portal, Typography } from "@mui/material";
 import DragIndicatorIcon from "@mui/icons-material/DragIndicator";
 import { limitNumber } from "../../libs/utils";
+import { getEditorPortalContainer } from "./portal";
+
+const HEADER_HEIGHT = 56;
 
 // Shared by the editor and inspector; position is independent of page elements.
 export default function FloatingPanel({
@@ -10,6 +13,8 @@ export default function FloatingPanel({
   actions,
   children,
   footer,
+  notification,
+  notificationContainer,
   position,
   onMove,
   onMoveEnd,
@@ -80,132 +85,172 @@ export default function FloatingPanel({
     lastMove.current = null;
   };
   return (
-    <Paper
-      ref={panel}
-      component="aside"
-      aria-label={title}
-      sx={{
-        position: "fixed",
-        zIndex: 2147483647,
-        left,
-        top,
-        width: panelWidth,
-        maxHeight: viewport.h - margin * 2,
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden",
-        border: "1px solid",
-        borderColor: "divider",
-        borderRadius: 2,
-        boxShadow: "0 12px 48px #0003",
-      }}
-    >
-      <Box
-        component="header"
+    <>
+      <Paper
+        ref={panel}
+        component="aside"
+        aria-label={title}
+        elevation={0}
         sx={{
+          position: "fixed",
+          zIndex: 2147483647,
+          left,
+          top,
+          width: panelWidth,
+          maxHeight: viewport.h - margin * 2,
+          boxSizing: "border-box",
           display: "flex",
-          alignItems: "center",
-          px: 1,
-          borderBottom: "1px solid",
-          borderColor: "divider",
-          flexShrink: 0,
+          flexDirection: "column",
+          overflow: "hidden",
+          border: "1px solid",
+          borderColor: "var(--kt-linev)",
+          borderRadius: "20px",
+          bgcolor: "var(--kt-sf0)",
+          color: "var(--kt-on)",
+          boxShadow: "var(--kt-shadow-2)",
         }}
       >
-        <ButtonBase
-          data-rule-editor-move=""
-          aria-label={moveLabel}
-          title={moveLabel}
-          disableRipple
-          onPointerDown={(event) => {
-            if (event.button !== 0 || event.isPrimary === false) return;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            origin.current = {
-              x: left,
-              y: top,
-              clientX: event.clientX,
-              clientY: event.clientY,
-            };
-          }}
-          onPointerMove={(event) => {
-            if (!origin.current) return;
-            move(
-              origin.current.x + event.clientX - origin.current.clientX,
-              origin.current.y + event.clientY - origin.current.clientY
-            );
-          }}
-          onPointerUp={(event) => {
-            stopDrag();
-            if (event.currentTarget.hasPointerCapture(event.pointerId))
-              event.currentTarget.releasePointerCapture(event.pointerId);
-          }}
-          onPointerCancel={stopDrag}
-          onLostPointerCapture={stopDrag}
-          onKeyDown={(event) => {
-            const directions = {
-              ArrowLeft: [-1, 0],
-              ArrowRight: [1, 0],
-              ArrowUp: [0, -1],
-              ArrowDown: [0, 1],
-            };
-            const direction = directions[event.key];
-            if (!direction) return;
-            event.preventDefault();
-            onMoveEnd?.(
-              move(left + direction[0] * 24, top + direction[1] * 24)
-            );
-          }}
+        <Box
+          component="header"
           sx={{
-            flex: 1,
-            minWidth: 0,
-            justifyContent: "start",
-            py: 1.75,
-            gap: 0.5,
-            cursor: "grab",
-            touchAction: "none",
-            userSelect: "none",
-            fontSize: 18,
-            fontWeight: 700,
-            "&:active": { cursor: "grabbing" },
-            "&.Mui-focusVisible": {
-              outline: "2px solid",
-              outlineColor: "primary.main",
-            },
+            display: "flex",
+            alignItems: "center",
+            minHeight: HEADER_HEIGHT,
+            px: 2,
+            gap: 1,
+            bgcolor: "var(--kt-sf1)",
+            borderBottom: "1px solid",
+            borderColor: "var(--kt-linev)",
+            flexShrink: 0,
           }}
         >
-          <DragIndicatorIcon sx={{ fontSize: 20, color: "text.secondary" }} />
-          {title}
-        </ButtonBase>
-        {actions}
-      </Box>
-      <Box
-        sx={{
-          overflowY: "auto",
-          overscrollBehavior: "contain",
-          minHeight: 0,
-          p: 2,
-          ...bodySx,
-        }}
-      >
-        {children}
-      </Box>
-      {footer && (
+          <ButtonBase
+            data-rule-editor-move=""
+            aria-label={moveLabel}
+            title={moveLabel}
+            disableRipple
+            onPointerDown={(event) => {
+              if (event.button !== 0 || event.isPrimary === false) return;
+              event.currentTarget.setPointerCapture(event.pointerId);
+              origin.current = {
+                x: left,
+                y: top,
+                clientX: event.clientX,
+                clientY: event.clientY,
+              };
+            }}
+            onPointerMove={(event) => {
+              if (!origin.current) return;
+              move(
+                origin.current.x + event.clientX - origin.current.clientX,
+                origin.current.y + event.clientY - origin.current.clientY
+              );
+            }}
+            onPointerUp={(event) => {
+              stopDrag();
+              if (event.currentTarget.hasPointerCapture(event.pointerId))
+                event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onPointerCancel={stopDrag}
+            onLostPointerCapture={stopDrag}
+            onKeyDown={(event) => {
+              const directions = {
+                ArrowLeft: [-1, 0],
+                ArrowRight: [1, 0],
+                ArrowUp: [0, -1],
+                ArrowDown: [0, 1],
+              };
+              const direction = directions[event.key];
+              if (!direction) return;
+              event.preventDefault();
+              onMoveEnd?.(
+                move(left + direction[0] * 24, top + direction[1] * 24)
+              );
+            }}
+            sx={{
+              flex: 1,
+              minWidth: 0,
+              minHeight: 40,
+              justifyContent: "flex-start",
+              px: 0.5,
+              py: 1,
+              ml: -0.5,
+              gap: 1,
+              borderRadius: "8px",
+              cursor: "grab",
+              touchAction: "none",
+              userSelect: "none",
+              "&:active": { cursor: "grabbing" },
+              "&&.Mui-focusVisible": {
+                outline: "none",
+                boxShadow: "inset 0 0 0 3px var(--kt-pri)",
+              },
+            }}
+          >
+            <DragIndicatorIcon
+              sx={{ fontSize: 20, flexShrink: 0, color: "var(--kt-onv)" }}
+            />
+            <Typography
+              component="span"
+              noWrap
+              sx={{ fontSize: 16, lineHeight: 1.5, fontWeight: 650 }}
+            >
+              {title}
+            </Typography>
+          </ButtonBase>
+          {actions}
+        </Box>
         <Box
-          component="footer"
           sx={{
-            p: 2,
-            pt: 1.5,
-            borderTop: "1px solid",
-            borderColor: "divider",
-            flexShrink: 0,
-            maxHeight: viewport.h * 0.55,
             overflowY: "auto",
             overscrollBehavior: "contain",
+            minHeight: 0,
+            p: 2,
+            ...bodySx,
           }}
         >
-          {footer}
+          {children}
         </Box>
+        {footer && (
+          <Box
+            component="footer"
+            sx={{
+              p: 2,
+              bgcolor: "var(--kt-sf1)",
+              borderTop: "1px solid",
+              borderColor: "var(--kt-linev)",
+              flexShrink: 0,
+              maxHeight: viewport.h * 0.55,
+              overflowY: "auto",
+              overscrollBehavior: "contain",
+            }}
+          >
+            {footer}
+          </Box>
+        )}
+      </Paper>
+      {notification && (
+        <Portal
+          container={
+            notificationContainer ||
+            (() => getEditorPortalContainer(panel.current))
+          }
+        >
+          <Box
+            data-rule-editor-notification=""
+            sx={{
+              position: "fixed",
+              zIndex: 2147483647,
+              left: left + 16,
+              top: top + HEADER_HEIGHT + 12,
+              width: Math.max(0, panelWidth - 32),
+              pointerEvents: "none",
+            }}
+          >
+            {notification}
+          </Box>
+        </Portal>
       )}
-    </Paper>
+    </>
   );
 }
